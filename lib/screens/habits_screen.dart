@@ -360,10 +360,18 @@ class _HabitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = context.watch<LanguageProvider>().strings;
+    final habitProvider = context.watch<HabitProvider>();
     final color = Color(habit.color);
-    final valueText = habit.unit == 'hrs'
-        ? habit.current.toStringAsFixed(1)
-        : habit.current.round().toString();
+    // Habit "phone" hiển thị số giờ dùng THẬT (không bị clamp về target*2
+    // như habit.current) — nhất quán với thẻ "Sử dụng theo ứng dụng" và điểm
+    // sức khỏe mắt, đều dùng chung totalScreenTimeHoursToday.
+    final displayCurrent = habit.id == 'phone' ? habitProvider.totalScreenTimeHoursToday : habit.current;
+    final valueText = habit.unit == 'hrs' ? displayCurrent.toStringAsFixed(1) : displayCurrent.round().toString();
+    // Vượt mục tiêu dùng điện thoại -> đổi thanh tiến độ + số liệu sang màu
+    // đỏ cảnh báo (thay vì làm thanh vơi đi, giữ nguyên đầy 100% để không
+    // mất thông tin trực quan, chỉ đổi MÀU để báo hiệu nguy hiểm).
+    final isPhoneOverTarget = habit.id == 'phone' && displayCurrent > habit.target;
+    final barColor = isPhoneOverTarget ? AppColors.error : color;
     final targetText = habit.unit == 'hrs'
         ? habit.target.toStringAsFixed(0)
         : habit.target.round().toString();
@@ -399,14 +407,7 @@ class _HabitCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: habit.isLive ? AppColors.success : AppColors.textMuted,
-                          ),
-                        ),
+                        _HabitAlertIndicator(level: habitProvider.alertLevelFor(habit)),
                       ],
                     ),
                     Text(
@@ -424,7 +425,7 @@ class _HabitCard extends StatelessWidget {
                   Text(
                     valueText,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: color,
+                          color: barColor,
                           fontWeight: FontWeight.w800,
                         ),
                   ),
@@ -441,7 +442,7 @@ class _HabitCard extends StatelessWidget {
           const SizedBox(height: 12),
           AnimatedProgressBar(
             progress: habit.progress,
-            color: color,
+            color: barColor,
           ),
           const SizedBox(height: 8),
           Row(
@@ -452,16 +453,18 @@ class _HabitCard extends StatelessWidget {
                     ? '${(habit.progress * 100).round()}% mục tiêu ngày'
                     : '${(habit.progress * 100).round()}% of daily goal',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
+                      color: barColor,
                       fontWeight: FontWeight.w700,
                     ),
               ),
               Text(
-                _statusLabel(habit, strings),
+                _statusLabel(habit, strings, isPhoneOverTarget: isPhoneOverTarget),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: habit.isLive
-                          ? (habit.progress >= 0.8 ? AppColors.success : AppColors.textMuted)
-                          : AppColors.warning,
+                      color: isPhoneOverTarget
+                          ? AppColors.error
+                          : habit.isLive
+                              ? (habit.progress >= 0.8 ? AppColors.success : AppColors.textMuted)
+                              : AppColors.warning,
                       fontWeight: FontWeight.w600,
                     ),
               ),
@@ -472,9 +475,15 @@ class _HabitCard extends StatelessWidget {
     );
   }
 
-  String _statusLabel(HabitData habit, AppStrings strings) {
+  String _statusLabel(HabitData habit, AppStrings strings, {bool isPhoneOverTarget = false}) {
     if (!habit.isLive) {
       return strings.vi ? 'Chưa có nguồn dữ liệu' : 'No data source yet';
+    }
+    // Vượt mục tiêu dùng điện thoại: KHÔNG được hiện "Đã đạt mục tiêu!" (nghe
+    // như khen) dù thanh vẫn đang đầy 100% — phải nói rõ đây là VƯỢT, không
+    // phải ĐẠT, khớp với màu đỏ cảnh báo vừa đổi ở thanh tiến độ.
+    if (isPhoneOverTarget) {
+      return strings.vi ? 'Đã vượt mục tiêu!' : 'Over target!';
     }
     if (habit.progress >= 1) {
       return strings.vi ? 'Đã đạt mục tiêu!' : 'Goal reached!';
@@ -483,6 +492,32 @@ class _HabitCard extends StatelessWidget {
       return strings.vi ? 'Sắp đạt mục tiêu!' : 'Almost there!';
     }
     return strings.vi ? 'Đang theo dõi...' : 'Tracking...';
+  }
+}
+
+// Thay cho chấm tròn trung tính cũ (chỉ nói "có dữ liệu hay không") — hiện
+// dấu "!" (cảnh báo) khi chỉ số đang ở hướng XẤU cho sức khỏe mắt, hoặc dấu
+// ✓ (tốt) khi đang ở hướng TỐT, tuỳ theo HabitAlertLevel đã tính theo đúng
+// chiều riêng của từng loại habit (xem HabitProvider.alertLevelFor).
+class _HabitAlertIndicator extends StatelessWidget {
+  const _HabitAlertIndicator({required this.level});
+
+  final HabitAlertLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (level) {
+      case HabitAlertLevel.warning:
+        return const Icon(Icons.error_rounded, size: 15, color: AppColors.warning);
+      case HabitAlertLevel.good:
+        return const Icon(Icons.check_circle_rounded, size: 15, color: AppColors.success);
+      case HabitAlertLevel.none:
+        return Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.textMuted),
+        );
+    }
   }
 }
 

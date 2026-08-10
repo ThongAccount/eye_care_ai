@@ -482,9 +482,9 @@ class AppStrings {
       case 'sleep':
         return vi ? 'Health Connect hoặc nhập tay' : 'Health Connect or manual entry';
       case 'outdoor':
-        return vi ? 'Định vị GPS' : 'GPS location';
+        return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':
-        return vi ? 'Nhận diện ánh nhìn qua camera trước' : 'Front camera gaze detection';
+        return vi ? 'Nghỉ mắt trong ngày' : 'Eye breaks today';
       default:
         return '';
     }

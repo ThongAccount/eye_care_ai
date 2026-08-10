@@ -209,18 +209,20 @@ class DeviceDataService {
     }
   }
 
-  // ---------------- Outdoor Time: chỉ dùng GPS ----------------
-  // Trước đây tính năng này kết hợp thêm cảm biến ánh sáng (lux) với GPS để
-  // đoán "đang ở ngoài trời". Theo yêu cầu, đã bỏ hẳn phần cảm biến ánh sáng
-  // cho tính năng NÀY (cảm biến ánh sáng vẫn còn dùng riêng cho tính năng
-  // "cảnh báo dùng điện thoại trong bóng tối" ở phần dưới) — giờ Outdoor Time
-  // CHỈ dựa vào GPS:
-  //   - Có fix vị trí với độ chính xác tốt (accuracy <= ~30m, lấy nhanh
-  //     trong vài giây) -> coi là đang ở ngoài trời (ăng-ten GPS "nhìn thấy
-  //     trời" thường chỉ xảy ra khi không bị mái/tường nhà che chắn).
-  //   - Không lấy được fix / độ chính xác kém / thiếu quyền vị trí -> coi là
-  //     trong nhà, không cộng dồn.
+  // ---------------- Outdoor Time: GPS + cảm biến ánh sáng (lux) ----------------
+  // CHỈ dùng GPS (như trước) không đáng tin: điện thoại đời mới dùng
+  // A-GPS/định vị qua WiFi có thể cho fix "độ chính xác tốt" (<30m) ngay cả
+  // khi đang ở TRONG NHÀ (gần cửa sổ, nhà khung gỗ/mái tôn mỏng, hoặc nhờ
+  // WiFi xung quanh định vị hộ) — nghĩa là user đi lại trong nhà vẫn có thể
+  // bị tính nhầm là "ngoài trời". Cách đáng tin hơn: kết hợp thêm cảm biến
+  // ánh sáng — ánh sáng ban ngày ngoài trời (kể cả trời âm u) thường
+  // >= 1000 lux, trong khi đèn trong nhà hiếm khi vượt quá vài trăm lux.
+  // Chỉ tính là "ngoài trời" khi CẢ HAI điều kiện cùng đúng: GPS fix tốt
+  // VÀ ánh sáng đủ mạnh — giảm mạnh trường hợp báo nhầm theo cả 2 chiều
+  // (không chỉ GPS bị lừa bởi WiFi indoor, mà lux đơn lẻ cũng có thể bị lừa
+  // bởi ánh nắng chiếu qua cửa sổ dù đang ngồi trong nhà).
   static const _kGpsGoodAccuracyMeters = 30.0; // độ chính xác GPS coi là "tốt"
+  static const _kOutdoorLuxThreshold = 1000; // lux tối thiểu coi là "ánh sáng ngoài trời"
 
   Future<double> getOutdoorMinutesToday() async {
     final prefs = await SharedPreferences.getInstance();
@@ -243,17 +245,52 @@ class DeviceDataService {
         final current = prefs.getDouble(_kOutdoorMinutesKey) ?? 0;
         await prefs.setDouble(_kOutdoorMinutesKey, current + elapsedMinutes);
       }
-      // isOutdoor == false: trong nhà, không cộng dồn.
-      // isOutdoor == null: không đọc được lux, bỏ qua mẫu này hoàn toàn.
+      // isOutdoor == false: trong nhà (thiếu GPS tốt, hoặc đủ GPS nhưng
+      // ánh sáng không giống ngoài trời), không cộng dồn.
+      // isOutdoor == null: không đọc được cảm biến ánh sáng (máy không có
+      // cảm biến, hoặc iOS không hỗ trợ) -> bỏ qua mẫu này hoàn toàn thay vì
+      // đoán mò chỉ bằng GPS.
     });
   }
 
-  // Trả về true (ngoài trời) / false (trong nhà) / null (không đủ dữ liệu
-  // cảm biến ánh sáng để kết luận cho mẫu này).
+  // Trả về true (ngoài trời) / false (trong nhà) / null (không đọc được
+  // cảm biến ánh sáng để kết luận cho mẫu này — ví dụ máy không có cảm biến).
   Future<bool?> _detectOutdoorSample() async {
-    // Đã bỏ cảm biến ánh sáng (lux) theo yêu cầu — giờ CHỈ dùng GPS: có fix
-    // vị trí độ chính xác tốt -> coi là ngoài trời, ngược lại -> trong nhà.
+    final lux = await _readAmbientLuxOnce();
+    if (lux == null) return null; // Không có cảm biến ánh sáng -> không đủ căn cứ, bỏ qua mẫu.
+    if (lux < _kOutdoorLuxThreshold) return false; // Ánh sáng kiểu trong nhà -> chắc chắn không phải ngoài trời.
+    // Ánh sáng đủ mạnh RỒI mới kiểm tra thêm GPS (đỡ tốn pin hơn: GPS luôn
+    // là bước "xin fix vị trí" tốn thời gian/pin hơn hẳn so với đọc lux).
     return _hasGoodGpsFix();
+  }
+
+  // Đọc đúng 1 mẫu lux rồi hủy lắng nghe ngay — khác với
+  // startDarkRoomMonitoring() ở dưới vốn lắng nghe LIÊN TỤC cho mục đích
+  // khác (cảnh báo dùng điện thoại trong bóng tối); ở đây mỗi 2 phút chỉ cần
+  // 1 lần đọc tức thời.
+  Future<int?> _readAmbientLuxOnce({Duration timeout = const Duration(seconds: 3)}) async {
+    if (!Platform.isAndroid) return null; // light sensor not available on iOS
+    final completer = Completer<int?>();
+    StreamSubscription<int>? sub;
+    Timer? timer;
+    void finish(int? value) {
+      if (completer.isCompleted) return;
+      completer.complete(value);
+      timer?.cancel();
+      sub?.cancel();
+    }
+
+    try {
+      sub = Light().lightSensorStream.listen(
+            (lux) => finish(lux),
+            onError: (_) => finish(null),
+            cancelOnError: true,
+          );
+    } catch (_) {
+      return null;
+    }
+    timer = Timer(timeout, () => finish(null));
+    return completer.future;
   }
 
   // Kiểm tra quyền vị trí đã được cấp hay chưa (không tự xin quyền ở đây —
