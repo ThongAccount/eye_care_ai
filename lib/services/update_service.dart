@@ -34,7 +34,7 @@ class UpdateService {
 
   // TODO: điền đúng chủ repo GitHub đang publish APK (xem link repo trên
   // GitHub của bạn, dạng https://github.com/<owner>/<repo>).
-  static const String githubOwner = 'ThongAccount';
+  static const String githubOwner = 'Supertime1236';
   static const String githubRepo = 'eye_care_ai';
 
   static const String _latestReleaseUrl =
