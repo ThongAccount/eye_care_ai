@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/app_icon.dart';
 import '../utils/permission_helper.dart';
+import 'app_lock_overlay.dart';
 
 import '../models/app_strings.dart';
 import '../providers/accent_color_provider.dart';
@@ -331,6 +332,16 @@ class SettingsScreen extends StatelessWidget {
                       valueLabel: settings.guardianEmail.isNotEmpty ? settings.guardianEmail : strings.guardianEmailAdd,
                       valueOnNewLine: true,
                       onTap: () => _showGuardianEmailDialog(context, settings, strings),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _MenuItem(
+                      icon: '🔒',
+                      title: strings.appLockTileTitle,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AppLockSettingsSheetHost(),
+                        ),
+                      ),
                     ),
                     const Divider(height: 1, indent: 56),
                     _MenuItem(

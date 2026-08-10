@@ -136,6 +136,20 @@ class AppStrings {
   String get more => vi ? 'Khác' : 'More';
   String get privacySecurity => vi ? 'Quyền riêng tư & Bảo mật' : 'Privacy & Security';
   String get termsOfService => vi ? 'Điều khoản dịch vụ' : 'Terms of Service';
+
+  // App Lock (giới hạn sử dụng hằng ngày)
+  String get appLockTileTitle => vi ? 'Giới hạn thời gian' : 'Usage Limit';
+  String get appLockTileSubtitle =>
+      vi ? 'Khóa app khi dùng quá thời gian cho phép' : 'Lock the app after the daily limit';
+  String get appLockTitle => vi ? 'Đã hết thời gian dùng hôm nay' : 'Daily limit reached';
+  String get appLockBody => vi
+      ? 'Bạn đã đạt giới hạn thời gian hôm nay. Hãy nghỉ ngơi cho đôi mắt — tiếp tục dùng sẽ kích hoạt khóa tạm thời.'
+      : 'You have reached today\'s usage limit. Give your eyes a break — continuing will re-trigger the lock.';
+  String get appLockGrantFive => vi ? '+5 phút nữa' : '+5 more minutes';
+  String get appLockOpenSettings => vi ? 'Mở Cài đặt giới hạn' : 'Open limit settings';
+  String get appLockSettingsTitle => vi ? 'Giới hạn thời gian' : 'Usage Limit';
+  String get appLockEnable => vi ? 'Bật giới hạn' : 'Enable limit';
+  String appLockMinutes(int m) => vi ? '$m phút mỗi ngày' : '$m minutes per day';
   String get helpSupport => vi ? 'Trợ giúp & Hỗ trợ' : 'Help & Support';
   String get signOut => vi ? 'Đăng xuất' : 'Sign Out';
   String get version => vi ? 'EyeCare AI v1.0.0' : 'EyeCare AI v1.0.0';
