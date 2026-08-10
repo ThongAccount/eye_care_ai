@@ -57,7 +57,7 @@
          ACTION_MANAGE_WRITE_SETTINGS (xem lib/services/brightness_service.dart). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
     <application
-        android:label="EyeCare AI"
+        android:label="EyeCare AI (Branched)"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
