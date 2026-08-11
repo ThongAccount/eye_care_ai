@@ -32,8 +32,22 @@ class HabitData {
   // khi số liệu luôn đứng yên ở 0.
   final bool isComingSoon;
 
-  double get progress => target == 0 ? 0 : (current / target).clamp(0.0, 1.0);
+  double get progress {
+    if (target == 0) return 0;
+    // "phone" (dùng ít hơn tốt hơn) vẫn dùng chung công thức clamp 0-1 như
+    // các habit khác — current vượt target thì thanh GIỮ NGUYÊN ĐẦY (100%)
+    // thay vì vơi dần về 0, để không mất thông tin trực quan; phần "vượt
+    // bao nhiêu" được thể hiện qua MÀU của thanh (xem _HabitCard trong
+    // habits_screen.dart: đổi sang màu đỏ cảnh báo khi current > target),
+    // không phải qua độ dài thanh.
+    return (current / target).clamp(0.0, 1.0);
+  }
 }
+
+/// Mức cảnh báo hiển thị cạnh tiêu đề mỗi thẻ habit — thay cho chấm tròn
+/// trung tính cũ (chỉ báo "có dữ liệu hay không", không nói lên tốt/xấu).
+/// none = chưa có dữ liệu/habit chưa hỗ trợ (giữ chấm tròn xám cũ).
+enum HabitAlertLevel { none, warning, good }
 
 class HabitProvider extends ChangeNotifier {
   static const _kHasCustomTargetsKey = 'pref_has_custom_habit_targets';
@@ -253,6 +267,37 @@ class HabitProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Ngưỡng "ngủ quá nhiều" — không có trong yêu cầu gốc con số cụ thể, chọn
+  // +25% so với mục tiêu (mục tiêu 8h -> trên 10h coi là ngủ quá nhiều) làm
+  // mốc hợp lý về mặt sức khỏe giấc ngủ (ngủ dư quá nhiều cũng không tốt).
+  static const _sleepOversleepMultiplier = 1.25;
+
+  /// Mức cảnh báo TỐT/XẤU của 1 habit — hướng "tốt" khác nhau tuỳ habit:
+  /// - phone: current > target là XẤU (dùng nhiều), còn lại (ít/đủ) là TỐT.
+  /// - sleep: current quá thấp HOẶC quá cao so target đều XẤU, ở giữa là TỐT.
+  /// - outdoor / breaks: current < target là XẤU (ít), >= target là TỐT.
+  HabitAlertLevel alertLevelFor(HabitData habit) {
+    if (!habit.isLive || habit.isComingSoon) return HabitAlertLevel.none;
+    switch (habit.id) {
+      case 'phone':
+        // Dùng đúng số THẬT (totalScreenTimeHoursToday), không dùng
+        // habit.current đã bị clamp — để nhất quán với điểm sức khỏe mắt và
+        // thẻ "Sử dụng theo ứng dụng" (xem _updateHabitsCompletion bên dưới).
+        return totalScreenTimeHoursToday > habit.target ? HabitAlertLevel.warning : HabitAlertLevel.good;
+      case 'sleep':
+        final oversleepAt = habit.target * _sleepOversleepMultiplier;
+        if (habit.current < habit.target || habit.current > oversleepAt) {
+          return HabitAlertLevel.warning;
+        }
+        return HabitAlertLevel.good;
+      case 'outdoor':
+      case 'breaks':
+        return habit.current < habit.target ? HabitAlertLevel.warning : HabitAlertLevel.good;
+      default:
+        return HabitAlertLevel.none;
+    }
+  }
+
   void _applyHabitValue(String id, double? value) {
     final habit = habits.firstWhere((h) => h.id == id);
     if (value == null) {
@@ -263,9 +308,57 @@ class HabitProvider extends ChangeNotifier {
     habit.isLive = true;
   }
 
+  // Mức thưởng/phạt tối đa cho việc dùng ít/nhiều điện thoại hơn mục tiêu —
+  // xem _updateHabitsCompletion() để biết cách 2 hằng số này được dùng.
+  static const _phoneBonusMaxPoints = 50.0; // dùng 0 giờ (so với target) -> +50 điểm
+  static const _phonePenaltyPerHourOver = 10.0; // mỗi giờ dùng vượt target -> -10 điểm
+
   void _updateHabitsCompletion() {
-    final total = habits.fold<double>(0, (sum, h) => sum + h.progress);
-    habitsCompletionPercent = ((total / habits.length) * 100).round();
+    // "Eye Test Count" (id: reading) chưa có tính năng đứng sau, current
+    // luôn = 0 vĩnh viễn -> nếu tính chung vào điểm trung bình sẽ kéo trần
+    // điểm sức khỏe mắt xuống tối đa ~80% MÃI MÃI dù 4 habit còn lại đều
+    // hoàn hảo. Loại hẳn các habit "isComingSoon" ra khỏi công thức tính điểm.
+    final scored = habits.where((h) => !h.isComingSoon).toList();
+    if (scored.isEmpty) {
+      habitsCompletionPercent = 0;
+      return;
+    }
+
+    double sum = 0;
+    for (final h in scored) {
+      if (h.id == 'phone') {
+        // Điện thoại được đánh giá RIÊNG qua thưởng/phạt bên dưới (chiều
+        // "tốt" ngược với 3 habit còn lại: current thấp = tốt, không phải
+        // current cao = tốt) — ở bước tính điểm nền này chỉ cần biết "có dữ
+        // liệu hay không", tránh cộng dồn 2 lần logic thưởng/phạt vào cùng
+        // 1 habit (1 lần trong average, 1 lần trong phoneAdjustment).
+        sum += h.isLive ? 1.0 : 0.0;
+      } else {
+        sum += h.progress;
+      }
+    }
+    final baseScore = (sum / scored.length) * 100;
+
+    // Thưởng/phạt riêng cho thói quen dùng điện thoại, CỘNG/TRỪ THẲNG vào
+    // điểm tổng (không pha loãng qua trung bình 4 habit) — đúng theo yêu
+    // cầu: dùng ít hơn target thì được CỘNG THÊM điểm (tối đa +50, đạt được
+    // khi dùng 0 giờ), dùng nhiều hơn target thì bị TRỪ điểm hiện có, mỗi
+    // giờ vượt target trừ 10 điểm. Dùng totalScreenTimeHoursToday (số giờ
+    // dùng THẬT, không bị clamp) để nhất quán với thẻ "Sử dụng theo ứng dụng".
+    final phone = habits.firstWhere((h) => h.id == 'phone');
+    double phoneAdjustment = 0;
+    if (phone.isLive) {
+      final hours = totalScreenTimeHoursToday;
+      if (hours < phone.target) {
+        final unusedRatio = (phone.target - hours) / phone.target;
+        phoneAdjustment = (unusedRatio * _phoneBonusMaxPoints).clamp(0, _phoneBonusMaxPoints);
+      } else if (hours > phone.target) {
+        final hoursOver = hours - phone.target;
+        phoneAdjustment = -(hoursOver * _phonePenaltyPerHourOver);
+      }
+    }
+
+    habitsCompletionPercent = (baseScore + phoneAdjustment).clamp(0, 100).round();
   }
 
   Future<double?> _getManualSleepHoursToday() async {
