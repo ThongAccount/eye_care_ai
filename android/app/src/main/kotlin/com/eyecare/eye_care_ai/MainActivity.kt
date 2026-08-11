@@ -4,9 +4,12 @@ import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.PowerManager
 import android.os.Process
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,9 +27,39 @@ import io.flutter.plugin.common.MethodChannel
 //    Android gộp dữ liệu theo nhiều khung thời gian chồng lấn.
 class MainActivity : FlutterActivity() {
     private val channelName = "eye_care_ai/usage_events"
+    private val appLockChannelName = "eye_care_ai/app_lock"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Kênh app-lock: kiểm tra/mở quyền Always on top (SYSTEM_ALERT_WINDOW)
+        // cho màn hình chặn app khác khi hết thời gian dùng (Phase 1).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, appLockChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this))
+                    "openOverlaySettings" -> {
+                        try {
+                            startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:$packageName")
+                                )
+                            )
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("OVERLAY_SETTINGS_FAILED", e.message, null)
+                        }
+                    }
+                    "showTestOverlay" ->
+                        result.success(AppLockOverlayManager.get(this).showTestOverlay())
+                    "dismissOverlay" -> {
+                        AppLockOverlayManager.get(this).dismiss()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         // BUG DA SUA: UsageStatsHandler (kenh "eye_care/usage" - dung boi
         // UsageService.dart cho checkUsagePermission/openUsageSettings/

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/language_provider.dart';
 import '../providers/usage_limit_provider.dart';
 import '../services/app_usage_monitor.dart';
 import '../theme/app_colors.dart';
+
+/// Kênh native app-lock (MainActivity: canDrawOverlays / showTestOverlay ...).
+const MethodChannel _appLockChannel = MethodChannel('eye_care_ai/app_lock');
 
 /// Overlay khóa toàn màn hình khi hết giờ dùng app (app-lock Phase 1).
 /// Không có nút thoát trực tiếp — chỉ có "+5 phút" (1 lần/khóa) hoặc tắt
@@ -113,6 +117,25 @@ class AppLockSettingsSheetHost extends StatelessWidget {
                 },
               ),
           ],
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.preview_outlined),
+            title: Text(strings.appLockTestTitle),
+            subtitle: Text(strings.appLockTestBody),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final ok = await _appLockChannel
+                  .invokeMethod<bool>('showTestOverlay') ?? false;
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(ok
+                      ? strings.appLockTestShown
+                      : strings.appLockTestDenied),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

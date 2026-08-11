@@ -28,6 +28,7 @@ enum SetupStepId {
   fullScreenIntent,
   batteryOptimization,
   focusMode,
+  overlay,
 }
 
 class SetupProvider extends ChangeNotifier {
@@ -74,6 +75,7 @@ class SetupProvider extends ChangeNotifier {
       _status[SetupStepId.fullScreenIntent] = true;
       _status[SetupStepId.batteryOptimization] = true;
       _status[SetupStepId.focusMode] = false;
+      _status[SetupStepId.overlay] = false;
     }
 
     _loading = false;
@@ -107,6 +109,7 @@ class SetupProvider extends ChangeNotifier {
         PermissionHelper.checkLocationPermission(),
         PermissionHelper.checkActivityPermission(),
         FocusModeService.instance.hasAccess(),
+        PermissionHelper.checkOverlayPermission(),
       ]).timeout(const Duration(seconds: 6));
 
       _status[SetupStepId.usageAccess] = results[0];
@@ -116,6 +119,7 @@ class SetupProvider extends ChangeNotifier {
       _status[SetupStepId.fullScreenIntent] = true;
       _status[SetupStepId.batteryOptimization] = true;
       _status[SetupStepId.focusMode] = results[4];
+      _status[SetupStepId.overlay] = results[5];
       notifyListeners();
     } catch (e) {
       notifyListeners();

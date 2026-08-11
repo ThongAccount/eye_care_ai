@@ -1,91 +1,128 @@
-# Usage-Limit App Lock — Plan
+# Usage-Limit App Lock — Plan (rev. 2: block OTHER apps)
 
-> Recreated 2026-08-10 on branch `feat/app-lock` — the original
-> `docs/usage-lock-plan.md` and all 4 scaffold files were lost (scaffold
-> deleted in `f44a978`, plan doc never made it into git). This file restores
-> the plan with the lessons learned since.
+> Rev 2 — 2026-08-10 on branch `feat/app-lock`. Rev 1 planned a
+> self-lock (app blocks ITSELF after in-app usage limit); on-device
+> feedback killed it: "it locks its own when reaching limit — how does
+> THAT make sense". The point of an eye-care app is to get you OUT of
+> distracting apps, not lock you out of the health app.
+>
+> New direction = Digital-Wellbeing-style: EyeCare AI stays accessible;
+> the *distracting* apps get gated once the phone-usage budget is spent.
 
 ## Goal
 
-Let the user set a daily limit on EyeCare AI usage (or phone usage while the
-app is foreground). When the limit is reached, the app blocks itself with a
-lock screen (“time's up” style) that requires a deliberate action to dismiss.
-This is the natural extension of the usage-limit idea shelved before the
-upstream merge.
+User sets a daily phone-usage budget (e.g. 90 min of screen time).
+When the budget is exhausted, launching a **blocked app** shows a
+full-screen "time's up" gate over that app. EyeCare AI itself is
+**never blocked** — it's the escape hatch / safe screen.
 
-## Why it was shelved / what changed
+## Hard Android constraint (why "block" is a soft block)
 
-- Scaffold (Phase 1 draft) existed at
-  `lib/models/app_usage_limit.dart`, `lib/providers/usage_limit_provider.dart`,
-  `lib/screens/app_lock_overlay.dart`, `lib/services/app_usage_monitor.dart`
-- It relied on `freezed`/`build_runner` codegen for the model —
-  **production builds do not run `build_runner`**, and the generated files
-  were not committed → uncompilable reference. Deleted in `f44a978` as
-  incomplete residue.
-- Upstream merge brought a 7-step Setup Wizard (`SetupStepId`) and timeout-safe
-  startup (`SetupProvider._init()`/`refreshStatus()` bounded in `749f37a` +
-  `823af03`). Any app-lock work must not reintroduce unbounded awaits on the
-  boot path.
+A normal app **cannot force-stop or kill another app** on stock
+Android (needs root or same-uid). Best-effort enforcement = a
+**system overlay** (`SYSTEM_ALERT_WINDOW`) rendered on top of the
+foreground app the moment it's detected:
 
-## Design decisions
+- Overlay appears full-screen above the blocked app → user can't
+  interact with the app underneath
+- Home button / recents still work (overlay can't trap the user)
+- The blocked app is never actually closed; it's *covered* by the gate
+- Optional hard close needs **AccessibilityService** (performGlobalAction
+  BACK / switch-to-home) — fragile, OEM-quirky, Phase 3 only
 
-1. **No codegen.** Plain Dart model, hand-written JSON serialization to
-   SharedPreferences. Delete the freezed dependency attempt.
-2. **Lock identity ≠ set a seat**: lock is a full-screen overlay route pushed
-   on the root navigator (`_rootNavigatorKey` in `lib/main.dart`) when
-   remaining minutes hit 0 — not a widget inserted per screen.
-3. **Data source**: reuse `DeviceDataService.instance` / `UsageService`
-   totals (the same numbers Home & Statistics show) rather than a new native
-   query; fall back to manual “session length” counting when usage permission
-   is missing.
-4. **Dismissal**: Phase 1 = unlock passes the lock only by navigating to the
-   app-lock setting and disabling the limit (profile the friction honestly),
-   or a 5-minute “extra time” button with a cooldown. Phase 2 = system-level.
-5. **No startup regression**: the lock check runs inside MainShell after
-   `_refreshHabitsAndSyncRank()`, bounded by the same 6s timeouts, and must
-   resolve to “no lock” by default on any error.
+Device: CPH2461 (Oppo/ColorOS). ColorOS kills background services
+aggressively → the gate must be *foreground-detection driven*, not a
+long-lived service. When user switches to a blocked app, gate shows
+within ~1s; when they leave, gate auto-dismisses.
 
-## Phase 1 — In-app overlay lock
+## Existing building blocks (all in repo)
 
-Files:
-- `lib/models/app_usage_limit.dart` — plain class:
-  `enabled, dailyLimitMinutes, extraTimeGrantedAt, lastResetDate`; JSON
-  round-trip; `remainingMinutes(now)`; `resetIfNewDay()`.
-- `lib/providers/usage_limit_provider.dart` — ChangeNotifier wrapping
-  SharedPreferences persistence + clock; no freezed.
-- `lib/screens/app_lock_overlay.dart` — full-screen lock UI: remaining time,
-  “+5 min” button, link to Settings.
-- `lib/services/app_usage_monitor.dart` — derives consumed minutes from
-  `DeviceDataService` (or session counter), triggers overlay via
-  `_rootNavigatorKey` when `remainingMinutes <= 0 && enabled`.
+- `android/.../UsageStatsHandler.kt` — `queryEvents` +
+  `MOVE_TO_FOREGROUND` scanning (sleep-estimate path already uses it),
+  `checkUsagePermission()`, `openUsageSettings()`: reuse for
+  foreground detection + budget accounting
+- `MainActivity.kt` — MethodChannel `eye_care_ai/usage_events`,
+  `setMethodCallHandler` pattern: add channel `eye_care_ai/app_lock`
+- Manifest: `PACKAGE_USAGE_STATS` already present; add
+  `SYSTEM_ALERT_WINDOW` (install-time normal permission; runtime grant
+  via `Settings.ACTION_MANAGE_OVERLAY_PERMISSION`)
+- `lib/services/app_usage_monitor.dart` (Phase-1 rev-1) — repurpose:
+  no longer pushes a Flutter lock route; becomes a thin Dart client of
+  the native gate (budget state, remaining time, config push)
+- `lib/providers/usage_limit_provider.dart` — keep; config surface:
+  enabled, budgetMinutes, blockedPackage list, graceSeconds
 
-Settings entry:
-- New tile in `lib/screens/settings_screen.dart` (use `AppIcon` mapping, e.g.
-  `🔒` already maps to `Icons.lock_outline`) → limit picker (15/30/45/60/90/120 min).
+## Phase 1 — native overlay gate (this branch)
 
-Defaults & reset:
-- Daily reset at 00:00 local (mirror streak snapshot logic in
-  `DeviceDataService`).
-- Off by default; no behavior change until enabled.
+Native (Kotlin):
+- `AppLockHandler.kt` — MethodChannel `eye_care_ai/app_lock`:
+  - `setConfig({enabled, budgetMinutes, blockedPackages, graceSeconds})`
+    → persists prefs, restarts polling
+  - `getBudgetState()` → `{remainingMinutes, lastResetDate}` (same
+    yyyyMMdd reset rule as rev-1 model)
+  - `grantExtra(minutes)` → +5/+"10 more" with 1-grant-per-hour cooldown
+  - `dismissOnce()` → per-launch snooze
+- Foreground watcher: `UsageStatsManager.queryEvents` poll every 3–5s;
+  on `MOVE_TO_FOREGROUND` of a package in `blockedPackages` while
+  budget exhausted → show overlay; on `MOVE_TO_BACKGROUND` (or Home)
+  → dismiss overlay
+- Overlay: `WindowManager.LayoutParams(TYPE_APPLICATION_OVERLAY)`,
+  full-screen, below `FLAG_NOT_FOCUSABLE` toggle, dark theme, shows
+  remaining 0 + buttons (+5 min / Open EyeCare AI / Settings)
+- Budget source: total foreground time from UsageStats since
+  `lastResetDate` — same numbers Home/Statistics show (their weekly
+  usage path), so the gate never contradicts the app
 
-Acceptance:
-- Home → Settings → enable 15 min → use app 15 min → lock appears.
-- +5 min works once per lock hour; disabling limit in Settings clears lock.
-- No Hang/crash; `flutter analyze` 0 errors; manual APK smoke test.
+Flutter (Dart):
+- Repurpose `lib/screens/app_lock_overlay.dart` → only used as the
+  in-app *settings* sheet (keep `AppLockSettingsSheetHost`); the
+  runtime gate is native, NOT a Flutter route
+- `lib/services/app_usage_monitor.dart` → `AppLockClient` calling
+  `app_lock` channel; `UsageLimitProvider` = settings model
+- Settings tile already added ("Usage Limit") → expand: budget picker
+  (30/45/60/90/120/180 min) + blocked-app list (pick from installed
+  apps via `getInstalledApps` MethodChannel call) + overlay-permission
+  deep-link button
+- Setup wizard: optionally add an 8th step "block distracting apps"
+  (reuse `SetupStepId` pattern; all steps skippable)
 
-## Phase 2 — System-level lock (deferred)
+## Phase 2 — niceties (later)
 
-- Once Phase 1 proves the UX, consider Android `UsageStatsManager`-driven
-  enforcement + device admin/DND, mirroring `FocusModeHandler.kt` patterns.
-  Needs native `MethodChannel` additions — out of scope for Phase 1.
-- iOS: needs entitlement review; keep local-only.
+- Per-app budgets (list item shows own consumed time)
+- Time-window schedules (block after 10pm)
+- Daily reset notification; streak-aware "you survived 3 days"
+
+## Phase 3 — optional hard close (risky, may never ship)
+
+- `AccessibilityService` that performsGlobalAction(HOME/BACK) on
+  blocked app; OEM quirks (ColorOS, MIUI) make this unreliable;
+  separate opt-in toggle, clearly labeled experimental
+
+## Acceptance (Phase 1)
+
+- Enable 1-min budget → open blocked app → gate appears ≤5s
+- EyeCare AI itself opens normally (never gated)
+- +5 min works once/hour; Settings always reachable; disable clears
+- Overlay permission grant flow works on CPH2461 (manual Settings
+  redirect acceptable)
+- `flutter analyze` 0 errors; native unit: `./gradlew testDebugUnitTest`
+  if any are added; manual smoke on device
+
+## Open questions
+
+- Budget = total phone usage vs per-app usage? Default total (matches
+  "screen time" numbers already shown)
+- Blocked list default: apps user picks, or preset distraction set
+  (YouTube/TikTok/games)?
+- Snooze semantics: dismissOnce per launch vs 5-min grant — both, with
+  separate cooldowns
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
-| User stuck on lock with no way out | Settings tile always reachable; “extra time” button; docs |
-| Clock manipulation | Compare `now` against persisted `lastResetDate`, clamp negatives |
-| Permission-less usage estimate wrong | Fall back to foreground-session counter, label the estimate |
-| Boot hangs | Bound lock-check futures (6s timeout pattern from `749f37a`); default no-lock |
-| Upstream merge pressure | Single-feature branch, rebase onto upstream/main before merging |
+| Overlay never grants on ColorOS | Settings deep-link + in-app status check (canDrawOverlays) |
+| Foreground poll misses fast app hops | 3–5s poll + grant extra only when foreground observed |
+| UsageStats data lag | Same query path as Home; accept ≤1 tick staleness |
+| User stuck under gate | EyeCare AI always reachable via Home; Settings button in gate |
+| Boot regression | All native config reads bounded; default disabled, no gate |

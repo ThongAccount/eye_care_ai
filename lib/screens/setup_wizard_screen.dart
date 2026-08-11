@@ -95,6 +95,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with WidgetsBindi
       onGrant: () => FocusModeService.instance.openAccessSettings(),
       opensExternalSettings: true,
     ),
+    _StepConfig(
+      id: SetupStepId.overlay,
+      emoji: '🪟',
+      title: (s) => s.setupStepOverlayTitle,
+      body: (s) => s.setupStepOverlayBody,
+      onGrant: () => PermissionHelper.openOverlaySettings(),
+      opensExternalSettings: true,
+    ),
   ];
 
   // +2: trang Welcome ở đầu, trang Done ở cuối.
