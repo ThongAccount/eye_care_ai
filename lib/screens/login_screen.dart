@@ -6,8 +6,6 @@ import '../providers/language_provider.dart';
 import '../providers/setup_provider.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
-import '../utils/app_icon.dart';
-import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 import 'main_shell.dart';
 import 'register_screen.dart';
@@ -149,14 +147,30 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    width: 72,
-                    height: 72,
+                    width: 88,
+                    height: 88,
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: AppTheme.gradientFor(Theme.of(context).colorScheme.primary),
+                      // Nền TRẮNG đơn giản thay vì gradient theo accent color
+                      // của app: logo có màu xanh CỐ ĐỊNH sẵn trong file ảnh
+                      // (không đổi màu theo theme như AppIcon emoji được), đặt
+                      // trên gradient tuỳ ý (accent color có thể bị người dùng
+                      // đổi sang cam/xanh lá...) dễ bị chỏi màu — nền trắng +
+                      // đổ bóng nhẹ luôn an toàn, giống hệt icon app ngoài
+                      // launcher (cũng nền trắng theo mặc định trước khi mờ).
+                      color: Colors.white,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    alignment: Alignment.center,
-                    child: const AppIcon('👁️', size: 32, color: AppColors.primaryBlue),
+                    // Logo thật của app (assets/icon/app_icon.png, nền trong
+                    // suốt) thay cho emoji 👁️ chung chung trước đây.
+                    child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.contain),
                   ),
                   const SizedBox(height: 16),
                   Text(

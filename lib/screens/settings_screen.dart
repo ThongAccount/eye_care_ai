@@ -14,9 +14,11 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/notification_service.dart';
+import '../services/update_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/smart_brightness_dialog.dart';
+import '../widgets/update_dialog.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
 import 'settings_more_page.dart';
@@ -392,10 +394,57 @@ class SettingsScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+              const SizedBox(height: 8),
+              const Center(child: _CheckForUpdateButton()),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// Nút "Kiểm tra bản cập nhật" thủ công — dùng CHUNG UpdateService/UpdateDialog
+// với luồng tự động kiểm tra lúc mở app (main_shell.dart), chỉ khác là:
+// (1) người dùng chủ động bấm thay vì tự động lúc mở app, (2) LUÔN cho phản
+// hồi rõ ràng dù có bản mới hay không — tự động thì im lặng nếu không có gì
+// mới, nhưng bấm nút thủ công mà không thấy gì xảy ra sẽ giống app bị đứng.
+class _CheckForUpdateButton extends StatefulWidget {
+  const _CheckForUpdateButton();
+
+  @override
+  State<_CheckForUpdateButton> createState() => _CheckForUpdateButtonState();
+}
+
+class _CheckForUpdateButtonState extends State<_CheckForUpdateButton> {
+  bool _checking = false;
+
+  Future<void> _check() async {
+    setState(() => _checking = true);
+    final update = await UpdateService.instance.checkForUpdate();
+    if (!mounted) return;
+    setState(() => _checking = false);
+
+    final strings = context.read<LanguageProvider>().strings;
+    if (update == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.noUpdateAvailable)),
+      );
+      return;
+    }
+    if (!mounted) return;
+    UpdateDialog.show(context, update, strings);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.watch<LanguageProvider>().strings;
+    return TextButton.icon(
+      onPressed: _checking ? null : _check,
+      icon: _checking
+          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.refresh_rounded, size: 18),
+      label: Text(strings.checkForUpdate),
     );
   }
 }

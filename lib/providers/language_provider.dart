@@ -10,7 +10,10 @@ class LanguageProvider extends ChangeNotifier {
     _loadSavedPreferences();
   }
 
-  bool _isVietnamese = false;
+  // Mặc định TIẾNG VIỆT cho lần cài đặt mới (chưa từng lưu lựa chọn trong
+  // SharedPreferences) — app hướng tới người dùng Việt Nam là chính, không
+  // nên mặc định tiếng Anh rồi bắt người dùng tự vào Cài đặt đổi lại.
+  bool _isVietnamese = true;
 
   bool get isVietnamese => _isVietnamese;
   Locale get locale => _isVietnamese ? const Locale('vi') : const Locale('en');

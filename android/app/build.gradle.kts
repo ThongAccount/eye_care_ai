@@ -12,15 +12,40 @@ plugins {
 
 // Đọc cấu hình ký release từ android/key.properties (không commit file này lên
 // git — trên CI, workflow sẽ tự tạo file này từ GitHub Secrets trước khi
-// build). Nếu file không tồn tại (build local chưa cấu hình), app vẫn build
-// được bằng debug key như trước, chỉ là các bản build từ nguồn khác nhau sẽ
-// KHÔNG cài đè lên nhau được (phải gỡ cài lại) vì chữ ký khác nhau.
+// build). Nếu file không tồn tại (build local chưa cấu hình, hoặc chủ repo
+// chưa thêm 4 secret KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD
+// trên GitHub), app vẫn build được nhờ ci-fallback-keystore.jks bên dưới.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseSigning = keystorePropertiesFile.exists()
 if (hasReleaseSigning) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+
+// FIX "Chưa cài đặt được ứng dụng do gói xung đột với một gói hiện có":
+// trước đây khi KHÔNG có key.properties, bản release rơi về dùng
+// debug.keystore MẶC ĐỊNH CỦA MÁY (~/.android/debug.keystore). Trên GitHub
+// Actions, mỗi lần chạy workflow là một máy ảo HOÀN TOÀN MỚI — file
+// debug.keystore đó KHÔNG tồn tại sẵn nên plugin Android tự sinh ra 1 file
+// MỚI, KHÁC NHAU ở MỖI LẦN BUILD. Kết quả: build 53 và build 54 có 2 chữ ký
+// khác nhau -> Android coi đây là 2 app khác nhau dùng chung package name,
+// từ chối cài đè ("package conflicts with an existing package") — đây CHÍNH
+// LÀ lỗi trong ảnh chụp màn hình, và nó sẽ LUÔN xảy ra ở MỌI lần cập nhật
+// tiếp theo cho tới khi được sửa, không phải lỗi ngẫu nhiên 1 lần.
+//
+// Giải pháp: dùng 1 file keystore CỐ ĐỊNH, COMMIT THẲNG vào repo, làm phương
+// án dự phòng khi chưa cấu hình key.properties thật. File này KHÔNG bí mật gì
+// (mục đích chỉ là "chữ ký ổn định giữa các lần build", không phải để bảo vệ
+// danh tính lên Play Store — giống hệt tinh thần debug.keystore mặc định của
+// Android vốn cũng không phải bí mật) — nhờ vậy MỌI bản release (kể cả khi
+// chủ repo chưa từng thêm 4 GitHub Secret ở trên) đều dùng chung 1 chữ ký ổn
+// định, cập nhật đè lên nhau bình thường. Muốn phát hành THẬT lên Play
+// Store/production, vẫn nên tự tạo keystore RIÊNG và cấu hình 4 secret đó —
+// key.properties (nếu có) LUÔN được ưu tiên hơn file dự phòng này.
+val ciFallbackKeystoreFile = file("ci-fallback-keystore.jks")
+val hasCiFallbackSigning = ciFallbackKeystoreFile.exists()
+val ciFallbackAlias = "eyecare_ci_fallback"
+val ciFallbackPassword = "eyecare_ci_fallback"
 
 android {
     namespace = "com.eyecare.eye_care_ai"
@@ -54,19 +79,27 @@ android {
                 storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
             }
+        } else if (hasCiFallbackSigning) {
+            create("ciFallback") {
+                keyAlias = ciFallbackAlias
+                keyPassword = ciFallbackPassword
+                storeFile = ciFallbackKeystoreFile
+                storePassword = ciFallbackPassword
+            }
         }
     }
 
     buildTypes {
         release {
-            // Dùng key release CỐ ĐỊNH nếu đã cấu hình (xem key.properties),
-            // để mọi bản build đều cùng chữ ký -> cài đè lên bản cũ được thay
-            // vì bắt buộc gỡ cài lại. Nếu chưa cấu hình, tạm dùng debug key
-            // như cũ (chỉ nên dùng khi build thử ở máy local).
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            // Thứ tự ưu tiên: key release THẬT (key.properties, nếu chủ repo
+            // đã cấu hình 4 GitHub Secret) > keystore dự phòng CỐ ĐỊNH commit
+            // sẵn trong repo (đảm bảo mọi bản release vẫn cùng 1 chữ ký, cập
+            // nhật đè lên nhau được) > debug key mặc định của máy (chỉ còn
+            // xảy ra nếu ai đó lỡ xoá luôn file ci-fallback-keystore.jks).
+            signingConfig = when {
+                hasReleaseSigning -> signingConfigs.getByName("release")
+                hasCiFallbackSigning -> signingConfigs.getByName("ciFallback")
+                else -> signingConfigs.getByName("debug")
             }
         }
     }

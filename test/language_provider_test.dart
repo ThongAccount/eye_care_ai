@@ -11,10 +11,10 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('starts with default locale en', () {
+    test('starts with default locale vi (upstream 53c355d)', () {
       final provider = LanguageProvider();
-      expect(provider.locale, const Locale('en'));
-      expect(provider.isVietnamese, isFalse);
+      expect(provider.locale, const Locale('vi'));
+      expect(provider.isVietnamese, isTrue);
     });
 
     test('toggles locale to vi and persists', () async {
@@ -33,11 +33,12 @@ void main() {
     });
 
     test('strings reflect locale', () {
-      final en = LanguageProvider();
-      expect(en.strings.home, 'Home');
-
-      final vi = LanguageProvider()..toggleVietnamese(true);
+      // Default locale is now vi (upstream 53c355d).
+      final vi = LanguageProvider();
       expect(vi.strings.home, 'Trang chủ');
+
+      final en = LanguageProvider()..toggleVietnamese(false);
+      expect(en.strings.home, 'Home');
     });
   });
 }

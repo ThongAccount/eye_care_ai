@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Reading Time / Sleep habits: accelerometer-based stillness heuristic -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- Đo khoảng cách mắt-màn hình khi kiểm tra thị lực (camera trước +
+         nhận diện khuôn mặt cục bộ, KHÔNG lưu/gửi ảnh đi đâu cả). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <!-- android.permission.health.READ_SLEEP đã BỊ XOÁ — không dùng Health
          Connect nữa, Sleep giờ ước lượng từ Usage Events (Usage Access đã
          xin ở permission đầu tiên, không cần quyền riêng cho Sleep nữa). -->

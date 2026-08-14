@@ -245,6 +245,27 @@ class NotificationService {
       ),
     );
   }
+  Future<void> showNightModeSuggestion({
+    required int currentPercent,
+    required int suggestedPercent,
+  }) async {
+    await initialize();
+
+    const androidDetails = AndroidNotificationDetails(
+      'night_mode_advisor',
+      'Night Mode Advisor',
+      channelDescription: 'Gợi ý giảm độ sáng màn hình vào ban đêm',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    await notifications.show(
+      2001,
+      '🌙 Gợi ý giảm độ sáng',
+      'Phòng đang tối nhưng màn hình ở $currentPercent%. Giảm xuống $suggestedPercent% để dễ chịu hơn?',
+      const NotificationDetails(android: androidDetails),
+    );
+  }
 
   Future<void> showInstantNotification({
     required String title,
