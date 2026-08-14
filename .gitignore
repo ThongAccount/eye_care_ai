@@ -51,6 +51,12 @@ app.*.map.json
 
 # Keystore & signing secrets — KHÔNG BAO GIỜ commit lên git
 *.jks
+# NGOẠI LỆ: ci-fallback-keystore.jks KHÔNG PHẢI bí mật (xem giải thích trong
+# android/app/build.gradle.kts) — đây là keystore dự phòng CỐ Ý commit lên
+# git để mọi bản release đều có chữ ký ổn định/giống nhau khi chưa cấu hình
+# keystore thật, tránh lỗi "package conflicts with an existing package" khi
+# cập nhật app. PHẢI commit file này, không phải thứ cần giữ kín.
+!android/app/ci-fallback-keystore.jks
 key.properties
 local.properties
 release-keystore-base64.txt

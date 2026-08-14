@@ -90,6 +90,19 @@ class _ChatScreenState extends State<ChatScreen> {
     chat.addUserMessage(text);
     _scrollToBottom();
 
+    // Câu hỏi khớp ĐÚNG 1 trong 4 gợi ý nhanh (chatQuickPrompts) -> trả lời
+    // ngay bằng câu trả lời soạn sẵn (chatResponses), KHÔNG gọi API — vừa
+    // nhanh tức thì, vừa đỡ tốn quota/tiền gọi model cho đúng 4 câu cố định
+    // mà app đã tự đề xuất sẵn cho người dùng bấm. Chỉ áp dụng khi khớp
+    // NGUYÊN VĂN (kể cả khi người dùng tự gõ tay trùng y hệt gợi ý), còn lại
+    // vẫn đi qua AI như bình thường.
+    final cannedAnswer = strings.chatResponses[text];
+    if (cannedAnswer != null) {
+      chat.addBotMessage(cannedAnswer);
+      _scrollToBottom();
+      return;
+    }
+
     setState(() => _sending = true);
     // Bong bóng trả lời của AI, bắt đầu ở trạng thái "đang gõ..." rồi được
     // nối chữ dần dần (appendToLastMessage) ngay khi từng mẩu chữ về tới —

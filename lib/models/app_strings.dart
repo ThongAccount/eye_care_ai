@@ -300,20 +300,39 @@ class AppStrings {
         ];
 
   String get eyeTest => vi ? 'Kiểm tra mắt' : 'Eye Test';
-  String get quickEyeCheck => vi ? 'Kiểm tra nhanh mắt' : 'Quick eye check';
   String get stepLabel => vi ? 'Bước' : 'Step';
-  String get canReadClearly => vi ? 'Đọc rõ' : 'Clear';
-  String get notClear => vi ? 'Không rõ' : 'Not clear';
-  String get eyeFeelsFine => vi ? 'Mắt vẫn ổn' : 'Eyes feel fine';
-  String get eyeFeelsTired => vi ? 'Mắt mỏi' : 'Eyes tired';
-  String get startCountdown => vi ? 'Bắt đầu đếm ngược' : 'Start countdown';
-  String get countdownRunning => vi ? 'Đang đếm ngược…' : 'Counting down…';
-  String get eyeTestStep1Title => vi ? 'Đọc chữ' : 'Read the letter';
-  String get eyeTestStep1Subtitle => vi ? 'Nhìn vào ký tự ở giữa và hỏi bản thân: có đọc rõ không?' : 'Look at the letter in the center and ask: can you read it clearly?';
-  String get eyeTestStep2Title => vi ? 'Nhìn xa' : 'Focus far away';
-  String get eyeTestStep2Subtitle => vi ? 'Chuyển tầm nhìn ra xa trong 3 giây để kiểm tra độ rõ của mắt.' : 'Shift your focus far away for 3 seconds to test your visual clarity.';
-  String get eyeTestStep3Title => vi ? 'Đếm thời gian nghỉ' : 'Count the rest time';
-  String get eyeTestStep3Subtitle => vi ? 'Đừng đọc thêm, hãy nhìn xa trong khoảng 20 giây rồi trả lời mức độ mỏi.' : 'Avoid reading more; look away for 20 seconds, then rate your eye fatigue.';
+
+  // ---------------- Kiểm tra mắt: Tumbling E ----------------
+  String get eyeTestIntroTitle => vi ? 'Kiểm tra thị lực nhanh' : 'Quick vision check';
+  String get eyeTestIntroBody => vi
+      ? 'Bài kiểm tra dùng chữ "E" xoay 4 hướng — bạn chỉ cần chọn đúng hướng mở của chữ E, không cần tự đánh giá "rõ hay không". Đo riêng từng mắt để phát hiện lệch thị lực giữa 2 bên.'
+      : 'This test shows a rotating "E" — just pick which way it opens, no need to judge "clear or not" yourself. Each eye is measured separately to catch differences between them.';
+  String get eyeTestDistanceHint => vi
+      ? 'Giữ điện thoại cách mắt khoảng 30-55cm (tầm sải cẳng tay), giữ nguyên khoảng cách suốt bài test để kết quả nhất quán giữa các lần đo.'
+      : 'Hold the phone about 30-55cm (arm\'s length) from your eyes, and keep that distance steady through the test so results stay consistent between attempts.';
+  String get eyeTestCameraPermissionHint => vi
+      ? 'Cho phép dùng camera trước để đo khoảng cách mắt-màn hình theo thời gian thực, giúp kết quả kiểm tra chính xác hơn. Ảnh không được lưu lại hay gửi đi đâu cả.'
+      : 'Allow the front camera to measure your eye-to-screen distance in real time, for a more accurate test. No images are saved or sent anywhere.';
+  String get eyeTestEnableCamera => vi ? 'Bật camera đo khoảng cách' : 'Enable distance camera';
+  String get eyeTestFaceNotDetected => vi ? 'Chưa thấy rõ khuôn mặt' : 'Face not detected';
+  String get eyeTestTooClose => vi ? 'Đang quá gần — lùi điện thoại ra một chút' : 'Too close — move the phone a bit further away';
+  String get eyeTestTooFar => vi ? 'Đang quá xa — đưa điện thoại lại gần một chút' : 'Too far — bring the phone a bit closer';
+  String get eyeTestPausedTitle => vi ? 'Đã tạm dừng bài kiểm tra' : 'Test paused';
+  String get eyeTestStart => vi ? 'Bắt đầu kiểm tra' : 'Start test';
+  String get eyeTestDisclaimer => vi
+      ? 'Đây là công cụ sàng lọc nhanh tại nhà, không thay thế khám mắt chuyên khoa. Nếu nghi ngờ có vấn đề về thị lực, hãy gặp bác sĩ nhãn khoa.'
+      : 'This is a quick at-home screening tool, not a substitute for a professional eye exam. If you suspect a vision problem, please see an eye doctor.';
+  String get eyeTestHistoryTitle => vi ? 'Lịch sử kiểm tra gần đây' : 'Recent test history';
+  String get eyeTestRightEyeTitle => vi ? 'Kiểm tra mắt PHẢI' : 'Testing RIGHT eye';
+  String get eyeTestLeftEyeTitle => vi ? 'Kiểm tra mắt TRÁI' : 'Testing LEFT eye';
+  String get eyeTestPickDirection => vi ? 'Chữ E đang mở về hướng nào?' : 'Which way does the E open?';
+  String get eyeTestContrastTitle => vi ? 'Độ nhạy tương phản' : 'Contrast sensitivity';
+  String get eyeTestContrastBody => vi
+      ? 'Chữ E sẽ mờ dần — vẫn chọn đúng hướng mở cho tới khi không còn thấy rõ.'
+      : 'The E will fade gradually — keep picking the direction it opens until you can no longer tell.';
+  String get eyeTestRightEyeShort => vi ? 'Mắt phải' : 'Right eye';
+  String get eyeTestLeftEyeShort => vi ? 'Mắt trái' : 'Left eye';
+  String get eyeTestContrastShort => vi ? 'Tương phản' : 'Contrast';
   String get eyeTestResult => vi ? 'Kết quả kiểm tra' : 'Check result';
   String get eyeTestGood => vi ? 'Mắt của bạn đang ở mức ổn.' : 'Your eyes look in good condition.';
   String get eyeTestFair => vi ? 'Mắt có thể đang mỏi nhẹ, nên nghỉ ngơi thêm.' : 'Your eyes may be a bit tired; take a short rest.';

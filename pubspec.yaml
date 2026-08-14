@@ -49,6 +49,8 @@ dependencies:
 
   # --- Real device data sources for the Habits screen ---
   sensors_plus: ^6.0.1     # accelerometer (reading posture, sleep motion heuristic)
+  camera: ^0.11.0+2         # camera trước (selfie) để đo khoảng cách mắt-màn hình lúc kiểm tra thị lực
+  google_mlkit_face_detection: ^0.13.1 # nhận diện vị trí 2 mắt trên khung hình camera
   geolocator: ^13.0.1      # GPS - nguồn dữ liệu duy nhất cho Outdoor time
   light: ^5.0.0             # cảm biến ánh sáng (lux) - dùng cho cảnh báo dùng điện thoại trong bóng tối + tự động điều chỉnh độ sáng
   screen_brightness: ^2.1.1 # chỉnh độ sáng màn hình theo lux đọc được từ cảm biến ánh sáng
