@@ -31,6 +31,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Watcher app-lock: poll foreground mỗi 3s, hiện gate khi mở app bị chặn
+        // trong lúc budget đã cạn (armed). Chạy độc lập với vòng đời Dart.
+        AppLockOverlayManager.get(this).startWatcher()
 
         // Kênh app-lock: kiểm tra/mở quyền Always on top (SYSTEM_ALERT_WINDOW)
         // cho màn hình chặn app khác khi hết thời gian dùng (Phase 1).
@@ -53,6 +56,24 @@ class MainActivity : FlutterActivity() {
                     }
                     "showTestOverlay" ->
                         result.success(AppLockOverlayManager.get(this).showTestOverlay())
+                    "showGateOverlay" -> {
+                        val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        result.success(AppLockOverlayManager.get(this).showGateOverlay().let {
+                            if (it) {
+                                AppLockOverlayManager.get(this).setBlockedPackages(blocked)
+                            }
+                            it
+                        })
+                    }
+                    "armGate" -> {
+                        val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        AppLockOverlayManager.get(this).armGate(blocked)
+                        result.success(true)
+                    }
+                    "disarmGate" -> {
+                        AppLockOverlayManager.get(this).disarmGate()
+                        result.success(true)
+                    }
                     "dismissOverlay" -> {
                         AppLockOverlayManager.get(this).dismiss()
                         result.success(true)

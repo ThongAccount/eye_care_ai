@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_usage_limit.dart';
+import '../services/app_usage_monitor.dart';
 
 /// Lưu giới hạn sử dụng (app-lock Phase 1) xuống SharedPreferences và cung
 /// cấp ChangeNotifier cho Settings + overlay.
@@ -40,17 +41,25 @@ class UsageLimitProvider extends ChangeNotifier {
   Future<void> setEnabled(bool enabled) async {
     _limit = _limit.copyWith(enabled: enabled);
     await _persist();
+    if (!enabled) {
+      // Tắt limit → tháo gate native ngay.
+      await AppUsageMonitor.instance.disarm();
+    }
   }
 
   Future<void> setDailyLimitMinutes(int minutes) async {
     _limit = _limit.copyWith(dailyLimitMinutes: minutes);
     await _persist();
+    if (_limit.enabled) {
+      // Đổi giới hạn (thường là tăng) → tháo gate để không kẹt.
+      await AppUsageMonitor.instance.disarm();
+    }
   }
 
   Future<void> grantExtraTime(DateTime now) async {
     _limit = _limit.grantExtraTime(now);
     await _persist();
-    notifyListeners();
+    await AppUsageMonitor.instance.disarm();
   }
 
   void updateConsumedMinutes(int minutes) {
