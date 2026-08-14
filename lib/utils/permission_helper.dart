@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/usage_service.dart';
 
 
@@ -27,12 +26,14 @@ class PermissionHelper {
 
   /// Mở trang quyền overlay (Always on top) của hệ thống — người dùng tự bật,
   /// quay lại app → refreshStatus() cập nhật.
+  ///
+  /// KHÔNG dùng url_launcher 'package:' — trên ColorOS/Oppo resolver hay đưa
+  /// về trang thông tin app thay vì trang quyền overlay, hoặc im lặng no-op.
+  /// Gọi thẳng native Settings.ACTION_MANAGE_OVERLAY_PERMISSION qua kênh đã
+  /// đăng ký trong MainActivity (giữ ý định chính xác, tránh browser fallback).
   static Future<void> openOverlaySettings() async {
     try {
-      await launchUrl(
-        Uri.parse('package:com.eyecare.eye_care_ai'),
-        mode: LaunchMode.externalApplication,
-      );
+      await _overlayChannel.invokeMethod<void>('openOverlaySettings');
     } catch (_) {
       // Bỏ qua nếu không mở được — người dùng vẫn có thể bỏ qua bước này.
     }
