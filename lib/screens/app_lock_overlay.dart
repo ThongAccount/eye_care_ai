@@ -124,6 +124,11 @@ class AppLockSettingsSheetHost extends StatelessWidget {
             subtitle: Text(strings.appLockTestBody),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
+              final vi = context
+                  .read<LanguageProvider>()
+                  .isVietnamese;
+              await _appLockChannel
+                  .invokeMethod<void>('setLanguage', {'vi': vi});
               final ok = await _appLockChannel
                   .invokeMethod<bool>('showTestOverlay') ?? false;
               if (!context.mounted) return;

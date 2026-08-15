@@ -47,6 +47,25 @@ class AppLockOverlayManager private constructor(private val context: Context) {
     // Danh sách app bị chặn (package names) — Dart set qua setBlockedPackages.
     private val blockedPackages = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    // Locale hiện tại của app (vi = true, en = false). Dart set qua
+    // setLanguage khi khởi động / đổi ngôn ngữ; overlay dùng để chọn chuỗi.
+    private var isVietnamese = true
+
+    fun setLanguage(vi: Boolean) {
+        isVietnamese = vi
+        // Nếu overlay đang hiện, dựng lại với ngôn ngữ mới ngay.
+        val current = overlayView ?: return
+        val wasTest = testOverlayShown
+        dismiss()
+        if (wasTest) {
+            showTestOverlay()
+        } else {
+            showGateOverlay()
+        }
+    }
+
+    private var testOverlayShown = false
+
     private val watcherRunnable = object : Runnable {
         override fun run() {
             if (gateArmed.get()) checkForegroundAndShow()
@@ -74,17 +93,27 @@ class AppLockOverlayManager private constructor(private val context: Context) {
         blockedPackages.addAll(packages)
     }
 
-    /** Preview (Settings -> Test): KHÔNG tự đóng — người dùng bấm "Close preview". */
+    /** Preview (Settings -> Test): KHÔNG tự đóng — người dùng bấm "Đóng xem trước". */
     fun showTestOverlay(): Boolean {
         if (isShowing()) return true
         if (!android.provider.Settings.canDrawOverlays(context)) return false
 
-        val built = buildGateView(
-            title = "EyeCare AI — Time up preview",
-            body = "Switch to another app now — this gate will cover it.\n" +
-                "(This is the preview. The real gate appears when the daily limit runs out.)",
-            closeLabel = "Close preview"
-        ) ?: return false
+        val (title, body, close) = if (isVietnamese) {
+            Triple(
+                "EyeCare AI — Xem trước hết giờ",
+                "Chuyển sang app khác ngay — màn hình này sẽ che app đó.\n" +
+                    "(Đây chỉ là bản xem trước. Màn hình thật sẽ hiện khi hết giờ dùng trong ngày.)",
+                "Đóng xem trước"
+            )
+        } else {
+            Triple(
+                "EyeCare AI — Time up preview",
+                "Switch to another app now — this gate will cover it.\n" +
+                    "(This is the preview. The real gate appears when the daily limit runs out.)",
+                "Close preview"
+            )
+        }
+        val built = buildGateView(title = title, body = body, closeLabel = close) ?: return false
 
         val added = try {
             windowManager.addView(built, makeLayoutParams())
@@ -95,6 +124,7 @@ class AppLockOverlayManager private constructor(private val context: Context) {
         if (!added) return false
 
         overlayView = built
+        testOverlayShown = true
         return true
     }
 
@@ -104,12 +134,22 @@ class AppLockOverlayManager private constructor(private val context: Context) {
         if (isShowing()) return true
         if (!android.provider.Settings.canDrawOverlays(context)) return false
 
-        val built = buildGateView(
-            title = "Daily limit reached",
-            body = "Your phone-usage budget for today is used up.\n" +
-                "Open EyeCare AI for a break, or come back tomorrow.",
-            closeLabel = "Open EyeCare AI"
-        ) ?: return false
+        val (title, body, close) = if (isVietnamese) {
+            Triple(
+                "Đã hết giờ dùng trong ngày",
+                "Hạn mức dùng điện thoại hôm nay đã hết.\n" +
+                    "Mở EyeCare AI để nghỉ mắt, hoặc quay lại vào ngày mai.",
+                "Mở EyeCare AI"
+            )
+        } else {
+            Triple(
+                "Daily limit reached",
+                "Your phone-usage budget for today is used up.\n" +
+                    "Open EyeCare AI for a break, or come back tomorrow.",
+                "Open EyeCare AI"
+            )
+        }
+        val built = buildGateView(title = title, body = body, closeLabel = close) ?: return false
 
         val added = try {
             windowManager.addView(built, makeLayoutParams())
@@ -120,8 +160,7 @@ class AppLockOverlayManager private constructor(private val context: Context) {
         if (!added) return false
 
         overlayView = built
-        // KHÔNG auto-dismiss — gate đứng yên cho tới khi rời app bị chặn
-        // (watcher dismiss khi foreground đổi) hoặc bấm nút.
+        testOverlayShown = false
         return true
     }
 
@@ -207,6 +246,7 @@ class AppLockOverlayManager private constructor(private val context: Context) {
         autoDismissRunnable = null
         overlayView?.let { windowManager.removeView(it) }
         overlayView = null
+        testOverlayShown = false
     }
 
     /** MainActivity khởi động watcher 1 lần. */

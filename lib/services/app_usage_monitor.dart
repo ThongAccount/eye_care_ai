@@ -20,6 +20,19 @@ class AppUsageMonitor {
   bool _gateRequested = false;
   DateTime? _lastChecked;
 
+  // Ngôn ngữ hiện tại của app — native overlay dùng để chọn chuỗi hiển thị.
+  bool _isVietnamese = true;
+
+  /// Gọi từ LanguageProvider khi đổi ngôn ngữ — đồng bộ xuống native.
+  Future<void> setLanguage(bool vi) async {
+    _isVietnamese = vi;
+    try {
+      await _appLockChannel.invokeMethod<void>('setLanguage', {
+        'vi': vi,
+      });
+    } catch (_) {}
+  }
+
   /// Gọi từ MainShell sau mỗi lần refresh habit (init, poll 60s, resume).
   /// Bounded timeout 6s giống mọi nguồn khác — lỗi → bỏ qua, KHÔNG bao giờ
   /// treo boot (xem quy tắc từ 749f37a).
@@ -55,6 +68,7 @@ class AppUsageMonitor {
     try {
       await _appLockChannel.invokeMethod<void>('armGate', {
         'blockedPackages': [], // chưa có blocked-app picker — Phase 1 mở rộng
+        'vi': _isVietnamese,
       });
     } catch (_) {
       _gateRequested = false;

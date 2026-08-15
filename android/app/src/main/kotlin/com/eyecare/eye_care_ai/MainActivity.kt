@@ -67,7 +67,15 @@ class MainActivity : FlutterActivity() {
                     }
                     "armGate" -> {
                         val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        call.argument<Boolean>("vi")?.let {
+                            AppLockOverlayManager.get(this).setLanguage(it)
+                        }
                         AppLockOverlayManager.get(this).armGate(blocked)
+                        result.success(true)
+                    }
+                    "setLanguage" -> {
+                        val vi = call.argument<Boolean>("vi") ?: true
+                        AppLockOverlayManager.get(this).setLanguage(vi)
                         result.success(true)
                     }
                     "disarmGate" -> {
