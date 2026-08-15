@@ -98,9 +98,11 @@ image = (
 )
 
 
-def run(*args, cwd=None, env=None, check=True):
+def run(*args, cwd=None, env=None, check=True, shell=False):
     print("+", " ".join(str(x) for x in args), flush=True)
-
+    if shell:
+        subprocess.run(" ".join(str(x) for x in args), shell=True, cwd=cwd, env=env, check=check)
+        return
     subprocess.run(
         list(map(str, args)),
         cwd=cwd,
@@ -174,7 +176,7 @@ def build_apk(
         print("SDK copied to volume — next runs skip this step.")
 
     # Always accept licenses (NDK auto-installed by Gradle needs them).
-    run("yes", "|", "flutter", "doctor", "--android-licenses")
+    run("yes", "|", "flutter", "doctor", "--android-licenses", shell=True)
 
     # ------------------------------------------------------------------
     # Equivalent to actions/cache
