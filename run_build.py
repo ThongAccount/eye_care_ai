@@ -75,23 +75,23 @@ image = (
                 "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             ),
             "JAVA_HOME": "/usr/lib/jvm/temurin-17-jdk-amd64",
-            "ANDROID_HOME": "/opt/android-sdk",
-            "ANDROID_SDK_ROOT": "/opt/android-sdk",
+            "ANDROID_HOME": "/cache/android-sdk",
+            "ANDROID_SDK_ROOT": "/cache/android-sdk",
             "PUB_CACHE": "/cache/pub",
             "GRADLE_USER_HOME": "/cache/gradle",
         }
     )
-    # Android SDK (cmdline-tools + platform-tools + platform 36 + build-tools 36)
+    # Android SDK on cache volume (survives container teardown).
     .run_commands(
-        "mkdir -p /opt/android-sdk/cmdline-tools",
+        "mkdir -p /cache/android-sdk/cmdline-tools",
         "curl -fsSL -o /tmp/cmdtools.zip "
         "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip",
-        "unzip -q /tmp/cmdtools.zip -d /opt/android-sdk/cmdline-tools",
-        "mv /opt/android-sdk/cmdline-tools/cmdline-tools /opt/android-sdk/cmdline-tools/latest",
-        "yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses",
-        "/opt/android-sdk/cmdline-tools/latest/bin/sdkmanager "
+        "unzip -q /tmp/cmdtools.zip -d /cache/android-sdk/cmdline-tools",
+        "mv /cache/android-sdk/cmdline-tools/cmdline-tools /cache/android-sdk/cmdline-tools/latest",
+        "yes | /cache/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses",
+        "/cache/android-sdk/cmdline-tools/latest/bin/sdkmanager "
         "\"platform-tools\" \"platforms;android-36\" \"build-tools;36.0.0\"",
-        "chmod -R a+rX /opt/android-sdk",
+        "chmod -R a+rX /cache/android-sdk",
     )
 )
 
