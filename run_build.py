@@ -81,17 +81,19 @@ image = (
             "GRADLE_USER_HOME": "/cache/gradle",
         }
     )
-    # Android SDK on cache volume (survives container teardown).
+    # Android SDK pre-installed in image layer (can't write to /cache during
+    # image build — Modal refuses to mount a volume on a non-empty path).
+    # At runtime build_apk() copies to /cache/android-sdk on first run.
     .run_commands(
-        "mkdir -p /cache/android-sdk/cmdline-tools",
+        "mkdir -p /opt/android-sdk/cmdline-tools",
         "curl -fsSL -o /tmp/cmdtools.zip "
         "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip",
-        "unzip -q /tmp/cmdtools.zip -d /cache/android-sdk/cmdline-tools",
-        "mv /cache/android-sdk/cmdline-tools/cmdline-tools /cache/android-sdk/cmdline-tools/latest",
-        "yes | /cache/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses",
-        "/cache/android-sdk/cmdline-tools/latest/bin/sdkmanager "
+        "unzip -q /tmp/cmdtools.zip -d /opt/android-sdk/cmdline-tools",
+        "mv /opt/android-sdk/cmdline-tools/cmdline-tools /opt/android-sdk/cmdline-tools/latest",
+        "yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses",
+        "/opt/android-sdk/cmdline-tools/latest/bin/sdkmanager "
         "\"platform-tools\" \"platforms;android-36\" \"build-tools;36.0.0\"",
-        "chmod -R a+rX /cache/android-sdk",
+        "chmod -R a+rX /opt/android-sdk",
     )
 )
 
@@ -152,6 +154,24 @@ def build_apk(
 
     run("java", "-version")
     run("flutter", "--version")
+
+    # ------------------------------------------------------------------
+    # First-run: copy Android SDK image layer → cache volume
+    # (ANDROID_HOME = /cache/android-sdk, but /opt/android-sdk has the
+    #  real install from image build. Volume mounts over /cache AFTER
+    #  image build, so cmdline-tools can't live there in the image.)
+    # ------------------------------------------------------------------
+
+    cached_sdk = Path("/cache/android-sdk")
+    if not (cached_sdk / "cmdline-tools" / "latest").exists():
+        print("\n--- First-run: copying Android SDK to cache volume ---")
+        cached_sdk.mkdir(parents=True, exist_ok=True)
+        run("cp", "-a", "/opt/android-sdk/cmdline-tools", str(cached_sdk))
+        run("cp", "-a", "/opt/android-sdk/platform-tools", str(cached_sdk))
+        run("cp", "-a", "/opt/android-sdk/platforms", str(cached_sdk))
+        run("cp", "-a", "/opt/android-sdk/build-tools", str(cached_sdk))
+        print("SDK copied to volume — next runs skip this step.")
+
     run("flutter", "doctor", "-v")
 
     # ------------------------------------------------------------------
