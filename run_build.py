@@ -170,9 +170,11 @@ def build_apk(
         run("cp", "-a", "/opt/android-sdk/platform-tools", str(cached_sdk))
         run("cp", "-a", "/opt/android-sdk/platforms", str(cached_sdk))
         run("cp", "-a", "/opt/android-sdk/build-tools", str(cached_sdk))
+        run("cp", "-a", "/opt/android-sdk/licenses", str(cached_sdk))
         print("SDK copied to volume — next runs skip this step.")
 
-    run("flutter", "doctor", "-v")
+    # Always accept licenses (NDK auto-installed by Gradle needs them).
+    run("flutter", "doctor", "--android-licenses")
 
     # ------------------------------------------------------------------
     # Equivalent to actions/cache
