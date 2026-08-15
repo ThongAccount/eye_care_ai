@@ -174,7 +174,7 @@ def build_apk(
         print("SDK copied to volume — next runs skip this step.")
 
     # Always accept licenses (NDK auto-installed by Gradle needs them).
-    run("flutter", "doctor", "--android-licenses")
+    run("yes", "|", "flutter", "doctor", "--android-licenses")
 
     # ------------------------------------------------------------------
     # Equivalent to actions/cache
