@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -14,6 +15,15 @@ import 'package:path_provider/path_provider.dart';
 /// run_number CHÍNH LÀ versionCode thật của APK đó. Nhờ vậy so sánh được
 /// "trên GitHub có bản mới hơn máy đang chạy không" chỉ bằng cách so sánh 2
 /// số nguyên, không cần app tự theo dõi lịch sử bản đã cài.
+///
+/// LƯU Ý QUAN TRỌNG nếu "kiểm tra cập nhật" báo "đang dùng bản mới nhất" một
+/// cách SAI (đã có release mới thật trên GitHub): cơ chế này CHỈ nhận diện
+/// được release có tag đúng định dạng `build-<số>` — tự tạo release thủ công
+/// trên GitHub UI với tag khác (vd "v1.3.0") sẽ KHÔNG được nhận diện, phải
+/// tạo release bằng cách chạy đúng workflow `build-apk.yml`. Ngoài ra nếu
+/// repo đang ở chế độ PRIVATE, các request KHÔNG XÁC THỰC (app không mang
+/// theo token GitHub) sẽ luôn nhận lỗi 404 — repo phải PUBLIC thì tính năng
+/// này mới hoạt động được cho người dùng cuối.
 class UpdateInfo {
   UpdateInfo({
     required this.buildNumber,
@@ -28,12 +38,35 @@ class UpdateInfo {
   final String releaseNotes;
 }
 
+/// Dùng cho nút "Kiểm tra cập nhật" thủ công (Settings) — khác với
+/// [UpdateService.checkForUpdate] (dùng cho lần tự động kiểm tra lúc mở app,
+/// vốn cố tình im lặng khi lỗi), ở đây CẦN phân biệt rõ 3 trường hợp để
+/// người dùng/người debug biết chính xác vì sao không thấy bản cập nhật —
+/// "đang dùng bản mới nhất" và "kiểm tra thất bại" là 2 tình huống khác hẳn
+/// nhau nhưng trước đây gộp chung làm một (đều trả về null), khiến không
+/// thể phân biệt được.
+enum UpdateCheckStatus { upToDate, updateAvailable, failed }
+
+class UpdateCheckResult {
+  UpdateCheckResult(this.status, this.info, {this.errorDetail});
+  final UpdateCheckStatus status;
+  final UpdateInfo? info;
+  // Chi tiết kỹ thuật (mã lỗi HTTP, thông báo exception...) — CHỈ để debug,
+  // không hiển thị thẳng cho người dùng thường (khó hiểu/không cần biết).
+  final String? errorDetail;
+}
+
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
-  // TODO: điền đúng chủ repo GitHub đang publish APK (xem link repo trên
-  // GitHub của bạn, dạng https://github.com/<owner>/<repo>).
+// Chủ repo GitHub đang publish APK qua workflow build-apk.yml. Nếu nút
+// "Kiểm tra cập nhật" LUÔN báo lỗi/luôn "đang dùng bản mới nhất" dù rõ
+// ràng đã có bản mới, việc ĐẦU TIÊN cần xác minh là 2 hằng số này khớp
+// ĐÚNG với repo thật (https://github.com/<owner>/<repo>) — sai 1 trong 2
+// sẽ khiến GitHub trả về 404 cho MỌI request, bị nuốt thành "checkForUpdate
+// trả về null" ở bản tự động, và hiện lỗi rõ ràng hơn ở nút kiểm tra thủ
+// công (xem checkForUpdateVerbose).
   static const String githubOwner = 'Supertime1236';
   static const String githubRepo = 'eye_care_ai';
 
@@ -47,9 +80,19 @@ class UpdateService {
 
   /// Trả về null nếu không có bản mới hơn (hoặc không kiểm tra được, ví dụ
   /// mất mạng) — gọi nơi dùng không cần phân biệt 2 trường hợp này, đều coi
-  /// như "chưa chắc có cập nhật" và im lặng bỏ qua.
+  /// như "chưa chắc có cập nhật" và im lặng bỏ qua. Dùng cho lần tự động
+  /// kiểm tra lúc mở app — muốn biết rõ lý do thất bại, dùng
+  /// [checkForUpdateVerbose] thay thế (nút kiểm tra thủ công).
   Future<UpdateInfo?> checkForUpdate() async {
-    if (!Platform.isAndroid) return null; // sideload APK chỉ áp dụng cho Android
+    final result = await checkForUpdateVerbose();
+    return result.info;
+  }
+
+  /// Bản "nói rõ lý do" — dùng cho nút kiểm tra thủ công trong Settings.
+  Future<UpdateCheckResult> checkForUpdateVerbose() async {
+    if (!Platform.isAndroid) {
+      return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'not_android');
+    }
 
     try {
       final response = await _dio.get(
@@ -57,16 +100,27 @@ class UpdateService {
         options: Options(headers: {'Accept': 'application/vnd.github+json'}),
       );
       final raw = response.data;
-      if (raw == null) return null;
+      if (raw == null) {
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'empty_response');
+      }
 
       final data = raw is List ? (raw.firstOrNull as Map<String, dynamic>?) : raw as Map<String, dynamic>?;
-      if (data == null) return null;
+      if (data == null) {
+        // raw is List rỗng -> repo CHƯA CÓ release nào (khác với lỗi mạng).
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_releases_found');
+      }
 
       final tag = (data['tag_name'] ?? '').toString(); // "build-42"
       final match = RegExp(r'build-(\d+)').firstMatch(tag);
-      if (match == null) return null;
+      if (match == null) {
+        debugPrint('[UpdateService] Release mới nhất có tag "$tag" không khớp định dạng "build-<số>" '
+            '— có thể release này được tạo thủ công thay vì qua workflow build-apk.yml.');
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'tag_format_mismatch:$tag');
+      }
       final latestBuildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
-      if (latestBuildNumber <= 0) return null;
+      if (latestBuildNumber <= 0) {
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'invalid_build_number');
+      }
 
       final assets = (data['assets'] as List?) ?? [];
       final apkAsset = assets.cast<Map<String, dynamic>>().firstWhere(
@@ -74,23 +128,37 @@ class UpdateService {
             orElse: () => {},
           );
       final downloadUrl = (apkAsset['browser_download_url'] ?? '').toString();
-      if (downloadUrl.isEmpty) return null;
+      if (downloadUrl.isEmpty) {
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_apk_asset');
+      }
 
       final packageInfo = await PackageInfo.fromPlatform();
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      if (latestBuildNumber <= currentBuildNumber) return null;
+      if (latestBuildNumber <= currentBuildNumber) {
+        return UpdateCheckResult(UpdateCheckStatus.upToDate, null);
+      }
 
-      return UpdateInfo(
-        buildNumber: latestBuildNumber,
-        versionName: (data['name'] ?? tag).toString(),
-        downloadUrl: downloadUrl,
-        releaseNotes: (data['body'] ?? '').toString(),
+      return UpdateCheckResult(
+        UpdateCheckStatus.updateAvailable,
+        UpdateInfo(
+          buildNumber: latestBuildNumber,
+          versionName: (data['name'] ?? tag).toString(),
+          downloadUrl: downloadUrl,
+          releaseNotes: (data['body'] ?? '').toString(),
+        ),
       );
-    } catch (_) {
-      // Mất mạng / GitHub rate-limit / repo chưa có release nào -> im lặng bỏ
-      // qua, không làm phiền người dùng bằng lỗi kỹ thuật họ không cần biết.
-      return null;
+    } on DioException catch (e) {
+      // Lỗi hay gặp nhất trong nhóm này: 404 (sai githubOwner/githubRepo,
+      // hoặc repo đang PRIVATE nên request không xác thực bị từ chối) và 403
+      // (vượt giới hạn 60 request/giờ không xác thực của GitHub API — dễ xảy
+      // ra khi nhiều người dùng app cùng lúc gọi từ chung 1 địa chỉ IP/NAT).
+      final status = e.response?.statusCode;
+      debugPrint('[UpdateService] Gọi GitHub API thất bại (HTTP $status): ${e.message}');
+      return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'http_$status');
+    } catch (e) {
+      debugPrint('[UpdateService] Lỗi không xác định khi kiểm tra cập nhật: $e');
+      return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'unknown:$e');
     }
   }
 

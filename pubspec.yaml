@@ -53,6 +53,7 @@ dependencies:
   google_mlkit_face_detection: ^0.13.1 # nhận diện vị trí 2 mắt trên khung hình camera
   geolocator: ^13.0.1      # GPS - nguồn dữ liệu duy nhất cho Outdoor time
   light: ^5.0.0             # cảm biến ánh sáng (lux) - dùng cho cảnh báo dùng điện thoại trong bóng tối + tự động điều chỉnh độ sáng
+  workmanager: ^0.9.0+2     # kiểm tra "dùng điện thoại trong bóng tối" định kỳ ~15 phút KỂ CẢ khi app đã đóng hẳn (xem dark_room_background_service.dart) — PHẢI dùng bản >=0.9.x (kiến trúc federated); bản 0.5.x cũ dùng API embedding v1 đã bị gỡ khỏi Flutter/AGP hiện tại, gây lỗi biên dịch "Unresolved reference: shim/PluginRegistrantCallback".
   screen_brightness: ^2.1.1 # chỉnh độ sáng màn hình theo lux đọc được từ cảm biến ánh sáng
   app_usage: ^4.1.0        # OS screen-on time (Android only, needs Usage Access permission)
   # health package đã BỊ BỎ — Sleep giờ ước lượng từ Usage Events (xem

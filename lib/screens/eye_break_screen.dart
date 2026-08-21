@@ -147,6 +147,19 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
   // _recomputeFromEndAt/_syncWithRealNextFireTime bên trên) — chấp nhận
   // được vì đa số trường hợp app vẫn còn tiến trình chạy nền.
 
+  // Chỉ dùng cho nút "Bắt đầu" người dùng BẤM TAY (không dùng cho các lần tự
+  // động chuyển vòng kế tiếp trong _confirmBreakTaken/_dismissPrompt) — nếu
+  // lúc bấm mà đã đạt/vượt mục tiêu ngày, coi như người dùng CHỦ Ý muốn tiếp
+  // tục dù đã đủ, kích hoạt "không giới hạn" cho hết ngày hôm nay luôn.
+  Future<void> _startFromButton(ReminderProvider reminder) async {
+    final habitProvider = context.read<HabitProvider>();
+    final target = habitProvider.habits.firstWhere((h) => h.id == 'breaks').target;
+    if (habitProvider.eyeBreaksTakenToday >= target && !reminder.unlimitedOverrideToday) {
+      await reminder.activateUnlimitedForToday();
+    }
+    _startReminder(reminder);
+  }
+
   void _startReminder(ReminderProvider reminder) {
     _countdownTimer?.cancel();
     final endAt = DateTime.now().add(Duration(minutes: reminder.reminderMinutes));
@@ -265,9 +278,27 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
   }
 
   Future<void> _confirmBreakTaken(ReminderProvider reminder) async {
-    await context.read<HabitProvider>().recordEyeBreak();
+    final habitProvider = context.read<HabitProvider>();
+    await habitProvider.recordEyeBreak();
     if (!mounted) return;
     setState(() => _breakPromptShowing = false);
+
+    // Đã đạt/vượt mục tiêu số lần nghỉ mắt hôm nay (lấy từ target habit
+    // 'breaks' trong Habits) VÀ chưa bật chế độ "không giới hạn" cho hôm
+    // nay -> tự dừng nhắc, không tiếp tục vòng đếm ngược tiếp theo nữa.
+    final target = habitProvider.habits.firstWhere((h) => h.id == 'breaks').target;
+    final reachedTarget = habitProvider.eyeBreaksTakenToday >= target;
+    if (reachedTarget && !reminder.unlimitedOverrideToday) {
+      final strings = context.read<LanguageProvider>().strings;
+      _stopReminder(reminder);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.eyeBreakTargetReached(target as int))),
+        );
+      }
+      return;
+    }
+
     // Tự động bắt đầu chu kỳ đếm ngược tiếp theo.
     _startReminder(reminder);
   }
@@ -411,7 +442,7 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
                         ),
                         onPressed: () => reminder.isEyeBreakReminderActive
                             ? _stopReminder(reminder)
-                            : _startReminder(reminder),
+                            : _startFromButton(reminder),
                         child: Text(
                           reminder.isEyeBreakReminderActive ? strings.eyeBreakStop : strings.eyeBreakStart,
                         ),

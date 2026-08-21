@@ -19,7 +19,14 @@ class AppStrings {
   String get chat => vi ? 'Chat' : 'Chat';
   String get settings => vi ? 'Cài đặt' : 'Settings';
 
-  String get goodMorning => vi ? 'Chào buổi sáng 👋' : 'Good morning 👋';
+  String get greeting {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 11) return vi ? 'Chào buổi sáng 👋' : 'Good morning 👋';
+    if (hour >= 11 && hour < 14) return vi ? 'Chào buổi trưa 👋' : 'Good afternoon 👋';
+    if (hour >= 14 && hour < 18) return vi ? 'Chào buổi chiều 👋' : 'Good afternoon 👋';
+    if (hour >= 18 && hour < 22) return vi ? 'Chào buổi tối 👋' : 'Good evening 👋';
+    return vi ? 'Khuya rồi, nhớ nghỉ mắt nhé 👋' : 'Up late? Remember to rest your eyes 👋';
+  }
   String get welcomeTitle => 'EyeCare AI';
   String get eyeHealthScore => vi ? 'Điểm sức khỏe mắt' : 'Eye Health Score';
   String get goodProgress => vi ? 'Tiến triển tốt! Giữ vững.' : 'Good progress! Keep it up.';
@@ -354,6 +361,9 @@ class AppStrings {
   String get eyeBreakIntervalLabel => vi ? 'Nhắc mỗi' : 'Remind every';
   String get eyeBreakStart => vi ? 'Bắt đầu nhắc nghỉ mắt' : 'Start reminding';
   String get eyeBreakStop => vi ? 'Dừng nhắc' : 'Stop reminding';
+  String eyeBreakTargetReached(int target) => vi
+      ? 'Đã đạt mục tiêu $target lần nghỉ mắt hôm nay! Tạm dừng nhắc. Bấm "Bắt đầu" nếu muốn tiếp tục nhắc không giới hạn.'
+      : 'Reached today\'s goal of $target eye breaks! Reminders paused. Tap "Start" if you want unlimited reminders to continue.';
   String get eyeBreakNextIn => vi ? 'Lần nhắc tiếp theo sau' : 'Next reminder in';
   String get breakNotificationTitle => vi ? 'Đang đếm giờ nghỉ mắt' : 'Eye break countdown';
   String get breakNotificationRemaining => vi ? 'Sẽ nhắc lúc' : 'Will remind at';
@@ -476,7 +486,7 @@ class AppStrings {
   String habitTitle(String id) {
     switch (id) {
       case 'reading':
-        return vi ? 'Số lần test mắt' : 'Eye Test Count';
+        return vi ? 'Số lần test mắt (tuần này)' : 'Eye Tests This Week';
       case 'phone':
         return vi ? 'Sử dụng điện thoại' : 'Phone Usage';
       case 'sleep':
@@ -495,7 +505,7 @@ class AppStrings {
   String habitSubtitle(String id) {
     switch (id) {
       case 'reading':
-        return featureInDevelopment;
+        return vi ? 'Đếm trong 7 ngày gần nhất' : 'Counted over the last 7 days';
       case 'phone':
         return vi ? 'Thời gian màn hình (hệ điều hành)' : 'Screen-on time (OS)';
       case 'sleep':

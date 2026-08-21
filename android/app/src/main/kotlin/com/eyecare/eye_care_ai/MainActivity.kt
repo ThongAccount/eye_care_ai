@@ -5,6 +5,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.PowerManager
 import android.os.Process
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -47,6 +48,15 @@ class MainActivity : FlutterActivity() {
                 "getUsageBreakdown" -> {
                     val (start, end) = extractRange(call) ?: return@setMethodCallHandler result.error("BAD_ARGS", "startMillis/endMillis required", null)
                     result.success(getUsageBreakdown(start, end))
+                }
+                // Dùng cho tính năng cảnh báo "dùng điện thoại trong bóng
+                // tối" chạy NỀN định kỳ (workmanager, xem
+                // dark_room_background_service.dart): tránh báo nhầm khi máy
+                // đang nằm trong túi/trên bàn với màn hình tắt nhưng phòng
+                // vừa tối (không phải đang thật sự CẦM MÁY nhìn màn hình).
+                "isScreenOn" -> {
+                    val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    result.success(powerManager.isInteractive)
                 }
                 else -> result.notImplemented()
             }
