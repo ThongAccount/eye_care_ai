@@ -161,7 +161,7 @@ class _AboutGridState extends State<_AboutGrid> {
     }
   }
 
-  Future<void> _copyCommit(BuildContext context) async {
+  Future<void> _copyCommit() async {
     final sha = _fullCommit;
     if (sha == null) return;
     await Clipboard.setData(ClipboardData(text: sha));
@@ -181,7 +181,7 @@ class _AboutGridState extends State<_AboutGrid> {
       children: [
         for (final entry in _items.entries)
           InkWell(
-            onTap: entry.key == 'Commit' ? () => _copyCommit(context) : null,
+            onTap: entry.key == 'Commit' ? _copyCommit : null,
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

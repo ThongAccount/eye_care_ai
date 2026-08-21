@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +25,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/setup_wizard_screen.dart';
 import 'services/analytics_service.dart';
+import 'services/dark_room_background_service.dart';
 import 'services/device_data_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
@@ -61,6 +64,13 @@ Future<void> main() async {
   } catch (_) {
     // Báo thức nghỉ mắt có thể khởi tạo lại sau khi vào app.
   }
+  // Đăng ký kiểm tra "dùng điện thoại trong bóng tối" chạy NỀN ĐỊNH KỲ (mỗi
+  // ~15 phút, kể cả khi app đã đóng hẳn) — không await/không có timeout
+  // riêng: đây chỉ là ĐĂNG KÝ lịch với hệ thống (rất nhanh), KHÔNG phải bản
+  // thân việc kiểm tra (việc đó chạy sau, trong isolate riêng của
+  // WorkManager) — lỗi ở đây (ví dụ thiết bị không hỗ trợ) không được làm
+  // chậm/kẹt màn hình khởi động app.
+  unawaited(DarkRoomBackgroundService.register());
 
   // Trường hợp app đã bị TẮT HẲN (không chỉ thu nhỏ) và người dùng mở lại
   // bằng cách nhấn vào thông báo "Đến giờ nghỉ mắt": onDidReceiveNotification
@@ -241,8 +251,6 @@ class _AppGateState extends State<_AppGate> {
   late final Future<bool> _consentGivenFuture;
   AuthProvider? _authProvider;
 
-  static Future<bool> _timeoutFuture(Duration duration) => Future.delayed(duration, () => false);
-
   @override
   void initState() {
     super.initState();
@@ -311,8 +319,16 @@ class _AppGateState extends State<_AppGate> {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 context.read<HabitProvider>().setSurveyCompleted(true);
               });
-              final isLoggedIn = context.read<AuthProvider>().isLoggedIn;
-              if (!isLoggedIn) {
+              final authProvider = context.read<AuthProvider>();
+              // Đợi Firebase Auth khôi phục xong phiên đăng nhập cũ (xem
+              // giải thích ở AuthProvider.authReady) trước khi quyết định
+              // hiện LoginScreen — nếu không, người dùng ĐÃ đăng nhập từ
+              // trước vẫn có thể bị "chớp" ra màn đăng nhập oan mỗi lần mở
+              // app do đọc currentUser quá sớm.
+              if (!authProvider.authReady) {
+                return const AppLoadingSkeleton();
+              }
+              if (!authProvider.isLoggedIn) {
                 return const LoginScreen();
               }
 

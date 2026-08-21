@@ -73,26 +73,22 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   // lib/services/update_service.dart) — chỉ hỏi 1 LẦN mỗi lần mở app (không
   // đặt trong Timer.periodic như refresh habit ở trên), tránh phiền người
   // dùng bằng dialog bật lên lặp lại giữa lúc họ đang dùng app.
-  Future<void> _checkForAppUpdate({bool manual = false, BuildContext? context}) async {
+  //
+  // Trước đây hàm này nhận thêm `manual`/`context` optional (cho 1 nút
+  // "kiểm tra cập nhật" thủ công) nhưng nút đó rốt cuộc được implement bằng
+  // 1 widget riêng (_CheckForUpdateButton trong settings_screen.dart) tự
+  // gọi UpdateService trực tiếp, không đi qua hàm này — 2 tham số kia thành
+  // dead code không nơi nào truyền vào. Bỏ hẳn: vừa dọn code chết, vừa hết
+  // luôn lỗi "use_build_context_synchronously" (dùng BuildContext của MỘT
+  // WIDGET KHÁC được truyền vào, `mounted` của State này không chứng minh
+  // được BuildContext đó vẫn còn sống qua await) vì giờ chỉ còn dùng đúng
+  // `context` của chính State này, luôn được bảo vệ bởi đúng `mounted` của nó.
+  Future<void> _checkForAppUpdate() async {
     final update = await UpdateService.instance.checkForUpdate();
-    final target = context ?? this.context;
-    if (!manual) {
-      if (update == null || !mounted) return;
-      final strings = target.read<LanguageProvider>().strings;
-      if (!mounted) return;
-      UpdateDialog.show(target, update, strings);
-      return;
-    }
-
+    if (update == null || !mounted) return;
+    final strings = context.read<LanguageProvider>().strings;
     if (!mounted) return;
-    final strings = target.read<LanguageProvider>().strings;
-    if (update == null) {
-      ScaffoldMessenger.of(target).showSnackBar(
-        SnackBar(content: Text(strings.updateCheckFailed)),
-      );
-      return;
-    }
-    UpdateDialog.show(target, update, strings);
+    UpdateDialog.show(context, update, strings);
   }
 
   @override

@@ -4,7 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/app_strings.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/profile_provider.dart';
@@ -44,7 +43,7 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    strings.goodMorning,
+                    strings.greeting,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   Text(
@@ -53,21 +52,53 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              Builder(builder: (context) {
-                final profile = context.watch<ProfileProvider>();
-                final accent = Theme.of(context).colorScheme.primary;
-                return CircleAvatar(
-                  radius: 22,
-                  backgroundColor: accent.withValues(alpha: 0.1),
-                  backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
-                  child: profile.avatarUrl == null
-                      ? Text(
-                          profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '👤',
-                          style: TextStyle(fontSize: 18, color: accent),
-                        )
-                      : null,
-                );
-              }),
+              Row(
+                children: [
+                  // Badge chuỗi (streak) — trước đây chỉ hiện ở trang Thống
+                  // kê, giờ thêm ở Trang chủ luôn để thấy ngay không cần vào
+                  // sâu. Chỉ hiện khi có streak > 0 (streak = 0 hiện ra
+                  // "🔥 0 ngày" trông kỳ, không cần thiết ngay từ đầu).
+                  if (habit.streakDays > 0) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const AppIcon('🔥', size: 16, color: AppColors.warning),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${habit.streakDays}',
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: AppColors.warning,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Builder(builder: (context) {
+                    final profile = context.watch<ProfileProvider>();
+                    final accent = Theme.of(context).colorScheme.primary;
+                    return CircleAvatar(
+                      radius: 22,
+                      backgroundColor: accent.withValues(alpha: 0.1),
+                      backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
+                      child: profile.avatarUrl == null
+                          ? Text(
+                              profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '👤',
+                              style: TextStyle(fontSize: 18, color: accent),
+                            )
+                          : null,
+                    );
+                  }),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 20),

@@ -620,6 +620,13 @@ class DeviceDataService {
   // trong một khoảng thời gian liên tục đủ dài, coi như người dùng đang nhìn
   // màn hình trong bóng tối và gọi callback `onDarkWarning` MỘT LẦN cho tới
   // khi ánh sáng trở lại bình thường (tránh spam thông báo liên tục).
+  //
+  // Đây là bản REAL-TIME, chỉ chạy khi app còn tiến trình (mở hoặc vừa
+  // chuyển nền). Còn khi app đã bị đóng hẳn, xem thêm bản chạy nền định kỳ
+  // ~15 phút ở lib/services/dark_room_background_service.dart (dùng
+  // WorkManager, tách biệt hoàn toàn — 2 bản có thể hiếm khi cùng bắn thông
+  // báo gần nhau nếu trùng thời điểm, coi là đánh đổi chấp nhận được so với
+  // việc phải đồng bộ giữa 2 isolate độc lập).
   StreamSubscription<int>? _darkRoomLightSub;
   DateTime? _darkSince;
   bool _darkWarningFired = false;

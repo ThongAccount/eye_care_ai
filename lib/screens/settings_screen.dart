@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -388,18 +389,44 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  strings.version,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
+              const Center(child: _AppVersionLabel()),
               const SizedBox(height: 8),
               const Center(child: _CheckForUpdateButton()),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// "EyeCare AI v1.0.0" trước đây bị HARDCODE cứng, không khớp với bản thật
+// đang cài (đặc biệt sai sau mỗi lần cập nhật) — đọc động từ PackageInfo.
+class _AppVersionLabel extends StatefulWidget {
+  const _AppVersionLabel();
+
+  @override
+  State<_AppVersionLabel> createState() => _AppVersionLabelState();
+}
+
+class _AppVersionLabelState extends State<_AppVersionLabel> {
+  String? _label;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (!mounted) return;
+      setState(() => _label = 'EyeCare AI v${info.version} (build ${info.buildNumber})');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.watch<LanguageProvider>().strings;
+    return Text(
+      _label ?? strings.version,
+      style: Theme.of(context).textTheme.bodySmall,
     );
   }
 }
@@ -421,19 +448,31 @@ class _CheckForUpdateButtonState extends State<_CheckForUpdateButton> {
 
   Future<void> _check() async {
     setState(() => _checking = true);
-    final update = await UpdateService.instance.checkForUpdate();
+    // Dùng bản "nói rõ lý do" thay vì checkForUpdate() — bấm nút thủ công mà
+    // luôn nhận đúng 1 câu "đang dùng bản mới nhất" dù có lỗi thật sự (sai
+    // repo, repo private, hết quota GitHub API...) sẽ không cách nào tự
+    // biết được vì sao — xem UpdateService.checkForUpdateVerbose().
+    final result = await UpdateService.instance.checkForUpdateVerbose();
     if (!mounted) return;
     setState(() => _checking = false);
 
     final strings = context.read<LanguageProvider>().strings;
-    if (update == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.noUpdateAvailable)),
-      );
-      return;
+    switch (result.status) {
+      case UpdateCheckStatus.updateAvailable:
+        if (!mounted) return;
+        UpdateDialog.show(context, result.info!, strings);
+        break;
+      case UpdateCheckStatus.upToDate:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.noUpdateAvailable)),
+        );
+        break;
+      case UpdateCheckStatus.failed:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${strings.updateCheckFailed} (${result.errorDetail})')),
+        );
+        break;
     }
-    if (!mounted) return;
-    UpdateDialog.show(context, update, strings);
   }
 
   @override

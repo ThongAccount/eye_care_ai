@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:eye_care_ai/services/update_service.dart';
 
 void main() {
   group('UpdateService release parsing', () {
