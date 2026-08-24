@@ -114,8 +114,10 @@ def run(*args, cwd=None, env=None, check=True, shell=False, quiet=False, redacte
             ]
             import re
             for i, arg in enumerate(display_args):
+                masked = arg
                 for pattern in secret_patterns:
-                    display_args[i] = re.sub(pattern, '[REDACTED]', arg)
+                    masked = re.sub(pattern, '[REDACTED]', masked)
+                display_args[i] = masked
         print("+", " ".join(display_args), flush=True)
     if shell:
         subprocess.run(" ".join(str(x) for x in args), shell=True, cwd=cwd, env=env, check=check)
