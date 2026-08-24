@@ -98,8 +98,25 @@ image = (
 )
 
 
-def run(*args, cwd=None, env=None, check=True, shell=False):
-    print("+", " ".join(str(x) for x in args), flush=True)
+def run(*args, cwd=None, env=None, check=True, shell=False, quiet=False, redacted=False):
+    if not quiet:
+        display_args = list(map(str, args))
+        if redacted:
+            # Mask common secret patterns
+            secret_patterns = [
+                r'--dart-define=[A-Z_]+=[^\s]+',
+                r'KEYSTORE_BASE64=[^\s]+',
+                r'KEYSTORE_PASSWORD=[^\s]+',
+                r'KEY_ALIAS=[^\s]+',
+                r'KEY_PASSWORD=[^\s]+',
+                r'NIM_API_KEY=[^\s]+',
+                r'COMMIT_HASH=[^\s]+',
+            ]
+            import re
+            for i, arg in enumerate(display_args):
+                for pattern in secret_patterns:
+                    display_args[i] = re.sub(pattern, '[REDACTED]', arg)
+        print("+", " ".join(display_args), flush=True)
     if shell:
         subprocess.run(" ".join(str(x) for x in args), shell=True, cwd=cwd, env=env, check=check)
         return
@@ -176,7 +193,7 @@ def build_apk(
         print("SDK copied to volume — next runs skip this step.")
 
     # Always accept licenses (NDK auto-installed by Gradle needs them).
-    run("yes", "|", "flutter", "doctor", "--android-licenses", shell=True)
+    run("yes", "|", "flutter", "doctor", "--android-licenses", shell=True, quiet=True)
 
     # ------------------------------------------------------------------
     # Equivalent to actions/cache
@@ -272,6 +289,7 @@ def build_apk(
         f"--build-number={build_number}",
         f"--dart-define=NIM_API_KEY={NIM_API_KEY}",
         f"--dart-define=COMMIT_HASH={commit_hash}",
+        redacted=True,
     )
 
     # ------------------------------------------------------------------
