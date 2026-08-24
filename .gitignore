@@ -48,6 +48,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/release/
 
 # Keystore & signing secrets — KHÔNG BAO GIỜ commit lên git
 *.jks

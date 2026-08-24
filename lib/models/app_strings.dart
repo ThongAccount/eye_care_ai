@@ -136,6 +136,28 @@ class AppStrings {
   String get more => vi ? 'Khác' : 'More';
   String get privacySecurity => vi ? 'Quyền riêng tư & Bảo mật' : 'Privacy & Security';
   String get termsOfService => vi ? 'Điều khoản dịch vụ' : 'Terms of Service';
+
+  // App Lock (giới hạn sử dụng hằng ngày)
+  String get appLockTileTitle => vi ? 'Giới hạn thời gian' : 'Usage Limit';
+  String get appLockTileSubtitle =>
+      vi ? 'Khóa app khi dùng quá thời gian cho phép' : 'Lock the app after the daily limit';
+  String get appLockTitle => vi ? 'Đã hết thời gian dùng hôm nay' : 'Daily limit reached';
+  String get appLockBody => vi
+      ? 'Bạn đã đạt giới hạn thời gian hôm nay. Hãy nghỉ ngơi cho đôi mắt — tiếp tục dùng sẽ kích hoạt khóa tạm thời.'
+      : 'You have reached today\'s usage limit. Give your eyes a break — continuing will re-trigger the lock.';
+  String get appLockGrantFive => vi ? '+5 phút nữa' : '+5 more minutes';
+  String get appLockOpenSettings => vi ? 'Mở Cài đặt giới hạn' : 'Open limit settings';
+  String get appLockSettingsTitle => vi ? 'Giới hạn thời gian' : 'Usage Limit';
+  String get appLockEnable => vi ? 'Bật giới hạn' : 'Enable limit';
+  String appLockMinutes(int m) => vi ? '$m phút mỗi ngày' : '$m minutes per day';
+  String get appLockTestTitle => vi ? 'Kiểm tra màn hình chặn' : 'Test the blocking screen';
+  String get appLockTestBody => vi
+      ? 'Bấm để hiện thử màn hình chặn phủ lên app khác — chuyển sang app khác sau khi bấm.'
+      : 'Shows a preview of the blocking screen over another app — switch apps after tapping.';
+  String get appLockTestShown => vi ? 'Đã hiện màn hình chặn — hãy chuyển sang app khác!' : 'Blocking screen shown — switch to another app!';
+  String get appLockTestDenied => vi
+      ? 'Chưa có quyền hiển thị trên màn hình. Hãy bật trong Cài đặt.'
+      : 'Display-over-other-apps permission missing. Enable it in Settings.';
   String get helpSupport => vi ? 'Trợ giúp & Hỗ trợ' : 'Help & Support';
   String get signOut => vi ? 'Đăng xuất' : 'Sign Out';
   String get version => vi ? 'EyeCare AI v1.0.0' : 'EyeCare AI v1.0.0';
@@ -720,6 +742,12 @@ class AppStrings {
   String get setupStepFocusModeBody => vi
       ? 'Cho phép app tạm chặn thông báo từ app khác trong lúc đang đếm ngược giữa 2 lần nghỉ mắt, giúp bạn không bị làm phiền/giật mình.'
       : 'Lets the app briefly block other notifications while counting down between eye breaks, so you\'re not interrupted.';
+
+  // Always on top (SYSTEM_ALERT_WINDOW) — cần cho app-lock chặn app khác
+  String get setupStepOverlayTitle => vi ? 'Hiển thị trên màn hình' : 'Display over other apps';
+  String get setupStepOverlayBody => vi
+      ? 'Cần quyền hiển thị trên màn hình (Always on top) để EyeCare AI có thể hiện màn hình nhắc nhở PHỦ TRÊN các app bạn chọn chặn khi đã hết thời gian dùng hôm nay.'
+      : 'Needs display-over-other-apps permission (Always on top) so EyeCare AI can show the time-up reminder ON TOP of the apps you choose to block once the daily limit is reached.';
 
   String get setupBannerTitle => vi ? 'Hoàn tất thiết lập' : 'Finish setup';
   String setupBannerSubtitle(int granted, int total) =>

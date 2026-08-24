@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_strings.dart';
+import '../services/app_usage_monitor.dart';
 
 class LanguageProvider extends ChangeNotifier {
   static const _kVietnameseKey = 'pref_vietnamese';
@@ -25,6 +26,8 @@ class LanguageProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _isVietnamese = prefs.getBool(_kVietnameseKey) ?? _isVietnamese;
     notifyListeners();
+    // Đồng bộ lần đầu xuống native (overlay app-lock).
+    await AppUsageMonitor.instance.setLanguage(_isVietnamese);
   }
 
   Future<void> toggleVietnamese(bool value) async {
@@ -32,5 +35,7 @@ class LanguageProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kVietnameseKey, value);
     notifyListeners();
+    // Đồng bộ xuống native để overlay app-lock dùng đúng ngôn ngữ.
+    await AppUsageMonitor.instance.setLanguage(value);
   }
 }
