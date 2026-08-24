@@ -60,13 +60,13 @@ class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
-// Chủ repo GitHub đang publish APK qua workflow build-apk.yml. Nếu nút
-// "Kiểm tra cập nhật" LUÔN báo lỗi/luôn "đang dùng bản mới nhất" dù rõ
-// ràng đã có bản mới, việc ĐẦU TIÊN cần xác minh là 2 hằng số này khớp
-// ĐÚNG với repo thật (https://github.com/<owner>/<repo>) — sai 1 trong 2
-// sẽ khiến GitHub trả về 404 cho MỌI request, bị nuốt thành "checkForUpdate
-// trả về null" ở bản tự động, và hiện lỗi rõ ràng hơn ở nút kiểm tra thủ
-// công (xem checkForUpdateVerbose).
+  // Chủ repo GitHub đang publish APK qua workflow build-apk.yml. Nếu nút
+  // "Kiểm tra cập nhật" LUÔN báo lỗi/luôn "đang dùng bản mới nhất" dù rõ
+  // ràng đã có bản mới, việc ĐẦU TIÊN cần xác minh là 2 hằng số này khớp
+  // ĐÚNG với repo thật (https://github.com/<owner>/<repo>) — sai 1 trong 2
+  // sẽ khiến GitHub trả về 404 cho MỌI request, bị nuốt thành "checkForUpdate
+  // trả về null" ở bản tự động, và hiện lỗi rõ ràng hơn ở nút kiểm tra thủ
+  // công (xem checkForUpdateVerbose).
   static const String githubOwner = 'Supertime1236';
   static const String githubRepo = 'eye_care_ai';
 

@@ -18,6 +18,8 @@ import 'providers/settings_more_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/setup_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/usage_limit_provider.dart';
+import 'navigation/root_navigator.dart';
 import 'screens/consent_screen.dart';
 import 'screens/eye_break_screen.dart';
 import 'screens/habits_survey_screen.dart';
@@ -30,16 +32,13 @@ import 'services/device_data_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 
-// Navigator toàn cục — dùng để điều hướng tới EyeBreakScreen ngay khi người
-// dùng nhấn vào thông báo "Đến giờ nghỉ mắt", kể cả khi thông báo được nhấn
-// lúc app đang ở nền (không có BuildContext nào sẵn có lúc đó). Đặt ở top
-// level (không phải trong 1 State) vì NotificationService (tầng service,
-// không có UI) cần gọi được nó thông qua callback onBreakReminderTapped mà
-// không phải import ngược lại màn hình.
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-
+// Navigator toàn cục sinh ra ở navigation/root_navigator.dart (dùng chung với
+// AppUsageMonitor của app-lock) — để điều hướng tới EyeBreakScreen ngay khi
+// người dùng nhấn vào thông báo "Đến giờ nghỉ mắt" ngay cả khi app ở nền
+// (không có BuildContext nào sẵn lúc đó). NotificationService (tầng service)
+// gọi qua callback onBreakReminderTapped, không import ngược màn hình.
 void _openEyeBreakScreenFromNotification() {
-  final navigator = _rootNavigatorKey.currentState;
+  final navigator = rootNavigatorKey.currentState;
   if (navigator == null) return;
   // Tránh chồng nhiều EyeBreakScreen nếu người dùng bấm thông báo nhiều lần
   // liên tiếp (VD báo thức lặp bắn 2 lần trước khi mở thông báo đầu) — quay
@@ -94,6 +93,7 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (_) => SettingsMoreProvider()..init(),
         ),
+        ChangeNotifierProvider(create: (_) => UsageLimitProvider()),
         ChangeNotifierProvider(create: (_) => HabitProvider()),
         ChangeNotifierProvider(create: (_) => RankProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
@@ -136,7 +136,7 @@ class _EyeCareAppState extends State<EyeCareApp> {
     final fontTextTheme = font.getTextTheme(isVietnamese);
 
     return MaterialApp(
-      navigatorKey: _rootNavigatorKey,
+      navigatorKey: rootNavigatorKey,
       title: 'EyeCare AI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(accentSeed: accent.seedColor, fontTextTheme: fontTextTheme),

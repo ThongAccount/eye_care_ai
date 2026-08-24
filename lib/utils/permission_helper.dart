@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/usage_service.dart';
 
@@ -9,6 +10,35 @@ class PermissionHelper {
   static Future<bool> checkUsagePermission() async {
     return await UsageService.hasPermission();
   }
+
+  // Kiểm tra quyền hiển thị overlay (SYSTEM_ALERT_WINDOW) — native
+  // Settings.canDrawOverlays qua MethodChannel (permission_handler không
+  // cover quyền này).
+  static const MethodChannel _overlayChannel = MethodChannel('eye_care_ai/app_lock');
+
+  static Future<bool> checkOverlayPermission() async {
+    try {
+      return await _overlayChannel.invokeMethod<bool>('canDrawOverlays') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Mở trang quyền overlay (Always on top) của hệ thống — người dùng tự bật,
+  /// quay lại app → refreshStatus() cập nhật.
+  ///
+  /// KHÔNG dùng url_launcher 'package:' — trên ColorOS/Oppo resolver hay đưa
+  /// về trang thông tin app thay vì trang quyền overlay, hoặc im lặng no-op.
+  /// Gọi thẳng native Settings.ACTION_MANAGE_OVERLAY_PERMISSION qua kênh đã
+  /// đăng ký trong MainActivity (giữ ý định chính xác, tránh browser fallback).
+  static Future<void> openOverlaySettings() async {
+    try {
+      await _overlayChannel.invokeMethod<void>('openOverlaySettings');
+    } catch (_) {
+      // Bỏ qua nếu không mở được — người dùng vẫn có thể bỏ qua bước này.
+    }
+  }
+
 
 
   // Yêu cầu quyền PACKAGE_USAGE_STATS

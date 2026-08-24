@@ -4,9 +4,12 @@ import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.PowerManager
 import android.os.Process
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,9 +27,68 @@ import io.flutter.plugin.common.MethodChannel
 //    Android gộp dữ liệu theo nhiều khung thời gian chồng lấn.
 class MainActivity : FlutterActivity() {
     private val channelName = "eye_care_ai/usage_events"
+    private val appLockChannelName = "eye_care_ai/app_lock"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Watcher app-lock: poll foreground mỗi 3s, hiện gate khi mở app bị chặn
+        // trong lúc budget đã cạn (armed). Chạy độc lập với vòng đời Dart.
+        AppLockOverlayManager.get(this).startWatcher()
+
+        // Kênh app-lock: kiểm tra/mở quyền Always on top (SYSTEM_ALERT_WINDOW)
+        // cho màn hình chặn app khác khi hết thời gian dùng (Phase 1).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, appLockChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this))
+                    "openOverlaySettings" -> {
+                        try {
+                            startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:$packageName")
+                                )
+                            )
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("OVERLAY_SETTINGS_FAILED", e.message, null)
+                        }
+                    }
+                    "showTestOverlay" ->
+                        result.success(AppLockOverlayManager.get(this).showTestOverlay())
+                    "showGateOverlay" -> {
+                        val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        result.success(AppLockOverlayManager.get(this).showGateOverlay().let {
+                            if (it) {
+                                AppLockOverlayManager.get(this).setBlockedPackages(blocked)
+                            }
+                            it
+                        })
+                    }
+                    "armGate" -> {
+                        val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        call.argument<Boolean>("vi")?.let {
+                            AppLockOverlayManager.get(this).setLanguage(it)
+                        }
+                        AppLockOverlayManager.get(this).armGate(blocked)
+                        result.success(true)
+                    }
+                    "setLanguage" -> {
+                        val vi = call.argument<Boolean>("vi") ?: true
+                        AppLockOverlayManager.get(this).setLanguage(vi)
+                        result.success(true)
+                    }
+                    "disarmGate" -> {
+                        AppLockOverlayManager.get(this).disarmGate()
+                        result.success(true)
+                    }
+                    "dismissOverlay" -> {
+                        AppLockOverlayManager.get(this).dismiss()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         // BUG DA SUA: UsageStatsHandler (kenh "eye_care/usage" - dung boi
         // UsageService.dart cho checkUsagePermission/openUsageSettings/
