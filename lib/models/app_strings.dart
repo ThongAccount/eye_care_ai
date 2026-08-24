@@ -535,7 +535,7 @@ class AppStrings {
       case 'outdoor':
         return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':
-        return vi ? 'Nghỉ mắt trong ngày' : 'Eye breaks today';
+        return vi ? 'Nhận diện ánh nhìn qua camera trước' : 'Front camera gaze detection';
       default:
         return '';
     }
