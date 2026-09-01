@@ -5,11 +5,17 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Bundle
 import android.os.PowerManager
 import android.os.Process
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.TimeUnit
 
 // MainActivity thêm một MethodChannel riêng cho các dữ liệu mà package
 // `app_usage` không cung cấp đủ chính xác/đầy đủ:
@@ -24,6 +30,28 @@ import io.flutter.plugin.common.MethodChannel
 //    Android gộp dữ liệu theo nhiều khung thời gian chồng lấn.
 class MainActivity : FlutterActivity() {
     private val channelName = "eye_care_ai/usage_events"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        registerNativeDarkRoomWorker()
+    }
+
+    // Đăng ký DarkRoomWorker (xem DarkRoomWorker.kt để hiểu VÌ SAO chuyển
+    // hẳn sang native thay vì Dart/workmanager) — gọi ở đây, KHÔNG phải qua
+    // MethodChannel, vì bản thân việc đăng ký lịch lặp chỉ cần chạy đúng 1
+    // lần khi có Context sẵn sàng; dùng ExistingPeriodicWorkPolicy.KEEP nên
+    // gọi lại nhiều lần (mỗi lần mở app) là vô hại, WorkManager tự bỏ qua
+    // nếu task cùng tên đã tồn tại.
+    private fun registerNativeDarkRoomWorker() {
+        val request = PeriodicWorkRequestBuilder<DarkRoomWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(false).build())
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            DarkRoomWorker.UNIQUE_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

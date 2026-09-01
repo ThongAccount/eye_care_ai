@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -71,12 +73,11 @@ class HabitProvider extends ChangeNotifier {
     HabitData(
       id: 'reading',
       title: 'Eye Test Count',
-      subtitle: 'Coming soon',
+      subtitle: 'Counted over the last 7 days',
       icon: '🧪',
       unit: 'times',
       target: 1,
       color: 0xFF3B82F6,
-      isComingSoon: true,
     ),
     HabitData(
       id: 'phone',
@@ -223,6 +224,7 @@ class HabitProvider extends ChangeNotifier {
       service.getSleepHours().timeout(const Duration(seconds: 6), onTimeout: () => null),
       service.getOutdoorMinutesToday().timeout(const Duration(seconds: 6), onTimeout: () => 0),
       service.getEyeBreaksToday().timeout(const Duration(seconds: 6), onTimeout: () => 0),
+      _getEyeTestCountLast7Days().timeout(const Duration(seconds: 6), onTimeout: () => 0),
     ]);
 
     appUsageBreakdown = results[0] as List<AppUsageBreakdownEntry>;
@@ -232,9 +234,11 @@ class HabitProvider extends ChangeNotifier {
     // appUsageBreakdown, cùng 1 con số với thẻ "Sử dụng theo ứng dụng".
     totalScreenTimeHoursToday = phoneHours ?? 0;
 
-    // 'reading' giờ là "Eye Test Count" — tính năng đang phát triển, chưa có
-    // nguồn dữ liệu thật nên không gọi getReadingMinutesToday()/áp giá trị
-    // nữa, giữ nguyên current = 0 do UI đã làm mờ + khoá thẻ này.
+    // 'reading' giờ là "Eye Test Count" — đếm số lần người dùng đã hoàn
+    // thành bài Kiểm tra mắt (EyeTestScreen) trong 7 ngày gần nhất, lấy từ
+    // lịch sử lưu ở SharedPreferences key 'eye_test_history'.
+    final eyeTestCount = results[4] as int;
+    _applyHabitValue('reading', eyeTestCount.toDouble());
     _applyHabitValue('phone', phoneHours);
     // Health Connect chỉ ĐỌC được dữ liệu ngủ nếu có app khác (Samsung
     // Health, Google Fit, Fitbit...) đã ghi vào đó — nếu máy không cài Health
@@ -298,6 +302,28 @@ class HabitProvider extends ChangeNotifier {
     }
   }
 
+  // Đếm số lần hoàn thành bài Kiểm tra mắt (EyeTestScreen) trong 7 ngày gần
+  // nhất, đọc từ cùng key 'eye_test_history' mà eye_test_screen.dart dùng để
+  // lưu lịch sử (tối đa 10 lần gần nhất, mỗi entry có field 'date' dạng ISO8601).
+  Future<int> _getEyeTestCountLast7Days() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('eye_test_history');
+    if (raw == null) return 0;
+    try {
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      final cutoff = DateTime.now().subtract(const Duration(days: 7));
+      return list.where((e) {
+        final dateStr = e['date'] as String?;
+        if (dateStr == null) return false;
+        final date = DateTime.tryParse(dateStr);
+        return date != null && date.isAfter(cutoff);
+      }).length;
+    } catch (_) {
+      // Dữ liệu cũ hỏng/không đọc được -> coi như chưa có lần test nào.
+      return 0;
+    }
+  }
+
   void _applyHabitValue(String id, double? value) {
     final habit = habits.firstWhere((h) => h.id == id);
     if (value == null) {
@@ -314,10 +340,9 @@ class HabitProvider extends ChangeNotifier {
   static const _phonePenaltyPerHourOver = 10.0; // mỗi giờ dùng vượt target -> -10 điểm
 
   void _updateHabitsCompletion() {
-    // "Eye Test Count" (id: reading) chưa có tính năng đứng sau, current
-    // luôn = 0 vĩnh viễn -> nếu tính chung vào điểm trung bình sẽ kéo trần
-    // điểm sức khỏe mắt xuống tối đa ~80% MÃI MÃI dù 4 habit còn lại đều
-    // hoàn hảo. Loại hẳn các habit "isComingSoon" ra khỏi công thức tính điểm.
+    // Loại các habit "isComingSoon" (nếu có trong tương lai) ra khỏi công
+    // thức tính điểm — "Eye Test Count" (id: reading) giờ đã có dữ liệu thật
+    // (đếm từ eye_test_history) nên được tính vào như các habit khác.
     final scored = habits.where((h) => !h.isComingSoon).toList();
     if (scored.isEmpty) {
       habitsCompletionPercent = 0;

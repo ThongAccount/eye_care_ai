@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/device_data_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_icon.dart';
@@ -30,6 +31,7 @@ class HomeScreen extends StatelessWidget {
     final habit = context.watch<HabitProvider>();
     final language = context.watch<LanguageProvider>();
     final strings = language.strings;
+    final hasUpdate = context.watch<UpdateProvider>().hasUpdateAvailable;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -54,30 +56,30 @@ class HomeScreen extends StatelessWidget {
               ),
               Row(
                 children: [
-                  // Badge chuỗi (streak) — trước đây chỉ hiện ở trang Thống
-                  // kê, giờ thêm ở Trang chủ luôn để thấy ngay không cần vào
-                  // sâu. Chỉ hiện khi có streak > 0 (streak = 0 hiện ra
-                  // "🔥 0 ngày" trông kỳ, không cần thiết ngay từ đầu).
-                  if (habit.streakDays > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
+                  // Biểu tượng báo "có bản cập nhật đang chờ" — thay cho
+                  // chấm đỏ trước đây gắn trên ô Cài đặt trong lưới tính
+                  // năng (dễ bị hiểu nhầm là lỗi UI khi tràn ra ngoài ô).
+                  // Đặt hẳn lên góc trên Trang chủ, bấm vào mở luôn Cài đặt
+                  // (đã có sẵn mục "Kiểm tra bản cập nhật" trong đó).
+                  if (hasUpdate) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon('🔥', size: 16, color: AppColors.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${habit.streakDays}',
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                  color: AppColors.warning,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ],
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.system_update_rounded,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),

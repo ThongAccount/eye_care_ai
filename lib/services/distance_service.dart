@@ -38,6 +38,26 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 /// ±15-20% tùy khuôn mặt người dùng và đời máy cụ thể. Đủ dùng để phân biệt
 /// "quá gần / vừa / quá xa" (mục đích chính: nhắc giữ khoảng cách ỔN ĐỊNH
 /// giữa các lần đo, không phải đo milimet chính xác tuyệt đối).
+/// Kết quả đo 1 khung hình: khoảng cách + xác suất mở mắt từng bên (0.0 =
+/// chắc chắn nhắm, 1.0 = chắc chắn mở). Xác suất mắt null nếu ML Kit không
+/// trả về được (thường do góc mặt/ánh sáng), lúc đó coi như "chưa xác định
+/// được", không nên khẳng định là nhắm hay mở.
+class FaceMeasurement {
+  const FaceMeasurement({
+    required this.distanceCm,
+    required this.leftEyeOpenProbability,
+    required this.rightEyeOpenProbability,
+  });
+
+  final double? distanceCm;
+  // LƯU Ý HỆ QUY CHIẾU: đây là mắt TRÁI/PHẢI THẬT của người dùng (theo cách
+  // ML Kit gắn nhãn landmark dựa trên cấu trúc khuôn mặt, không phải theo
+  // vị trí trái/phải trên ẢNH — camera trước dù có lật ảnh để hiển thị kiểu
+  // "soi gương" thì ML Kit vẫn luôn trả nhãn theo đúng mắt thật của mặt).
+  final double? leftEyeOpenProbability;
+  final double? rightEyeOpenProbability;
+}
+
 class DistanceService {
   DistanceService._();
   static final instance = DistanceService._();
@@ -51,11 +71,12 @@ class DistanceService {
   bool _busy = false;
   bool _disposed = false;
 
-  final _distanceController = StreamController<double?>.broadcast();
+  final _distanceController = StreamController<FaceMeasurement?>.broadcast();
 
-  /// Stream khoảng cách ước lượng (cm), null = hiện không thấy khuôn mặt rõ
-  /// ràng (quá tối, ra khỏi khung hình, camera chưa sẵn sàng...).
-  Stream<double?> get distanceStream => _distanceController.stream;
+  /// Stream kết quả đo (khoảng cách + độ mở từng mắt), null = hiện không
+  /// thấy khuôn mặt rõ ràng (quá tối, ra khỏi khung hình, camera chưa sẵn
+  /// sàng...).
+  Stream<FaceMeasurement?> get distanceStream => _distanceController.stream;
 
   bool get isRunning => _controller != null && (_controller?.value.isStreamingImages ?? false);
 
@@ -88,6 +109,10 @@ class DistanceService {
       _faceDetector = FaceDetector(
         options: FaceDetectorOptions(
           enableLandmarks: true,
+          // enableClassification: BẬT thêm để lấy được leftEyeOpenProbability
+          // / rightEyeOpenProbability — dùng cho việc kiểm tra "mắt còn lại
+          // có đang nhắm/che đúng không" trong bài đo thị lực từng mắt.
+          enableClassification: true,
           // Chậm hơn "fast" một chút nhưng landmark mắt ổn định hơn HẲN —
           // xem giải thích chi tiết ở doc comment class phía trên.
           performanceMode: FaceDetectorMode.accurate,
@@ -167,7 +192,11 @@ class DistanceService {
         _distanceController.add(null);
         return;
       }
-      _distanceController.add(distanceCm);
+      _distanceController.add(FaceMeasurement(
+        distanceCm: distanceCm,
+        leftEyeOpenProbability: face.leftEyeOpenProbability,
+        rightEyeOpenProbability: face.rightEyeOpenProbability,
+      ));
     } catch (_) {
       _distanceController.add(null);
     } finally {

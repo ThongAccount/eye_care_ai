@@ -18,6 +18,7 @@ import 'providers/settings_more_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/setup_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/update_provider.dart';
 import 'screens/consent_screen.dart';
 import 'screens/eye_break_screen.dart';
 import 'screens/habits_survey_screen.dart';
@@ -99,6 +100,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => SetupProvider()),
+        ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ProfileProvider>(
           create: (_) => ProfileProvider(),
           update: (_, auth, profile) => profile!..syncFromUser(auth.user),

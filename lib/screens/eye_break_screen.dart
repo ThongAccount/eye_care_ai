@@ -199,13 +199,22 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
   // và bấm "Tắt" (xem _stopReminder), không cần app phải luôn mở.
   void _scheduleRepeatingAlarm(int intervalMinutes) {
     final strings = context.read<LanguageProvider>().strings;
+    final reminder = context.read<ReminderProvider>();
+    // Body thông báo lặp là CỐ ĐỊNH ngay từ lúc đặt lịch (báo thức lặp chạy
+    // hoàn toàn native, không có callback Dart nào chạy mỗi lần bắn để đổi
+    // nội dung — xem giải thích ở scheduleRepeatingBreakAlarm trong
+    // notification_service.dart). Vì vậy câu nhắc uống nước được ghép vào
+    // ĐÂY, một lần, dựa theo cờ waterReminderEnabled tại thời điểm bấm "Bắt
+    // đầu" — nếu người dùng đổi cờ này giữa chừng lúc đang đếm ngược, chỉ có
+    // hiệu lực từ lần bấm Start tiếp theo (cùng trade-off với đổi ngôn ngữ).
+    final waterHint = reminder.waterReminderEnabled ? ' ${strings.eyeBreakWaterHint}.' : '';
     NotificationService.instance.scheduleRepeatingBreakAlarm(
       intervalMinutes: intervalMinutes,
       title: strings.eyeBreakTimeUp,
       // Kèm câu gợi ý chạm vào thông báo để mở thẳng Break Reminder — xem
       // NotificationService.onBreakReminderTapped (gán trong main.dart) xử
       // lý điều hướng thật khi người dùng nhấn.
-      body: '${strings.eyeBreakLookAway}. ${strings.eyeBreakTapToOpen}.',
+      body: '${strings.eyeBreakLookAway}. ${strings.eyeBreakTapToOpen}.$waterHint',
       ongoingTitle: strings.breakNotificationTitle,
       ongoingRemainingSuffix: strings.breakNotificationUntil,
     );
@@ -458,6 +467,15 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
                   description: strings.autoDetectEyeBreakDescription,
                   value: reminder.autoDetectEyeBreaks,
                   onChanged: (value) => reminder.setAutoDetectEyeBreaks(value),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SectionCard(
+                child: SettingsToggleTile(
+                  title: strings.waterReminderTitle,
+                  description: strings.waterReminderDescription,
+                  value: reminder.waterReminderEnabled,
+                  onChanged: (value) => reminder.setWaterReminderEnabled(value),
                 ),
               ),
               const SizedBox(height: 16),

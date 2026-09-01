@@ -317,6 +317,13 @@ class AppStrings {
   String get eyeTestDistanceHint => vi
       ? 'Giữ điện thoại cách mắt khoảng 30-55cm (tầm sải cẳng tay), giữ nguyên khoảng cách suốt bài test để kết quả nhất quán giữa các lần đo.'
       : 'Hold the phone about 30-55cm (arm\'s length) from your eyes, and keep that distance steady through the test so results stay consistent between attempts.';
+  // Nhắc tháo kính (cận/viễn/áp tròng có độ) TRƯỚC khi bắt đầu — bài test đo
+  // thị lực TỰ NHIÊN của mắt, đeo kính vào sẽ cho kết quả sai lệch (thường
+  // là "tốt hơn thực tế"), khiến người dùng chủ quan không đi khám dù mắt
+  // thực sự đã kém đi.
+  String get eyeTestGlassesReminder => vi
+      ? 'Tháo kính cận/viễn hoặc kính áp tròng có độ trước khi bắt đầu — bài test cần đo đúng thị lực tự nhiên của mắt, đeo kính vào kết quả sẽ không chính xác.'
+      : 'Take off your glasses or corrective contact lenses before starting — this test needs to measure your natural vision; wearing them will skew the result.';
   String get eyeTestCameraPermissionHint => vi
       ? 'Cho phép dùng camera trước để đo khoảng cách mắt-màn hình theo thời gian thực, giúp kết quả kiểm tra chính xác hơn. Ảnh không được lưu lại hay gửi đi đâu cả.'
       : 'Allow the front camera to measure your eye-to-screen distance in real time, for a more accurate test. No images are saved or sent anywhere.';
@@ -325,6 +332,12 @@ class AppStrings {
   String get eyeTestTooClose => vi ? 'Đang quá gần — lùi điện thoại ra một chút' : 'Too close — move the phone a bit further away';
   String get eyeTestTooFar => vi ? 'Đang quá xa — đưa điện thoại lại gần một chút' : 'Too far — bring the phone a bit closer';
   String get eyeTestPausedTitle => vi ? 'Đã tạm dừng bài kiểm tra' : 'Test paused';
+  // Nhắc che/nhắm đúng mắt còn lại — hiện khi camera phát hiện mắt lẽ ra
+  // phải nhắm vẫn đang mở trong lúc đo thị lực mắt kia (che sai/quên che).
+  String get eyeTestCoverLeftEye =>
+      vi ? 'Hãy nhắm hoặc che MẮT TRÁI lại để đo đúng mắt phải' : 'Close or cover your LEFT eye to test the right eye correctly';
+  String get eyeTestCoverRightEye =>
+      vi ? 'Hãy nhắm hoặc che MẮT PHẢI lại để đo đúng mắt trái' : 'Close or cover your RIGHT eye to test the left eye correctly';
   String get eyeTestStart => vi ? 'Bắt đầu kiểm tra' : 'Start test';
   String get eyeTestDisclaimer => vi
       ? 'Đây là công cụ sàng lọc nhanh tại nhà, không thay thế khám mắt chuyên khoa. Nếu nghi ngờ có vấn đề về thị lực, hãy gặp bác sĩ nhãn khoa.'
@@ -373,6 +386,15 @@ class AppStrings {
   String get autoDetectEyeBreakDescription => vi
       ? 'Khoá màn hình / rời app từ 20 giây trở lên sẽ tự tính là 1 lần nghỉ mắt, không cần bấm "Xong" thủ công.'
       : 'Locking the screen or leaving the app for 20+ seconds automatically counts as an eye break — no need to tap "Done".';
+    // Cài đặt "Nhắc uống nước" kèm theo mỗi lần nghỉ mắt.
+  String get waterReminderTitle => vi ? 'Nhắc uống nước' : 'Water reminder';
+  String get waterReminderDescription => vi
+      ? 'Kèm thêm lời nhắc uống một ly nước mỗi lần thông báo nghỉ mắt hiện ra'
+      : 'Add a reminder to drink a glass of water with each eye-break notification';
+  // Câu ngắn ghép vào cuối nội dung thông báo nghỉ mắt khi bật cờ trên (xem
+  // _scheduleRepeatingAlarm trong eye_break_screen.dart — nơi gọi
+  // ' ${strings.eyeBreakWaterHint}.' nên KHÔNG kèm dấu chấm ở đây).
+  String get eyeBreakWaterHint => vi ? 'Nhớ uống thêm một ly nước nhé' : 'Remember to drink a glass of water too';
   String get focusModeTitle => vi ? 'Chế độ Focus' : 'Focus mode';
   String get focusModeDescription => vi
       ? 'Chặn thông báo từ app khác trong lúc đang đếm ngược, giảm giật mình/mất tập trung — tự tắt lại khi đến giờ nghỉ mắt.'

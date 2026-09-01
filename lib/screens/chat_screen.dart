@@ -249,9 +249,8 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             Consumer<ChatProvider>(
               builder: (context, chat, _) {
-                // Gợi ý câu hỏi nhanh — chỉ hiện khi mới vào chat (chưa hỏi gì).
-                final onlyGreeting = chat.messages.length <= 1;
-                if (!onlyGreeting) return const SizedBox.shrink();
+                // Gợi ý câu hỏi nhanh — luôn hiện, kể cả sau khi đã dùng,
+                // để người dùng có thể bấm lại nhiều lần.
                 return SizedBox(
                   height: 40,
                   child: ListView.separated(

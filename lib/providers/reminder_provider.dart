@@ -19,6 +19,11 @@ class ReminderProvider extends ChangeNotifier {
   // lần nào nữa trong CÙNG NGÀY đó — tự reset lại (coi như tắt) khi sang
   // ngày mới, không lưu vĩnh viễn.
   static const _kUnlimitedOverrideDateKey = 'pref_unlimited_override_date';
+  // Nhắc uống nước kèm nghỉ mắt: khô mắt có liên quan tới mất nước, nên mỗi
+  // lần thông báo hết-giờ-nghỉ-mắt bắn ra, kèm luôn 1 câu nhắc uống nước —
+  // xem chỗ ghép body trong eye_break_screen.dart (_scheduleRepeatingAlarm).
+  // Mặc định BẬT vì đây là thói quen tốt, không có tác dụng phụ.
+  static const _kWaterReminderKey = 'pref_water_reminder_enabled';
 
   ReminderProvider() {
     _loadSavedPreferences();
@@ -29,12 +34,14 @@ class ReminderProvider extends ChangeNotifier {
   bool _autoDetectEyeBreaks = true;
   bool _focusModeEnabled = false;
   bool _unlimitedOverrideToday = false;
+  bool _waterReminderEnabled = true;
 
   bool get isEyeBreakReminderActive => _isEyeBreakReminderActive;
   int get reminderMinutes => _reminderMinutes;
   bool get autoDetectEyeBreaks => _autoDetectEyeBreaks;
   bool get focusModeEnabled => _focusModeEnabled;
   bool get unlimitedOverrideToday => _unlimitedOverrideToday;
+  bool get waterReminderEnabled => _waterReminderEnabled;
 
   Future<void> reload() => _loadSavedPreferences();
 
@@ -49,6 +56,7 @@ class ReminderProvider extends ChangeNotifier {
     _autoDetectEyeBreaks = prefs.getBool(_kAutoDetectKey) ?? _autoDetectEyeBreaks;
     _focusModeEnabled = prefs.getBool(_kFocusModeKey) ?? _focusModeEnabled;
     _unlimitedOverrideToday = prefs.getString(_kUnlimitedOverrideDateKey) == _todayKey();
+    _waterReminderEnabled = prefs.getBool(_kWaterReminderKey) ?? _waterReminderEnabled;
     notifyListeners();
   }
 
@@ -65,6 +73,13 @@ class ReminderProvider extends ChangeNotifier {
     _focusModeEnabled = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kFocusModeKey, value);
+    notifyListeners();
+  }
+
+  Future<void> setWaterReminderEnabled(bool value) async {
+    _waterReminderEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kWaterReminderKey, value);
     notifyListeners();
   }
 

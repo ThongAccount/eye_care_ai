@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/app_strings.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
+import '../screens/eye_test_screen.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_icon.dart';
 import '../theme/app_theme.dart';
@@ -175,7 +176,42 @@ class _HabitsScreenState extends State<HabitsScreen> {
                             ],
                           ),
                         )
-                      : _HabitCard(habit: habitItem);
+                      : habitItem.id == 'reading'
+                          ? InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const EyeTestScreen()),
+                                );
+                                // Sau khi làm xong bài test (hoặc quay lại giữa chừng),
+                                // nạp lại habit để thẻ này cập nhật số lần mới nhất.
+                                if (context.mounted) {
+                                  await habit.refreshHabitsFromDevice();
+                                }
+                              },
+                              child: Stack(
+                                children: [
+                                  _HabitCard(habit: habitItem),
+                                  Positioned(
+                                    top: 10,
+                                    right: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.arrow_forward_rounded,
+                                        size: 14,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _HabitCard(habit: habitItem);
 
                   if (habitItem.isComingSoon) {
                     card = IgnorePointer(

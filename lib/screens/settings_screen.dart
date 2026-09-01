@@ -14,6 +14,7 @@ import '../providers/language_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/notification_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
@@ -457,10 +458,18 @@ class _CheckForUpdateButtonState extends State<_CheckForUpdateButton> {
     setState(() => _checking = false);
 
     final strings = context.read<LanguageProvider>().strings;
+    final updateProvider = context.read<UpdateProvider>();
     switch (result.status) {
       case UpdateCheckStatus.updateAvailable:
         if (!mounted) return;
-        UpdateDialog.show(context, result.info!, strings);
+        await updateProvider.setAvailableUpdate(result.info);
+        if (!mounted) return;
+        UpdateDialog.show(
+          context,
+          result.info!,
+          strings,
+          onDismissed: () => context.read<UpdateProvider>().dismissCurrentUpdate(),
+        );
         break;
       case UpdateCheckStatus.upToDate:
         ScaffoldMessenger.of(context).showSnackBar(
