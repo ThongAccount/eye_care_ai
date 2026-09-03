@@ -56,6 +56,12 @@
          màn hình Cài đặt hệ thống; app mở thẳng màn hình đó bằng Intent
          ACTION_MANAGE_WRITE_SETTINGS (xem lib/services/brightness_service.dart). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
+    <!-- Cho phép DarkRoomForegroundService chạy — cần thiết để đọc cảm biến
+         ánh sáng đáng tin cậy kể cả khi app đã bị ẩn/kill (xem
+         DarkRoomForegroundService.kt để hiểu vì sao WorkManager one-shot
+         không đủ trên nhiều máy Android quản lý pin gắt). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <application
         android:label="EyeCare AI"
         android:name="${applicationName}"
@@ -94,6 +100,18 @@
              không kêu khi app đã bị hệ thống dọn khỏi bộ nhớ (không còn chạy
              nền): AlarmManager vẫn kích hoạt đúng giờ, nhưng không có ai
              lắng nghe để hiển thị notification, nên coi như im lặng. -->
+        <!-- Xem DarkRoomForegroundService.kt: foregroundServiceType="specialUse"
+             là bắt buộc từ Android 14 (API 34) cho mọi foreground service,
+             kèm theo 1 "subtype" mô tả mục đích dùng, xét duyệt khi lên
+             Play Store (không áp dụng khi cài trực tiếp qua APK/sideload). -->
+        <service
+            android:name=".DarkRoomForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="eye_care_dark_room_lux_monitoring" />
+        </service>
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

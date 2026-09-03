@@ -4,10 +4,14 @@ import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.os.Process
+import android.provider.Settings
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -34,6 +38,54 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registerNativeDarkRoomWorker()
+        requestBatteryOptimizationExemptionOnce()
+        startDarkRoomForegroundServiceIfNeeded()
+    }
+
+    // Khởi động DarkRoomForegroundService ngay khi app mở lần đầu (không
+    // cần chờ user vào 1 màn hình cụ thể nào) — service tự chạy liên tục
+    // sau đó kể cả khi Activity này bị đóng. DarkRoomWorker (watchdog) sẽ
+    // khởi động lại nó nếu OS lỡ diệt.
+    private fun startDarkRoomForegroundServiceIfNeeded() {
+        if (DarkRoomForegroundService.isRunning) return
+        val intent = Intent(this, DarkRoomForegroundService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+
+    // LÝ DO THÊM HÀM NÀY: DarkRoomWorker (WorkManager, 15 phút/lần) chỉ
+    // "được lên lịch" đúng, còn có THỰC SỰ CHẠY khi app bị ẩn/kill hay
+    // không lại phụ thuộc vào việc hệ thống có đưa app vào diện tối ưu pin
+    // hay không. Trên các máy quản lý pin gắt (Xiaomi/OPPO/Vivo/Samsung...),
+    // nếu app KHÔNG nằm trong danh sách loại trừ tối ưu pin, Android sẽ
+    // "đóng băng" mọi WorkManager job của app ngay khi app rời foreground —
+    // đây là nguyên nhân phổ biến nhất khiến lux chỉ báo được lúc app đang
+    // mở. Quyền REQUEST_IGNORE_BATTERY_OPTIMIZATIONS đã khai báo sẵn trong
+    // Manifest nhưng trước đây KHÔNG có chỗ nào thực sự bật popup xin —
+    // hàm này bật popup đó đúng 1 lần (dùng SharedPreferences để nhớ đã hỏi
+    // rồi, tránh làm phiền mỗi lần mở app).
+    private fun requestBatteryOptimizationExemptionOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (powerManager.isIgnoringBatteryOptimizations(packageName)) return
+
+            val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val askedKey = "flutter.pref_asked_battery_optimization"
+            if (prefs.getBoolean(askedKey, false)) return
+            prefs.edit().putBoolean(askedKey, true).apply()
+
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            // Một số ROM tuỳ biến chặn hẳn action này -> bỏ qua, người dùng
+            // vẫn có thể tự bật thủ công trong Cài đặt pin của máy.
+        }
     }
 
     // Đăng ký DarkRoomWorker (xem DarkRoomWorker.kt để hiểu VÌ SAO chuyển
