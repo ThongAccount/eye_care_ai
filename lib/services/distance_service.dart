@@ -192,10 +192,19 @@ class DistanceService {
         _distanceController.add(null);
         return;
       }
+      // ĐẢO NGƯỢC CÓ CHỦ ĐÍCH: ML Kit trả left/rightEyeOpenProbability theo
+      // giải phẫu khuôn mặt trên buffer ảnh GỐC của camera trước (chưa lật
+      // gương), trong khi preview hiển thị cho người dùng lại bị lật gương
+      // (kiểu selfie, đúng như họ thấy trong gương thật). Vì lời nhắc "che
+      // mắt trái/phải" trong UI luôn nói theo góc nhìn của người dùng khi
+      // soi gương (khớp với preview họ đang thấy), nên "mắt trái" của ML Kit
+      // (tính theo ảnh gốc) chính là mắt PHẢI mà người dùng nhìn thấy trên
+      // màn hình, và ngược lại -> phải đảo 2 giá trị khi gán vào
+      // FaceMeasurement để khớp với những gì UI đang yêu cầu.
       _distanceController.add(FaceMeasurement(
         distanceCm: distanceCm,
-        leftEyeOpenProbability: face.leftEyeOpenProbability,
-        rightEyeOpenProbability: face.rightEyeOpenProbability,
+        leftEyeOpenProbability: face.rightEyeOpenProbability,
+        rightEyeOpenProbability: face.leftEyeOpenProbability,
       ));
     } catch (_) {
       _distanceController.add(null);
