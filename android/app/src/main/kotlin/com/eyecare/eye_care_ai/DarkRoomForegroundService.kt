@@ -10,7 +10,9 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 
 // ============================================================================
@@ -43,6 +45,19 @@ import androidx.core.app.NotificationCompat
 // = 0) thì gần như chắc chắn là mặt màn hình đang úp xuống 1 bề mặt, bỏ qua
 // không cảnh báo. Lux đã đủ sáng thì KHÔNG đọc proximity nữa (đúng yêu cầu:
 // chỉ check thêm khi nghi ngờ tối, sáng rồi thì thôi, đỡ tốn thêm 1 sensor).
+//
+// CHECK CHỐNG BÁO NHẦM #2 (lỡ tay che CAMERA, không phải che màn hình):
+// check proximity ở trên không lọc được hết — trên nhiều máy, cảm biến ánh
+// sáng nằm SÁT camera trước, còn cảm biến proximity lại nằm gần LOA THOẠI (vị
+// trí KHÁC hẳn). Che đúng camera (lau ống kính, đổi tư thế cầm máy...) làm
+// lux tụt thật (không phải đọc sai) nhưng proximity không phát hiện được vì
+// không cùng vị trí vật lý. Khắc phục bằng THỜI GIAN thay vì thêm cảm biến:
+// chỉ báo khi lux thấp duy trì LIÊN TỤC >= 8 giây (darkStreakStartMs) — che
+// tay thường chỉ thoáng qua 1-2 giây, còn phòng tối thật thì kéo dài hàng
+// chục giây trở lên. Vì cảm biến ánh sáng trên nhiều máy chỉ bắn sự kiện khi
+// giá trị THAY ĐỔI (không tự đọc liên tục), có thêm 1 Handler hẹn giờ đúng 8
+// giây sau khi bắt đầu chuỗi tối để chủ động kiểm tra lại, phòng trường hợp
+// không có thêm sự kiện lux nào tới trong lúc đó.
 // ============================================================================
 class DarkRoomForegroundService : Service(), SensorEventListener {
 
@@ -72,6 +87,26 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
     // báo nhầm còn hơn bỏ sót, vì không phải máy nào cũng có proximity).
     @Volatile
     private var lastProximityCm: Float? = null
+
+    // Mốc thời gian (millis) BẮT ĐẦU chuỗi lux thấp liên tục hiện tại, null
+    // nếu hiện không ở trong chuỗi tối nào. DÙNG ĐỂ CHỐNG BÁO NHẦM KHI LỠ TAY
+    // CHE CAMERA: trên NHIỀU máy, cảm biến ánh sáng nằm SÁT camera trước
+    // nhưng cảm biến proximity lại nằm gần LOA THOẠI (vị trí khác hẳn) — nên
+    // che đúng camera (lau ống kính, đổi tư thế cầm...) làm lux tụt thật
+    // (không phải lỗi đọc sai) nhưng proximity KHÔNG phát hiện được vật cản
+    // vì không cùng vị trí -> check proximity một mình không đủ. Phòng tối
+    // THẬT luôn kéo dài liên tục hàng chục giây trở lên, còn che tay chỉ
+    // thoáng qua 1-2 giây -> chỉ báo khi lux thấp liên tục đủ lâu.
+    @Volatile
+    private var darkStreakStartMs: Long? = null
+    private val minSustainedDarkMs = 900_000L // 15 phút
+
+    // Giá trị lux mới nhất, dùng lại trong checkStillDarkAfterDelay() bên
+    // dưới — vì lúc Handler chạy tới, có thể KHÔNG có sự kiện lux mới nào
+    // xảy ra trong lúc chờ (xem giải thích ở scheduleSustainedDarkCheck).
+    @Volatile
+    private var lastLux: Float? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -111,11 +146,15 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
     private fun handleLightEvent(event: SensorEvent) {
         if (event.values.isEmpty()) return
         val lux = event.values[0]
+        lastLux = lux
 
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         if (lux >= DARK_LUX_THRESHOLD) {
-            // Đủ sáng -> không cần xem proximity làm gì, chỉ reset session.
+            // Đủ sáng -> không cần xem proximity làm gì, chỉ reset session
+            // VÀ reset luôn chuỗi tối liên tục (dù đang giữa chừng đếm giờ,
+            // sáng lại là sáng lại, không còn "chuỗi tối" nào để tính nữa).
+            darkStreakStartMs = null
             prefs.edit().putBoolean(KEY_IN_DARK_SESSION, false).apply()
             return
         }
@@ -127,12 +166,57 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
         val isCovered = proximity != null && maxRange != null && proximity < maxRange
         if (isCovered) {
             // Có vật cản sát màn hình (úp bàn / trong túi) -> không phải
-            // đang thật sự nhìn màn hình trong bóng tối, bỏ qua, và reset
-            // session để nếu sau đó nhấc lên soi trong bóng tối thật vẫn
-            // được cảnh báo bình thường.
-            prefs.edit().putBoolean(KEY_IN_DARK_SESSION, false).apply()
+            // đang thật sự nhìn màn hình trong bóng tối, bỏ qua sự kiện
+            // này. QUAN TRỌNG: KHÔNG reset session/chuỗi tối ở đây -- "bị
+            // che" không đồng nghĩa "đã ra sáng". Nếu reset, lỡ tay che cảm
+            // biến rồi bỏ tay ra trong lúc vẫn đang ở phòng tối sẽ bị tính
+            // là "vào phiên tối mới" -> báo trùng lần 2 dù chưa hề rời khỏi
+            // bóng tối. Giữ nguyên session/chuỗi cũ; CHỈ lux đo được thật sự
+            // >= ngưỡng sáng (nhánh phía trên) mới được phép reset.
             return
         }
+
+        // Lux thấp VÀ proximity không phát hiện vật cản -> có thể là phòng
+        // tối thật, HOẶC đang lỡ tay che đúng camera (nơi cảm biến ánh sáng
+        // hay đặt cạnh, nhưng KHÁC vị trí proximity ở gần loa thoại — xem
+        // giải thích ở khai báo darkStreakStartMs phía trên). Chỉ báo khi
+        // chuỗi lux thấp này đã kéo dài đủ lâu, lọc bớt trường hợp che tay
+        // thoáng qua vài giây.
+        if (darkStreakStartMs == null) {
+            darkStreakStartMs = System.currentTimeMillis()
+            // Cảm biến ánh sáng trên nhiều máy CHỈ bắn sự kiện khi giá trị
+            // THAY ĐỔI, không đọc liên tục theo nhịp cố định -- nếu phòng
+            // tối thật và lux giữ nguyên suốt 15 phút, có thể KHÔNG có thêm
+            // sự kiện nào tới để "chốt" việc báo. Chủ động hẹn giờ kiểm tra
+            // lại đúng lúc đủ 15 phút, không phụ thuộc có sự kiện mới hay
+            // không.
+            handler.postDelayed({ checkStillDarkAfterDelay() }, minSustainedDarkMs)
+            return
+        }
+
+        maybeFireDarkRoomNotification(prefs)
+    }
+
+    // Gọi sau đúng [minSustainedDarkMs] kể từ lúc BẮT ĐẦU chuỗi tối hiện tại
+    // (xem handleLightEvent) — đánh giá lại bằng lastLux/lastProximityCm THAY
+    // VÌ chờ 1 sự kiện lux mới, vì có thể sẽ không có sự kiện nào tới nếu
+    // ánh sáng không đổi trong suốt lúc chờ.
+    private fun checkStillDarkAfterDelay() {
+        val lux = lastLux ?: return
+        if (lux >= DARK_LUX_THRESHOLD) return // đã sáng lại trong lúc chờ
+
+        val proximity = lastProximityCm
+        val maxRange = proximitySensor?.maximumRange
+        val isCovered = proximity != null && maxRange != null && proximity < maxRange
+        if (isCovered) return // đang bị che (proximity) đúng lúc kiểm tra lại -> bỏ qua
+
+        val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        maybeFireDarkRoomNotification(prefs)
+    }
+
+    private fun maybeFireDarkRoomNotification(prefs: android.content.SharedPreferences) {
+        val streakStart = darkStreakStartMs ?: return
+        if (System.currentTimeMillis() - streakStart < minSustainedDarkMs) return
 
         val alreadyNotified = prefs.getBoolean(KEY_IN_DARK_SESSION, false)
         if (alreadyNotified) return
@@ -145,6 +229,7 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         isRunning = false
+        handler.removeCallbacksAndMessages(null)
         sensorManager.unregisterListener(this)
         super.onDestroy()
     }

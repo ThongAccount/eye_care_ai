@@ -32,6 +32,18 @@ class AppStrings {
   String get goodProgress => vi ? 'Tiến triển tốt! Giữ vững.' : 'Good progress! Keep it up.';
   String get fromLastWeek => vi ? '+5 so với tuần trước' : '+5 from last week';
 
+  // Nhãn 5 yếu tố breakdown của Eye Health Score 2.0 (xem _ScoreCard trong
+  // home_screen.dart) — mỗi yếu tố là 1 thanh %, kèm 1 emoji cố định (không
+  // đổi theo ngôn ngữ) để dễ nhận diện nhanh.
+  String get scoreFactorScreenTime => vi ? 'Thời gian màn hình' : 'Screen Time';
+  String get scoreFactorDistance => vi ? 'Khoảng cách' : 'Distance';
+  String get scoreFactorEnvironment => vi ? 'Môi trường' : 'Environment';
+  String get scoreFactorEyeBreaks => vi ? 'Nghỉ mắt' : 'Eye Breaks';
+  String get scoreFactorSleep => vi ? 'Giấc ngủ' : 'Sleep';
+  // Hiện khi 1 yếu tố CHƯA có đủ dữ liệu (khác 0%) — ví dụ chưa cấp quyền
+  // camera nên chưa đo được Khoảng cách/Môi trường lần nào trong hôm nay.
+  String get scoreFactorNoData => vi ? 'Chưa có dữ liệu' : 'No data yet';
+
   String get screenTime => vi ? 'Thời gian màn hình' : 'Screen Time';
   String get outdoor => vi ? 'Ngoài trời' : 'Outdoor';
   String get breaks => vi ? 'Nghỉ ngơi' : 'Breaks';
@@ -531,7 +543,7 @@ class AppStrings {
       case 'phone':
         return vi ? 'Thời gian màn hình (hệ điều hành)' : 'Screen-on time (OS)';
       case 'sleep':
-        return vi ? 'Health Connect hoặc nhập tay' : 'Health Connect or manual entry';
+        return vi ? 'Ước lượng từ giờ dùng máy — bấm để nhập tay' : 'Estimated from usage times — tap to enter manually';
       case 'outdoor':
         return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':

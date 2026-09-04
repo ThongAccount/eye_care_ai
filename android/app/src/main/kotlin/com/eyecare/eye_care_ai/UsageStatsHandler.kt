@@ -313,8 +313,9 @@ class UsageStatsHandler(
      *
      * Cách làm: quét raw UsageEvents.MOVE_TO_FOREGROUND (mỗi lần người dùng
      * mở/chuyển tới 1 app tính là "màn hình đang hoạt động") trong khung giờ
-     * từ 12:00 trưa HÔM QUA tới hiện tại — đủ rộng để bắt được cả người ngủ
-     * muộn lẫn dậy sớm.
+     * CỐ ĐỊNH theo lịch — luôn là "18:00 HÔM QUA -> hiện tại", KHÔNG phụ
+     * thuộc app đang được mở vào giờ nào trong ngày hôm nay (xem lịch sử bug
+     * đã sửa ngay dưới đây nếu tò mò tại sao trước đây hay bị null).
      *   - "Đêm qua dùng máy lần cuối" = sự kiện MUỘN NHẤT nằm trong khung
      *     "tối" (18:00 hôm qua -> 04:00 hôm nay).
      *   - "Sáng nay dùng máy lần đầu" = sự kiện SỚM NHẤT nằm trong khung
@@ -334,24 +335,27 @@ class UsageStatsHandler(
 
         val now = Calendar.getInstance()
 
-        val todayNoon = (now.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 12); set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }
-        // Nếu bây giờ đã qua 12h trưa, mốc bắt đầu quét là 12h trưa HÔM NAY;
-        // nếu chưa (đang là buổi sáng), lùi về 12h trưa HÔM QUA để vẫn bắt
-        // được toàn bộ đêm qua.
-        val queryStart = if (now.after(todayNoon)) todayNoon else (todayNoon.clone() as Calendar).apply {
+        // BUG ĐÃ SỬA: bản cũ chọn cửa sổ "đêm" dựa theo bây giờ đang trước
+        // hay sau 12h trưa HÔM NAY — nếu app được mở vào buổi CHIỀU/TỐI (gần
+        // như mọi lúc người dùng thực sự cầm điện thoại lên, KHÔNG PHẢI chỉ
+        // trong khung 4h-12h sáng), cửa sổ "đêm" bị đặt vào 18h TỐI NAY (CHƯA
+        // xảy ra) thay vì tối HÔM QUA (đã xảy ra) -> luôn bỏ sót hoàn toàn dữ
+        // liệu tối qua -> kết quả luôn null, hiện "Chưa có nguồn dữ liệu" dù
+        // dữ liệu thật sự có tồn tại.
+        //
+        // Giờ cửa sổ được CỐ ĐỊNH theo lịch, không phụ thuộc giờ hiện tại:
+        // luôn xét đúng 1 chu kỳ "tối HÔM QUA (18:00) -> sáng HÔM NAY
+        // (04:00-12:00)" — đây luôn là chu kỳ ngủ GẦN NHẤT đã (hoặc đang)
+        // diễn ra, dù người dùng mở app vào bất kỳ giờ nào trong ngày.
+        val nightStart = (now.clone() as Calendar).apply {
             add(Calendar.DAY_OF_YEAR, -1)
-        }
-
-        val nightStart = (queryStart.clone() as Calendar).apply {
             set(Calendar.HOUR_OF_DAY, 18); set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }
         val nightEnd = (nightStart.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1); set(Calendar.HOUR_OF_DAY, 4) }
         val morningStart = nightEnd
         val morningEnd = (morningStart.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 12) }
+        val queryStart = nightStart
 
         val events: UsageEvents = usageManager.queryEvents(queryStart.timeInMillis, now.timeInMillis)
         val event = UsageEvents.Event()

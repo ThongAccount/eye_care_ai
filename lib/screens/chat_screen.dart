@@ -24,6 +24,28 @@ class _ChatScreenState extends State<ChatScreen> {
   final FocusNode _inputFocus = FocusNode();
   bool _sending = false;
 
+  // Phải khớp CHÍNH XÁC dấu mở đầu khối action trong system prompt của
+  // EyeChatService ("%%ACTION%%{...}%%END%%"). Chỉ cần canh dấu MỞ ĐẦU —
+  // một khi đã thấy dấu này, mọi thứ phía sau (kể cả %%END%% và các khối kế
+  // tiếp nếu có) đều bị ẩn cho tới khi AiActionHandler.extract() xử lý xong.
+  static const String _actionMarker = '%%ACTION%%';
+
+  // Trả về độ dài phần ĐUÔI của [buffer] có thể là phần ĐẦU bị cắt dở của
+  // _actionMarker (do 1 delta kết thúc giữa chừng dấu hiệu, ví dụ buffer kết
+  // thúc bằng "%%ACTI"). Dùng để giữ lại, KHÔNG hiển thị phần đuôi khả nghi
+  // đó cho tới khi chắc chắn nó không phải/đúng là điểm bắt đầu action, tránh
+  // hiện thoáng qua "%%ACTI" hay "%%" trần trụi trên màn hình rồi biến mất.
+  int _actionMarkerTailOverlap(String buffer) {
+    final maxCheck = _actionMarker.length - 1;
+    final start = buffer.length > maxCheck ? buffer.length - maxCheck : 0;
+    for (var i = start; i < buffer.length; i++) {
+      if (_actionMarker.startsWith(buffer.substring(i))) {
+        return buffer.length - i;
+      }
+    }
+    return 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,12 +137,37 @@ class _ChatScreenState extends State<ChatScreen> {
       final habits = context.read<HabitProvider>();
       final isVi = context.read<LanguageProvider>().isVietnamese;
       var gotAnyChunk = false;
+      // Giữ TOÀN BỘ text thô (kể cả khối %%ACTION%%...%%END%%) riêng ở đây —
+      // KHÔNG dùng chat.messages.last.text cho việc này nữa, vì text hiển thị
+      // giờ chỉ chứa phần đã xác nhận an toàn (xem _actionMarkerTailOverlap
+      // ở đầu class), không còn phản ánh đủ dữ liệu thô để tách action sau.
+      var rawBuffer = '';
+      var actionMarkerFound = false;
       await for (final delta in EyeChatService.instance.sendMessageStream(
         history: history,
         contextInfo: _buildHabitContext(habits, isVi),
       )) {
         gotAnyChunk = true;
-        chat.appendToLastMessage(delta);
+        rawBuffer += delta;
+        if (!actionMarkerFound) {
+          final markerIndex = rawBuffer.indexOf(_actionMarker);
+          if (markerIndex != -1) {
+            // Đã thấy điểm bắt đầu khối action -> CHỐT hiển thị tại đây,
+            // không hiện thêm gì nữa (phần còn lại toàn thuộc về action,
+            // theo đúng system prompt: khối lệnh luôn ở CUỐI câu trả lời).
+            actionMarkerFound = true;
+            chat.setLastMessageText(rawBuffer.substring(0, markerIndex).trimRight());
+          } else {
+            // Chưa thấy trọn dấu hiệu -> có thể vài ký tự cuối buffer đang
+            // là phần ĐẦU của "%%ACTION%%" bị cắt giữa 2 delta (ví dụ delta
+            // này kết thúc bằng "%%ACTI"). Giữ lại phần đuôi khả nghi đó,
+            // chỉ hiện phần chắc chắn an toàn, để không bị "nháy" JSON/dấu %%
+            // ra màn hình trong 1 khung hình rồi biến mất ngay sau.
+            final holdBack = _actionMarkerTailOverlap(rawBuffer);
+            final safeLength = rawBuffer.length - holdBack;
+            chat.setLastMessageText(rawBuffer.substring(0, safeLength));
+          }
+        }
         _scrollToBottom();
       }
       if (!gotAnyChunk) {
@@ -128,8 +175,10 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         // Model có thể đã chèn khối %%ACTION%%...%%END%% ở cuối câu trả lời
         // (xem system prompt trong eye_chat_service.dart) — tách nó ra khỏi
-        // văn bản hiển thị rồi THỰC SỰ áp dụng thay đổi vào app.
-        final result = AiActionHandler.extract(chat.messages.last.text);
+        // văn bản hiển thị (dùng rawBuffer đầy đủ, không phải text đang hiện,
+        // vì text đang hiện có thể đã bị chốt sớm hơn ở nhánh actionMarkerFound
+        // phía trên) rồi THỰC SỰ áp dụng thay đổi vào app.
+        final result = AiActionHandler.extract(rawBuffer);
         chat.setLastMessageText(result.cleanedText);
         if (result.actions.isNotEmpty) {
           final confirmations = await AiActionHandler.execute(
