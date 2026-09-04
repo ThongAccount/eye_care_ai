@@ -725,31 +725,62 @@ class _ScoreCard extends StatelessWidget {
                     // HabitProvider.eyeHealthScoreDelta) — không hiện gì nếu
                     // chưa có snapshot hôm qua để so sánh (ví dụ ngày đầu
                     // dùng app), thay vì bịa số cố định như trước.
-                    if (delta != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              delta >= 0 ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                              size: 13,
-                              color: Colors.white,
+                    // Đặt cùng hàng với badge chuỗi ngày (streak) — người
+                    // dùng trước đây chỉ thấy chuỗi ở trang Xếp hạng, không
+                    // biết chuỗi hiện tại của mình ngay ở Trang chủ.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (delta != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            Text(
-                              '${delta >= 0 ? '+' : ''}$delta',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  delta >= 0 ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                  size: 13,
+                                  color: Colors.white,
+                                ),
+                                Text(
+                                  '${delta >= 0 ? '+' : ''}$delta',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        if (habit.streakDays > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('🔥', style: TextStyle(fontSize: 12)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${habit.streakDays} ${strings.dayStreak}',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -769,30 +800,35 @@ class _ScoreCard extends StatelessWidget {
             label: strings.scoreFactorScreenTime,
             percent: habit.screenTimeScore,
             noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorScreenTimeExplain,
           ),
           _ScoreFactorRow(
             icon: '📏',
             label: strings.scoreFactorDistance,
             percent: habit.distanceScore,
             noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorDistanceExplain,
           ),
           _ScoreFactorRow(
             icon: '🌙',
             label: strings.scoreFactorEnvironment,
             percent: habit.environmentScore,
             noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorEnvironmentExplain,
           ),
           _ScoreFactorRow(
             icon: '💧',
             label: strings.scoreFactorEyeBreaks,
             percent: habit.eyeBreaksScore,
             noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorEyeBreaksExplain,
           ),
           _ScoreFactorRow(
             icon: '😴',
             label: strings.scoreFactorSleep,
             percent: habit.sleepScore,
             noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorSleepExplain,
           ),
         ],
       ),
@@ -810,62 +846,129 @@ class _ScoreFactorRow extends StatelessWidget {
     required this.label,
     required this.percent,
     required this.noDataLabel,
+    required this.explanation,
   });
 
   final String icon;
   final String label;
   final double? percent;
   final String noDataLabel;
+  // Giải thích cách tính % của yếu tố này — hiện trong bottom sheet khi
+  // người dùng chạm vào dòng này. Thêm vì "Khoảng cách"/"Môi trường" một
+  // mình không đủ rõ ràng người dùng tính bằng cách nào (dựa vào camera/cảm
+  // biến ánh sáng, không trực quan như thời gian màn hình hay giấc ngủ).
+  final String explanation;
+
+  void _showExplanation(BuildContext context) {
+    final strings = context.read<LanguageProvider>().strings;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final hasData = percent != null;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(icon, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: Theme.of(sheetContext).textTheme.titleMedium,
+                      ),
+                    ),
+                    Text(
+                      hasData ? '${percent!.round()}%' : strings.scoreFactorNoData,
+                      style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(sheetContext).colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  explanation,
+                  style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final hasData = percent != null;
     final displayPercent = (percent ?? 0).round();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 15)),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 96,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _showExplanation(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 15)),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 88,
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: hasData ? (percent! / 100).clamp(0.0, 1.0) : 0,
-                minHeight: 6,
-                backgroundColor: Colors.white.withValues(alpha: 0.18),
-                valueColor: AlwaysStoppedAnimation(
-                  Colors.white.withValues(alpha: hasData ? 1.0 : 0.35),
+            Icon(
+              Icons.info_outline_rounded,
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.55),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: hasData ? (percent! / 100).clamp(0.0, 1.0) : 0,
+                  minHeight: 6,
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  valueColor: AlwaysStoppedAnimation(
+                    Colors.white.withValues(alpha: hasData ? 1.0 : 0.35),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 40,
-            child: Text(
-              hasData ? '$displayPercent%' : '—',
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 40,
+              child: Text(
+                hasData ? '$displayPercent%' : '—',
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

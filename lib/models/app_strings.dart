@@ -44,6 +44,27 @@ class AppStrings {
   // camera nên chưa đo được Khoảng cách/Môi trường lần nào trong hôm nay.
   String get scoreFactorNoData => vi ? 'Chưa có dữ liệu' : 'No data yet';
 
+  // Giải thích cách tính từng yếu tố — hiện khi người dùng chạm vào 1 dòng
+  // trong _ScoreCard (xem _ScoreFactorRow trong home_screen.dart), vì tên
+  // ngắn gọn như "Khoảng cách"/"Môi trường" một mình không đủ rõ % này được
+  // tính ra sao (đặc biệt 2 yếu tố này dựa vào camera/cảm biến, không trực
+  // quan như "Thời gian màn hình" hay "Giấc ngủ").
+  String get scoreFactorScreenTimeExplain => vi
+      ? 'So sánh tổng thời gian dùng điện thoại hôm nay với mục tiêu bạn đặt trong phần Thói quen. Dùng càng gần hoặc ít hơn mục tiêu, điểm càng cao.'
+      : 'Compares your total phone screen time today against the target you set in Habits. The closer to or under target, the higher the score.';
+  String get scoreFactorDistanceExplain => vi
+      ? 'App dùng camera trước để ước lượng khoảng cách từ mắt bạn đến màn hình theo từng đợt lấy mẫu trong ngày. % này là tỉ lệ số lần đo được khoảng cách an toàn (≥30cm) trên tổng số lần đo. Cần cấp quyền camera để đo được.'
+      : 'The app uses the front camera to estimate the distance from your eyes to the screen, sampled periodically throughout the day. This % is the share of samples where the distance was safe (≥30cm). Camera permission is required for this to work.';
+  String get scoreFactorEnvironmentExplain => vi
+      ? 'App dùng cảm biến ánh sáng của máy để đo độ sáng xung quanh theo từng đợt lấy mẫu trong ngày. % này là tỉ lệ số lần đo được ánh sáng đủ tốt (không quá tối, không quá chói) trên tổng số lần đo.'
+      : 'The app uses your device\'s light sensor to measure ambient brightness, sampled periodically throughout the day. This % is the share of samples where lighting was good (not too dark, not too glaring).';
+  String get scoreFactorEyeBreaksExplain => vi
+      ? 'Tính theo số lần bạn nghỉ mắt thật sự (bấm "Đã nghỉ mắt" khi có thông báo nhắc) so với số lần nhắc nghỉ mắt trong hôm nay.'
+      : 'Based on how many break reminders you actually completed (tapped "Eye rest done") compared to how many reminders fired today.';
+  String get scoreFactorSleepExplain => vi
+      ? 'So sánh số giờ ngủ bạn ghi nhận đêm qua với mục tiêu giờ ngủ bạn đặt trong phần Thói quen.'
+      : 'Compares your logged sleep hours last night against the sleep target you set in Habits.';
+
   String get screenTime => vi ? 'Thời gian màn hình' : 'Screen Time';
   String get outdoor => vi ? 'Ngoài trời' : 'Outdoor';
   String get breaks => vi ? 'Nghỉ ngơi' : 'Breaks';
@@ -914,4 +935,16 @@ class AppStrings {
   String get checkForUpdate => vi ? 'Kiểm tra bản cập nhật' : 'Check for update';
   String get noUpdateAvailable => vi ? 'Bạn đang dùng bản mới nhất.' : 'You are on the latest version.';
   String get updateCheckFailed => vi ? 'Không kiểm tra được bản cập nhật. Vui lòng thử lại sau.' : 'Unable to check for updates. Please try again later.';
+
+  // ---------------- Changelog (Nhật ký cập nhật) ----------------
+  String get changelog => vi ? 'Nhật ký cập nhật' : 'Changelog';
+  String get changelogTitle => vi ? 'Nhật ký cập nhật' : 'Changelog';
+  String get changelogSubtitle =>
+      vi ? 'Những gì đã thay đổi qua từng bản cập nhật' : 'What changed in each update';
+  String get changelogCurrentVersionTag => vi ? 'Đang dùng' : 'Current';
+  String get changelogEmpty => vi ? 'Chưa có nhật ký cập nhật nào.' : 'No changelog entries yet.';
+  String get changelogLoadFailed =>
+      vi ? 'Không tải được nhật ký cập nhật. Vui lòng thử lại.' : 'Failed to load the changelog. Please try again.';
+  String get changelogRetry => vi ? 'Thử lại' : 'Retry';
+  String get changelogNoNotes => vi ? 'Không có ghi chú cho bản này.' : 'No notes for this release.';
 }

@@ -9,7 +9,6 @@ import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/device_data_service.dart';
 import '../theme/app_colors.dart';
-import '../utils/app_icon.dart';
 import '../widgets/shared_widgets.dart';
 
 // StatisticsScreen hiển thị biểu đồ và số liệu thống kê sức khỏe mắt.
@@ -160,6 +159,57 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final horizontalInterval = (maxY / 4) > 0 ? (maxY / 4) : 1.0;
     
     final latestValue = realValues.isEmpty ? null : realValues.last;
+    // Số thập phân hiển thị: Score là điểm nguyên (0 số lẻ), Screen Time/Sleep
+    // dùng giờ nên làm tròn 1 số lẻ — áp dụng thống nhất cho cả tooltip lẫn
+    // nhãn giá trị mới nhất phía trên, tránh 1 nơi hiện "5.1" nơi khác hiện
+    // số thô nhiều chữ số lẻ do sai số dấu phẩy động (ví dụ "5.111111...").
+    final decimals = state.statsMetricIndex == 0 ? 0 : 1;
+    // Chỉ số của điểm dữ liệu THẬT cuối cùng (bỏ qua các ngày null chưa có
+    // dữ liệu) — dùng để tự hiện sẵn 1 tooltip ở điểm mới nhất mà KHÔNG cần
+    // người dùng phải chạm vào biểu đồ mới thấy giá trị.
+    var lastRealIndex = -1;
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (data[i] != null) {
+        lastRealIndex = i;
+        break;
+      }
+    }
+
+    // Tách LineChartBarData ra biến riêng để dùng LẠI y hệt cho cả
+    // `lineBarsData` lẫn `showingTooltipIndicators` (fl_chart yêu cầu đúng
+    // cùng 1 object LineChartBarData ở cả 2 nơi để khớp tooltip tự hiện với
+    // đường/điểm đã vẽ).
+    final chartLineBarData = LineChartBarData(
+      spots: [
+        for (var i = 0; i < data.length; i++)
+          if (data[i] != null) FlSpot(i.toDouble(), data[i]!),
+      ],
+      isCurved: true,
+      color: AppColors.statsAccent,
+      barWidth: 3,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, percent, bar, index) {
+          return FlDotCirclePainter(
+            radius: index == data.length - 1 ? 5 : 3,
+            color: AppColors.statsAccent,
+            strokeWidth: 2,
+            strokeColor: Colors.white,
+          );
+        },
+      ),
+      belowBarData: BarAreaData(
+        show: true,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.statsAccent.withValues(alpha: 0.2),
+            AppColors.statsAccent.withValues(alpha: 0.0),
+          ],
+        ),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -236,9 +286,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       Text(
-                        latestValue != null
-                            ? '${latestValue.toStringAsFixed(state.statsMetricIndex == 0 ? 0 : 1)} $unit'
-                            : '—',
+                        latestValue != null ? '${latestValue.toStringAsFixed(decimals)} $unit' : '—',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: AppColors.statsAccent,
                             ),
@@ -262,6 +310,42 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           ),
                         ),
                         borderData: FlBorderData(show: false),
+                        // BUG ĐÃ SỬA: trước đây KHÔNG cấu hình lineTouchData nên
+                        // fl_chart dùng tooltip mặc định — in thẳng giá trị double
+                        // thô (vd "5.111111111111112" do sai số dấu phẩy động) và
+                        // KHÔNG giới hạn trong khung card, khiến số bị tràn ra
+                        // ngoài card khi ở gần mép màn hình. Giờ format tròn số
+                        // thập phân + ép tooltip luôn nằm trong khung card.
+                        lineTouchData: LineTouchData(
+                          handleBuiltInTouches: true,
+                          touchTooltipData: LineTouchTooltipData(
+                            fitInsideHorizontally: true,
+                            fitInsideVertically: true,
+                            getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                              return LineTooltipItem(
+                                '${spot.y.toStringAsFixed(decimals)} $unit',
+                                Theme.of(context).textTheme.bodySmall!.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        // Tự hiện sẵn 1 tooltip ở điểm dữ liệu MỚI NHẤT (hôm nay/
+                        // tuần này) ngay khi mở màn hình — người dùng không cần
+                        // phải chạm ("dí tay") vào biểu đồ mới biết giá trị.
+                        showingTooltipIndicators: lastRealIndex == -1
+                            ? []
+                            : [
+                                ShowingTooltipIndicators([
+                                  LineBarSpot(
+                                    chartLineBarData,
+                                    0,
+                                    FlSpot(lastRealIndex.toDouble(), data[lastRealIndex]!),
+                                  ),
+                                ]),
+                              ],
                         titlesData: FlTitlesData(
                           topTitles: const AxisTitles(
                             sideTitles: SideTitles(showTitles: false),
@@ -275,9 +359,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
+                              // BUG ĐÃ SỬA: không đặt `interval` khiến fl_chart tự
+                              // chọn interval (thường < 1, ví dụ 0.5) để "lấp đầy"
+                              // trục ngang khi có ít điểm dữ liệu — dẫn tới
+                              // getTitlesWidget bị gọi ở các giá trị lẻ (0.5, 1.5...)
+                              // và value.toInt() làm tròn xuống trùng với mốc nguyên
+                              // liền trước, hiện nhãn thứ bị LẶP LIÊN TIẾP (ví dụ
+                              // "T3 T3 T4 T4 T5 T5 T6"). Cố định interval = 1 để mỗi
+                              // mốc trục ngang khớp ĐÚNG 1 nhãn thứ duy nhất.
+                              interval: 1,
                               getTitlesWidget: (value, meta) {
-                                final idx = value.toInt();
-                                if (idx < 0 || idx >= labels.length) {
+                                final idx = value.round();
+                                // Chỉ vẽ nhãn đúng tại mốc số nguyên (mỗi ngày/tuần) —
+                                // bỏ qua mọi giá trị lẻ nếu fl_chart vẫn phát sinh
+                                // thêm mốc phụ ngoài interval đã khai báo.
+                                if (idx != value || idx < 0 || idx >= labels.length) {
                                   return const SizedBox.shrink();
                                 }
                                 return Padding(
@@ -291,39 +387,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             ),
                           ),
                         ),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: [
-                              for (var i = 0; i < data.length; i++)
-                                if (data[i] != null) FlSpot(i.toDouble(), data[i]!),
-                            ],
-                            isCurved: true,
-                            color: AppColors.statsAccent,
-                            barWidth: 3,
-                            dotData: FlDotData(
-                              show: true,
-                              getDotPainter: (spot, percent, bar, index) {
-                                return FlDotCirclePainter(
-                                  radius: index == data.length - 1 ? 5 : 3,
-                                  color: AppColors.statsAccent,
-                                  strokeWidth: 2,
-                                  strokeColor: Colors.white,
-                                );
-                              },
-                            ),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  AppColors.statsAccent.withValues(alpha: 0.2),
-                                  AppColors.statsAccent.withValues(alpha: 0.0),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                        lineBarsData: [chartLineBarData],
                       ),
                     ),
                   ),
@@ -331,104 +395,52 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // Phần hiển thị thống kê phụ: tiến trình hoàn thành thói quen và streak.
-            Row(
-              children: [
-                Expanded(
-                  child: SectionCard(
-                    child: Column(
-                      children: [
-                        Text(
-                          strings.habitCompletion,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 120,
-                          width: 120,
-                          child: PieChart(
-                            PieChartData(
-                              sectionsSpace: 2,
-                              centerSpaceRadius: 36,
-                              sections: [
-                                PieChartSectionData(
-                                  value: state.habitsCompletionPercent.toDouble(),
-                                  color: AppColors.habitsAccent,
-                                  radius: 14,
-                                  showTitle: false,
-                                ),
-                                PieChartSectionData(
-                                  value: (100 - state.habitsCompletionPercent).toDouble(),
-                                  color: AppColors.border,
-                                  radius: 14,
-                                  showTitle: false,
-                                ),
-                              ],
-                            ),
+            // Thẻ "Hoàn thành thói quen" — trước đây nằm chung 1 Row với thẻ
+            // streak dạng vòng tròn vàng, nhưng streak đã CHUYỂN sang hiện ở
+            // Trang chủ (badge 🔥 trong _ScoreCard, xem home_screen.dart) để
+            // người dùng thấy ngay khi mở app thay vì phải vào tận
+            // Thống kê mới biết — tránh trùng lặp 2 nơi, bỏ hẳn khối streak
+            // ở đây và cho thẻ còn lại chiếm trọn chiều ngang.
+            SectionCard(
+              child: Column(
+                children: [
+                  Text(
+                    strings.habitCompletion,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 120,
+                    width: 120,
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 36,
+                        sections: [
+                          PieChartSectionData(
+                            value: state.habitsCompletionPercent.toDouble(),
+                            color: AppColors.habitsAccent,
+                            radius: 14,
+                            showTitle: false,
                           ),
-                        ),
-                        Text(
-                          '${state.habitsCompletionPercent}%',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppColors.habitsAccent,
-                              ),
-                        ),
-                      ],
+                          PieChartSectionData(
+                            value: (100 - state.habitsCompletionPercent).toDouble(),
+                            color: AppColors.border,
+                            radius: 14,
+                            showTitle: false,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SectionCard(
-                    child: Column(
-                      children: [
-                        // Phần hiển thị chuỗi ngày hoàn thành liên tiếp.
-                        // Sử dụng vòng tròn màu vàng để nhấn mạnh số ngày streak.
-                        const SizedBox(height: 16),
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppColors.warning,
-                                AppColors.warning.withValues(alpha: 0.7),
-                              ],
-                            ),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.warning.withValues(alpha: 0.3),
-                                blurRadius: 12,
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const AppIcon('🔥', size: 20, color: AppColors.primaryBlue),
-                                Text(
-                                  '${state.streakDays}',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
+                  Text(
+                    '${state.habitsCompletionPercent}%',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.habitsAccent,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'day streak',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             const _AppUsageBreakdownCard(),

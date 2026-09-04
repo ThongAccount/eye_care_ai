@@ -21,6 +21,7 @@ import '../theme/app_colors.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/smart_brightness_dialog.dart';
 import '../widgets/update_dialog.dart';
+import 'changelog_screen.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
 import 'settings_more_page.dart';
@@ -361,6 +362,14 @@ class SettingsScreen extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => const SettingsMorePage(initialSection: SettingsMoreSection.help),
                         ),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _MenuItem(
+                      icon: '📜',
+                      title: strings.changelog,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ChangelogScreen()),
                       ),
                     ),
                     const Divider(height: 1, indent: 56),
