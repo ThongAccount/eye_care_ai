@@ -15,12 +15,14 @@ import '../providers/language_provider.dart';
 import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/notification_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/shared_widgets.dart';
 import '../widgets/smart_brightness_dialog.dart';
 import '../widgets/update_dialog.dart';
+import 'changelog_screen.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
 import 'settings_more_page.dart';
@@ -375,6 +377,14 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     const Divider(height: 1, indent: 56),
                     _MenuItem(
+                      icon: '📜',
+                      title: strings.changelog,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ChangelogScreen()),
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _MenuItem(
                       icon: '📊',
                       title: strings.dataUsagePermissions,
                       onTap: () => _showPermissionSettings(context),
@@ -468,10 +478,18 @@ class _CheckForUpdateButtonState extends State<_CheckForUpdateButton> {
     setState(() => _checking = false);
 
     final strings = context.read<LanguageProvider>().strings;
+    final updateProvider = context.read<UpdateProvider>();
     switch (result.status) {
       case UpdateCheckStatus.updateAvailable:
         if (!mounted) return;
-        UpdateDialog.show(context, result.info!, strings);
+        await updateProvider.setAvailableUpdate(result.info);
+        if (!mounted) return;
+        UpdateDialog.show(
+          context,
+          result.info!,
+          strings,
+          onDismissed: () => context.read<UpdateProvider>().dismissCurrentUpdate(),
+        );
         break;
       case UpdateCheckStatus.upToDate:
         ScaffoldMessenger.of(context).showSnackBar(

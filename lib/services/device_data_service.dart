@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'distance_service.dart';
 import 'usage_service.dart';
 
 // Một dòng dữ liệu sử dụng của MỘT app trong ngày hôm nay, dùng cho biểu đồ
@@ -671,5 +672,160 @@ class DeviceDataService {
     _accelSub?.cancel();
     _outdoorSampleTimer?.cancel();
     _darkRoomLightSub?.cancel();
+    _environmentSampleTimer?.cancel();
+  }
+
+  // ---------------- Môi trường (lux) + Khoảng cách: cho Eye Health Score 2.0 ----------------
+  // Gộp CHUNG 1 timer cho 2 yếu tố "🌙 Môi trường" và "📏 Khoảng cách" trong
+  // breakdown điểm sức khỏe mắt — mỗi lần lấy mẫu lux thì NHÂN TIỆN đo luôn
+  // khoảng cách, thay vì chạy 2 timer riêng (đỡ tốn pin hơn, và 2 số liệu đo
+  // cùng lúc phản ánh đúng "trạng thái hiện tại" nhất quán với nhau).
+  //
+  // AN TOÀN RIÊNG TƯ — ĐỌC KỸ TRƯỚC KHI ĐỔI CHU KỲ:
+  // - Camera trước CHỈ được mở khi (1) đã có quyền camera SẴN (không bao giờ
+  //   tự ý request() ở đây — xin quyền runtime phải do UI chủ động, đúng như
+  //   quy ước của DistanceService/EyeTestScreen), VÀ (2) DistanceService hiện
+  //   KHÔNG có phiên nào khác đang chạy (ví dụ người dùng đang làm Eye Test
+  //   ngay lúc này) — tránh giành camera giữa 2 nơi dùng cùng lúc.
+  // - Camera chỉ mở trong TỐI ĐA vài giây mỗi lần lấy mẫu rồi đóng ngay
+  //   (không giữ stream chạy nền liên tục suốt ngày) — mỗi lần mở camera đều
+  //   hiện chấm báo hiệu camera đang dùng (Android/iOS), nên chu kỳ lấy mẫu
+  //   CỐ Ý thưa (15 phút, tăng từ 5 phút ban đầu theo phản hồi thực tế) để
+  //   giảm tần suất người dùng thấy chấm camera nháy lên khi không thao tác
+  //   gì liên quan tới camera.
+  static const _kEnvironmentSampleInterval = Duration(minutes: 15);
+  // Lux dưới mức này coi là "hơi tối để nhìn màn hình" cho mục đích tính
+  // điểm (khác ngưỡng _kDarkLuxThreshold=10 dùng cho CẢNH BÁO phòng tối —
+  // ở đây chỉ cần "đủ sáng để đọc thoải mái", không cần tối om mới tính xấu).
+  static const _kGoodLuxThreshold = 50;
+  // Khoảng cách tối thiểu được coi là ổn — khớp
+  // EyeHealthStandards.minReadingDistanceCm (không import trực tiếp model từ
+  // service để tránh phụ thuộc chéo không cần thiết, chỉ lặp lại đúng giá trị).
+  static const _kGoodDistanceMinCm = 30.0;
+
+  static const _kEnvGoodLuxCountKey = 'env_good_lux_count';
+  static const _kEnvTotalLuxCountKey = 'env_total_lux_count';
+  static const _kEnvGoodDistanceCountKey = 'env_good_distance_count';
+  static const _kEnvTotalDistanceCountKey = 'env_total_distance_count';
+  static const _kEnvDateKey = 'env_sample_date';
+
+  Timer? _environmentSampleTimer;
+
+  void startEnvironmentMonitoring() {
+    _environmentSampleTimer?.cancel();
+    _environmentSampleTimer = Timer.periodic(_kEnvironmentSampleInterval, (_) {
+      _sampleEnvironmentAndDistanceOnce();
+    });
+  }
+
+  void stopEnvironmentMonitoring() {
+    _environmentSampleTimer?.cancel();
+    _environmentSampleTimer = null;
+  }
+
+  Future<void> _sampleEnvironmentAndDistanceOnce() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _resetEnvironmentCountersIfNewDay(prefs);
+
+    final lux = await _readAmbientLuxOnce();
+    if (lux != null) {
+      final total = (prefs.getInt(_kEnvTotalLuxCountKey) ?? 0) + 1;
+      await prefs.setInt(_kEnvTotalLuxCountKey, total);
+      if (lux >= _kGoodLuxThreshold) {
+        final good = (prefs.getInt(_kEnvGoodLuxCountKey) ?? 0) + 1;
+        await prefs.setInt(_kEnvGoodLuxCountKey, good);
+      }
+    }
+
+    final distanceCm = await _sampleDistanceOnceIfSafe();
+    if (distanceCm != null) {
+      final total = (prefs.getInt(_kEnvTotalDistanceCountKey) ?? 0) + 1;
+      await prefs.setInt(_kEnvTotalDistanceCountKey, total);
+      if (distanceCm >= _kGoodDistanceMinCm) {
+        final good = (prefs.getInt(_kEnvGoodDistanceCountKey) ?? 0) + 1;
+        await prefs.setInt(_kEnvGoodDistanceCountKey, good);
+      }
+    }
+  }
+
+  // Mở camera trước TỐI ĐA vài giây để lấy 1 mẫu khoảng cách rồi đóng ngay.
+  // Trả về null (bỏ qua mẫu này hoàn toàn, KHÔNG tính là "mẫu xấu") nếu:
+  // chưa có quyền camera, DistanceService đang bận (Eye Test đang chạy),
+  // camera không mở được, hoặc không thấy khuôn mặt trong thời gian chờ.
+  Future<double?> _sampleDistanceOnceIfSafe() async {
+    try {
+      final status = await Permission.camera.status;
+      if (!status.isGranted) return null;
+    } catch (_) {
+      return null;
+    }
+
+    if (DistanceService.instance.isRunning) return null; // đang có nơi khác dùng camera này
+
+    final completer = Completer<double?>();
+    StreamSubscription<FaceMeasurement?>? sub;
+    Timer? timer;
+    var settled = false;
+
+    Future<void> finish(double? value) async {
+      if (settled) return;
+      settled = true;
+      timer?.cancel();
+      await sub?.cancel();
+      await DistanceService.instance.stop();
+      if (!completer.isCompleted) completer.complete(value);
+    }
+
+    final started = await DistanceService.instance.start();
+    if (!started) return null;
+
+    sub = DistanceService.instance.distanceStream.listen(
+      (measurement) {
+        if (measurement?.distanceCm != null) finish(measurement!.distanceCm);
+      },
+      onError: (_) => finish(null),
+    );
+    // Không thấy mặt sau 4 giây (quá tối, ngoài khung hình, không có ai
+    // đang nhìn máy...) -> bỏ mẫu này, không đoán mò, không giữ camera lâu
+    // hơn nữa.
+    timer = Timer(const Duration(seconds: 4), () => finish(null));
+
+    return completer.future;
+  }
+
+  Future<void> _resetEnvironmentCountersIfNewDay(SharedPreferences prefs) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final storedDate = prefs.getString(_kEnvDateKey);
+    if (storedDate != today) {
+      await prefs.setString(_kEnvDateKey, today);
+      await prefs.setInt(_kEnvGoodLuxCountKey, 0);
+      await prefs.setInt(_kEnvTotalLuxCountKey, 0);
+      await prefs.setInt(_kEnvGoodDistanceCountKey, 0);
+      await prefs.setInt(_kEnvTotalDistanceCountKey, 0);
+    }
+  }
+
+  // % mẫu lux "đủ sáng" trong hôm nay — null nếu CHƯA có mẫu nào (máy không
+  // có cảm biến ánh sáng, hoặc mới mở app, chưa tới chu kỳ lấy mẫu đầu tiên)
+  // -> UI nên hiện "chưa có dữ liệu", không phải 0%.
+  Future<double?> getEnvironmentScoreToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _resetEnvironmentCountersIfNewDay(prefs);
+    final total = prefs.getInt(_kEnvTotalLuxCountKey) ?? 0;
+    if (total == 0) return null;
+    final good = prefs.getInt(_kEnvGoodLuxCountKey) ?? 0;
+    return (good / total) * 100;
+  }
+
+  // % mẫu khoảng cách "đủ xa" (>= 30cm) trong hôm nay — null nếu chưa có mẫu
+  // nào (chưa cấp quyền camera, hoặc chưa lần nào thấy mặt rõ trong lúc lấy
+  // mẫu, hoặc mới mở app).
+  Future<double?> getDistanceScoreToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _resetEnvironmentCountersIfNewDay(prefs);
+    final total = prefs.getInt(_kEnvTotalDistanceCountKey) ?? 0;
+    if (total == 0) return null;
+    final good = prefs.getInt(_kEnvGoodDistanceCountKey) ?? 0;
+    return (good / total) * 100;
   }
 }

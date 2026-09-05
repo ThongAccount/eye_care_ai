@@ -8,6 +8,7 @@ import '../providers/language_provider.dart';
 import '../providers/rank_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../providers/settings_more_provider.dart';
+import '../providers/update_provider.dart';
 import '../providers/usage_limit_provider.dart';
 import '../services/app_usage_monitor.dart';
 import '../services/cloud_backup_service.dart';
@@ -55,15 +56,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshHabitsAndSyncRank();
       _checkForAppUpdate();
-      // App-lock: kiểm tra giới hạn sau khi refresh habit (cùng nguồn dữ liệu).
-      AppUsageMonitor.instance
-          .check(context.read<UsageLimitProvider>());
     });
     _usagePollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       _refreshHabitsAndSyncRank();
-      // App-lock: nếu chạm giới hạn trong lúc đang dùng, khóa ngay (không
-      // chờ người dùng rời/mở lại app).
-      AppUsageMonitor.instance.check(context.read<UsageLimitProvider>());
     });
     _cloudBackupTimer = Timer.periodic(_cloudBackupInterval, (_) => _pushCloudBackupIfEnabled());
   }
@@ -93,10 +88,23 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   // `context` của chính State này, luôn được bảo vệ bởi đúng `mounted` của nó.
   Future<void> _checkForAppUpdate() async {
     final update = await UpdateService.instance.checkForUpdate();
+    if (!mounted) return;
+    // Luôn cập nhật UpdateProvider (kể cả khi update == null) để badge trên
+    // icon Settings tự ẩn nếu bản mới nhất đã được cài xong ở phiên trước.
+    final updateProvider = context.read<UpdateProvider>();
+    await updateProvider.setAvailableUpdate(update);
     if (update == null || !mounted) return;
+    // Đã dismiss ĐÚNG bản build này ở lần mở app trước -> chỉ để badge tự
+    // hiện (đã set ở trên), KHÔNG hiện lại dialog làm phiền.
+    if (!updateProvider.shouldShowDialog) return;
     final strings = context.read<LanguageProvider>().strings;
     if (!mounted) return;
-    UpdateDialog.show(context, update, strings);
+    UpdateDialog.show(
+      context,
+      update,
+      strings,
+      onDismissed: () => context.read<UpdateProvider>().dismissCurrentUpdate(),
+    );
   }
 
   @override
@@ -114,7 +122,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // Mở app trở lại (từ nền) -> làm mới ngay, không chờ tick 60s tiếp
       // theo, vì người dùng vừa dùng các app khác trong lúc app này ở nền.
       _refreshHabitsAndSyncRank();
-      AppUsageMonitor.instance.check(context.read<UsageLimitProvider>());
 
       final pausedAt = _pausedAt;
       _pausedAt = null;

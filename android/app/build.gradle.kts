@@ -108,6 +108,13 @@ android {
 
 dependencies {
         coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+        // Cần cho DarkRoomWorker.kt (androidx.work.Worker) + MainActivity.kt
+        // (WorkManager.enqueueUniquePeriodicWork...). Package `workmanager`
+        // (Flutter) có phụ thuộc androidx.work ở tầng NATIVE của chính nó,
+        // nhưng KHÔNG tự động "lộ" ra cho code Kotlin app dùng trực tiếp
+        // (implementation configuration không transitive theo hướng đó) ->
+        // phải khai báo tường minh ở đây.
+        implementation("androidx.work:work-runtime-ktx:2.9.0")
 }
 
 kotlin {

@@ -182,12 +182,24 @@ class _ReadingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // BUG ĐÃ SỬA: bản cũ dùng Row + Expanded(label) + Text(value) không giới
+    // hạn chiều rộng. Khi value dài (ví dụ "135 lux · Trong nhà, bình
+    // thường"), nó chiếm gần hết bề ngang dialog vì không hề bị ép co lại,
+    // đẩy Expanded(label) xuống còn vài pixel -> Flutter buộc phải wrap
+    // TỪNG KÝ TỰ MỘT xuống dòng (mỗi ký tự 1 dòng) vì không đủ chỗ cho cả 1
+    // từ. Đổi sang xếp dọc (nhãn nhỏ ở trên, giá trị to hơn ở dưới) — không
+    // còn 2 bên phải giành chỗ ngang của nhau nữa, hoạt động đúng với MỌI độ
+    // dài label/value mà không cần đoán trước độ dài tối đa.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              ),
         ),
+        const SizedBox(height: 2),
         Text(
           value,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(

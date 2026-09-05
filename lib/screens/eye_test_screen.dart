@@ -47,6 +47,10 @@ enum _Direction { up, right, down, left }
 
 enum _Phase { intro, rightEye, leftEye, contrast, result }
 
+// Lý do tạm dừng bài test — dùng để hiện đúng thông báo tương ứng thay vì
+// 1 câu chung chung.
+enum _PauseReason { none, distance, coverage }
+
 // Cỡ chữ E giảm dần theo tỉ lệ ~1.2x mỗi bậc — khoảng cách bậc tương tự
 // cách các bảng đo thị lực chuẩn chia độ (theo cấp số nhân, không phải cấp
 // số cộng) để mỗi bậc khó hơn bậc trước một lượng NHƯ NHAU về mặt cảm nhận.
@@ -74,25 +78,45 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
   final _random = math.Random();
   List<Map<String, dynamic>> _history = [];
 
-  // Khoảng cách đo được lần gần nhất từ camera (cm) — null = chưa đo được/
-  // camera không khả dụng/chưa cấp quyền. Chỉ dùng để CẢNH BÁO + khuyến
-  // khích đứng đúng khoảng cách, KHÔNG chặn cứng nút "Bắt đầu" (nhiều máy
-  // không có camera trước hoạt động tốt/người dùng từ chối quyền — vẫn phải
-  // cho làm bài test bình thường, xuống cấp nhẹ nhàng về trải nghiệm cũ).
+  // Khoảng cách + độ mở từng mắt đo được lần gần nhất từ camera — null =
+  // chưa đo được/camera không khả dụng/chưa cấp quyền. Chỉ dùng để CẢNH BÁO
+  // + khuyến khích đứng đúng khoảng cách, KHÔNG chặn cứng nút "Bắt đầu"
+  // (nhiều máy không có camera trước hoạt động tốt/người dùng từ chối
+  // quyền — vẫn phải cho làm bài test bình thường, xuống cấp nhẹ nhàng về
+  // trải nghiệm cũ).
   double? _liveDistanceCm;
+  double? _leftEyeOpenProb;
+  double? _rightEyeOpenProb;
   static const double _kIdealMinCm = 30;
   static const double _kIdealMaxCm = 55;
+  // Ngưỡng coi là "đang nhắm" — ML Kit trả xác suất MỞ mắt (0 = chắc chắn
+  // nhắm, 1 = chắc chắn mở). Dưới ngưỡng này mới coi là nhắm hợp lệ; CHỈ
+  // chặn khi có số đo RÕ RÀNG cho thấy mắt còn mở (giống nguyên tắc của
+  // phần đo khoảng cách: không đủ dữ liệu thì không chặn oan, tránh làm
+  // phiền vì false positive).
+  static const double _kEyeClosedThreshold = 0.4;
 
   // Camera có đang thực sự chạy hay không (đã cấp quyền + khởi động thành
   // công) — dùng để phân biệt "chưa đo được vì camera chưa sẵn sàng/không
   // khả dụng" (KHÔNG chặn bài test) với "camera đang chạy nhưng sai khoảng
-  // cách" (CÓ chặn, theo đúng yêu cầu).
+  // cách/che mắt sai" (CÓ chặn, theo đúng yêu cầu).
   bool _cameraActive = false;
-  // Tạm dừng bài test khi sai khoảng cách quá 700ms liên tục (debounce —
-  // tránh chớp tắt overlay liên tục chỉ vì 1 khung hình đo trượt thoáng qua,
-  // ví dụ lúc chớp mắt/quay đầu đổi hướng giữa 2 câu hỏi).
+  // Tạm dừng NGAY LẬP TỨC (không debounce) khi khoảng cách sai HOẶC che sai
+  // mắt trong lúc đang đo thị lực từng mắt — hiện overlay chặn thao tác cho
+  // tới khi đúng lại thì tự tiếp tục.
   bool _showDistancePause = false;
-  Timer? _distanceDebounceTimer;
+  // Lý do đang tạm dừng, để hiện đúng thông báo (không gộp chung 1 câu
+  // chung chung "sai gì đó").
+  _PauseReason _pauseReason = _PauseReason.none;
+  // Sub-scription khoảng cách do CHÍNH màn hình này sở hữu xuyên suốt cả bài
+  // test (intro -> mắt phải -> mắt trái -> tương phản) — KHÔNG đi qua
+  // _LiveDistanceMeter nữa. Trước đây _LiveDistanceMeter (chỉ tồn tại ở màn
+  // intro) tự listen() rồi gọi callback lên đây; khi rời màn intro,
+  // _LiveDistanceMeter bị dispose, `if (!mounted) return` bên trong listener
+  // của NÓ chặn callback lại vĩnh viễn dù camera vẫn đang chạy bình thường
+  // -> khoảng cách hiển thị bị đứng yên ở giá trị cuối cùng suốt phần còn
+  // lại của bài test, không cập nhật liên tục nữa như mong muốn.
+  StreamSubscription<FaceMeasurement?>? _distanceSub;
 
   // Thông báo lớn giữa màn hình khi vừa chuyển sang vòng test mới (mắt
   // phải/mắt trái/tương phản) — hiện vài giây rồi tự ẩn, để người dùng chỉ
@@ -110,25 +134,64 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
     });
   }
 
-  void _handleDistanceUpdate(double? cm) {
-    setState(() => _liveDistanceCm = cm);
-    if (!_cameraActive) return; // camera chưa chạy -> không có gì để chặn
+  // Đang test mắt nào thì mắt CÒN LẠI phải nhắm/che — trả về xác suất MỞ
+  // của đúng "mắt cần nhắm" ứng với vòng hiện tại, null nếu không áp dụng
+  // (đang ở intro/tương phản/kết quả, không cần che mắt nào).
+  double? get _otherEyeOpenProbForCurrentPhase => switch (_phase) {
+        // Test mắt PHẢI -> mắt TRÁI phải nhắm.
+        _Phase.rightEye => _leftEyeOpenProb,
+        // Test mắt TRÁI -> mắt PHẢI phải nhắm.
+        _Phase.leftEye => _rightEyeOpenProb,
+        _ => null,
+      };
 
-    final ok = cm != null && cm >= _kIdealMinCm && cm <= _kIdealMaxCm;
-    if (ok) {
-      _distanceDebounceTimer?.cancel();
-      if (_showDistancePause) setState(() => _showDistancePause = false);
-    } else {
-      _distanceDebounceTimer?.cancel();
-      _distanceDebounceTimer = Timer(const Duration(milliseconds: 700), () {
-        if (mounted) setState(() => _showDistancePause = true);
+  void _handleDistanceUpdate(FaceMeasurement? measurement) {
+    setState(() {
+      _liveDistanceCm = measurement?.distanceCm;
+      _leftEyeOpenProb = measurement?.leftEyeOpenProbability;
+      _rightEyeOpenProb = measurement?.rightEyeOpenProbability;
+    });
+    if (!_cameraActive) return; // camera chưa chạy -> không có gì để chặn
+    _evaluatePause();
+  }
+
+  // Đánh giá lại NGAY LẬP TỨC (không debounce) có cần tạm dừng hay không —
+  // theo đúng yêu cầu "sai là dừng luôn", ưu tiên kiểm tra khoảng cách
+  // trước vì đó là điều kiện gốc cho cả việc đo che mắt có đáng tin hay
+  // không.
+  void _evaluatePause() {
+    final distanceOk =
+        _liveDistanceCm != null && _liveDistanceCm! >= _kIdealMinCm && _liveDistanceCm! <= _kIdealMaxCm;
+    if (!distanceOk) {
+      setState(() {
+        _showDistancePause = true;
+        _pauseReason = _PauseReason.distance;
+      });
+      return;
+    }
+
+    // Chỉ kiểm tra che mắt trong 2 vòng đo thị lực từng mắt — vòng tương
+    // phản (nhìn bằng cả 2 mắt) và intro/result không áp dụng.
+    final otherEyeOpen = _otherEyeOpenProbForCurrentPhase;
+    if (otherEyeOpen != null && otherEyeOpen > (1 - _kEyeClosedThreshold)) {
+      setState(() {
+        _showDistancePause = true;
+        _pauseReason = _PauseReason.coverage;
+      });
+      return;
+    }
+
+    if (_showDistancePause) {
+      setState(() {
+        _showDistancePause = false;
+        _pauseReason = _PauseReason.none;
       });
     }
   }
 
   @override
   void dispose() {
-    _distanceDebounceTimer?.cancel();
+    _distanceSub?.cancel();
     _announcementTimer?.cancel();
     // Dừng camera hẳn khi rời màn kiểm tra mắt — đây là nơi DUY NHẤT chịu
     // trách nhiệm dừng, vì camera được dùng XUYÊN SUỐT nhiều bước (giới
@@ -142,6 +205,10 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
   void initState() {
     super.initState();
     _loadHistory();
+    // Broadcast stream nên subscribe sớm không sao — chưa có camera thì đơn
+    // giản là chưa có sự kiện nào bắn ra, không lỗi gì cả. Subscription này
+    // sống suốt vòng đời màn hình, không phụ thuộc widget con nào.
+    _distanceSub = DistanceService.instance.distanceStream.listen(_handleDistanceUpdate);
   }
 
   Future<void> _loadHistory() async {
@@ -180,6 +247,9 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
       _currentDirection = _Direction.values[_random.nextInt(4)];
     });
     _announce();
+    // Vòng mới có thể yêu cầu che mắt KHÁC với vòng vừa xong (phải -> trái
+    // đổi mắt cần che) -> đánh giá lại ngay, đừng đợi khung hình tiếp theo.
+    if (_cameraActive) _evaluatePause();
   }
 
   void _answerAcuity(_Direction picked) {
@@ -256,8 +326,8 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
       _contrastLevel = levelReached;
       _phase = _Phase.result;
       _showDistancePause = false;
+      _pauseReason = _PauseReason.none;
     });
-    _distanceDebounceTimer?.cancel();
     // Đã xong bài test -> không cần đo khoảng cách nữa, dừng camera ngay,
     // không để chạy ngầm vô ích lúc người dùng đang xem kết quả.
     DistanceService.instance.stop();
@@ -273,7 +343,6 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
   }
 
   void _resetTest() {
-    _distanceDebounceTimer?.cancel();
     _announcementTimer?.cancel();
     setState(() {
       _phase = _Phase.intro;
@@ -286,8 +355,11 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
       _currentDirection = null;
       _cameraActive = false;
       _showDistancePause = false;
+      _pauseReason = _PauseReason.none;
       _showAnnouncement = false;
       _liveDistanceCm = null;
+      _leftEyeOpenProb = null;
+      _rightEyeOpenProb = null;
     });
   }
 
@@ -337,12 +409,40 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
           _LiveDistanceMeter(
             idealMinCm: _kIdealMinCm,
             idealMaxCm: _kIdealMaxCm,
-            onDistanceChanged: _handleDistanceUpdate,
+            currentDistanceCm: _liveDistanceCm,
             onActiveChanged: (active) => setState(() => _cameraActive = active),
           ),
           const SizedBox(height: 24),
           if (_history.isNotEmpty) _buildHistoryPreview(context, strings),
           const SizedBox(height: 12),
+          // Cảnh báo tháo kính — đặt NGAY TRƯỚC nút bắt đầu để chắc chắn
+          // người dùng thấy sau cùng, đúng lúc chuẩn bị bấm.
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.visibility_off_rounded, color: AppColors.warning, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    strings.eyeTestGlassesReminder,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (_liveDistanceCm != null &&
               (_liveDistanceCm! < _kIdealMinCm || _liveDistanceCm! > _kIdealMaxCm))
             Padding(
@@ -582,9 +682,7 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _liveDistanceCm == null
-                            ? strings.eyeTestFaceNotDetected
-                            : (_liveDistanceCm! < _kIdealMinCm ? strings.eyeTestTooClose : strings.eyeTestTooFar),
+                        _pauseReasonMessage(strings),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                         textAlign: TextAlign.center,
                       ),
@@ -596,6 +694,14 @@ class _EyeTestScreenState extends State<EyeTestScreen> {
           ),
       ],
     );
+  }
+
+  String _pauseReasonMessage(AppStrings strings) {
+    if (_pauseReason == _PauseReason.coverage) {
+      return _phase == _Phase.rightEye ? strings.eyeTestCoverLeftEye : strings.eyeTestCoverRightEye;
+    }
+    if (_liveDistanceCm == null) return strings.eyeTestFaceNotDetected;
+    return _liveDistanceCm! < _kIdealMinCm ? strings.eyeTestTooClose : strings.eyeTestTooFar;
   }
 
   Widget _buildDistanceBadge(BuildContext context) {
@@ -849,13 +955,16 @@ class _LiveDistanceMeter extends StatefulWidget {
   const _LiveDistanceMeter({
     required this.idealMinCm,
     required this.idealMaxCm,
-    required this.onDistanceChanged,
+    required this.currentDistanceCm,
     required this.onActiveChanged,
   });
 
   final double idealMinCm;
   final double idealMaxCm;
-  final void Function(double? cm) onDistanceChanged;
+  // Giá trị khoảng cách hiện tại do _EyeTestScreenState (cha) đo và giữ —
+  // panel này chỉ HIỂN THỊ LẠI, không tự đo/tự lắng nghe stream riêng nữa
+  // (xem giải thích ở _startCamera bên dưới).
+  final double? currentDistanceCm;
   final void Function(bool active) onActiveChanged;
 
   @override
@@ -866,7 +975,6 @@ enum _MeterState { checkingPermission, needsPermission, unavailable, starting, r
 
 class _LiveDistanceMeterState extends State<_LiveDistanceMeter> {
   _MeterState _state = _MeterState.checkingPermission;
-  double? _distanceCm;
 
   @override
   void initState() {
@@ -912,11 +1020,11 @@ class _LiveDistanceMeterState extends State<_LiveDistanceMeter> {
     }
     setState(() => _state = _MeterState.running);
     widget.onActiveChanged(true);
-    DistanceService.instance.distanceStream.listen((cm) {
-      if (!mounted) return;
-      setState(() => _distanceCm = cm);
-      widget.onDistanceChanged(cm);
-    });
+    // KHÔNG tự listen() distanceStream ở đây nữa — _EyeTestScreenState (cha)
+    // đã tự subscribe MỘT LẦN DUY NHẤT xuyên suốt cả bài test (xem
+    // initState/_distanceSub ở class cha). Panel này chỉ hiển thị lại giá
+    // trị `widget.currentDistanceCm` mà cha truyền xuống, tránh 2 nơi cùng
+    // lắng nghe stream dễ gây lệch dữ liệu hoặc bug "đứng yên" như trước.
   }
 
   @override
@@ -993,11 +1101,12 @@ class _LiveDistanceMeterState extends State<_LiveDistanceMeter> {
     }
 
     // _state == running
-    final ok = _distanceCm != null && _distanceCm! >= widget.idealMinCm && _distanceCm! <= widget.idealMaxCm;
-    final color = _distanceCm == null ? AppColors.textMuted : (ok ? AppColors.success : AppColors.warning);
-    final label = _distanceCm == null
+    final distanceCm = widget.currentDistanceCm;
+    final ok = distanceCm != null && distanceCm >= widget.idealMinCm && distanceCm <= widget.idealMaxCm;
+    final color = distanceCm == null ? AppColors.textMuted : (ok ? AppColors.success : AppColors.warning);
+    final label = distanceCm == null
         ? strings.eyeTestFaceNotDetected
-        : '${_distanceCm!.round()} cm';
+        : '${distanceCm.round()} cm';
 
     return Container(
       padding: const EdgeInsets.all(16),

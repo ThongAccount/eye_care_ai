@@ -47,6 +47,23 @@ class UpdateInfo {
 /// thể phân biệt được.
 enum UpdateCheckStatus { upToDate, updateAvailable, failed }
 
+// 1 mục nhật ký cập nhật — ứng với 1 GitHub Release. Dùng cho màn hình
+// "Nhật ký cập nhật" (ChangelogScreen) trong Cài đặt, liệt kê TẤT CẢ các bản
+// đã phát hành (khác với UpdateInfo chỉ giữ bản MỚI NHẤT hiện chưa cài).
+class ChangelogEntry {
+  ChangelogEntry({
+    required this.buildNumber,
+    required this.versionName,
+    required this.notes,
+    required this.publishedAt,
+  });
+
+  final int buildNumber;
+  final String versionName;
+  final String notes;
+  final DateTime? publishedAt;
+}
+
 class UpdateCheckResult {
   UpdateCheckResult(this.status, this.info, {this.errorDetail});
   final UpdateCheckStatus status;
@@ -72,6 +89,9 @@ class UpdateService {
 
   static const String _latestReleaseUrl =
       'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=1';
+
+  static String _releasesUrl(int limit) =>
+      'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=$limit';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
@@ -159,6 +179,54 @@ class UpdateService {
     } catch (e) {
       debugPrint('[UpdateService] Lỗi không xác định khi kiểm tra cập nhật: $e');
       return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'unknown:$e');
+    }
+  }
+
+  /// Lấy danh sách bản phát hành gần đây để hiện màn hình "Nhật ký cập
+  /// nhật" trong Cài đặt — khác [checkForUpdateVerbose] chỉ lấy đúng 1 bản
+  /// MỚI NHẤT để so sánh với máy đang chạy. Trả về null nếu gọi API thất
+  /// bại (mất mạng, repo private, hết quota...); trả về danh sách rỗng nếu
+  /// repo chưa có release nào — 2 trường hợp này khác nhau nên UI cần phân
+  /// biệt (lỗi -> cho bấm thử lại, rỗng -> hiện thông báo "chưa có gì").
+  Future<List<ChangelogEntry>?> fetchChangelog({int limit = 20}) async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final response = await _dio.get(
+        _releasesUrl(limit),
+        options: Options(headers: {'Accept': 'application/vnd.github+json'}),
+      );
+      final raw = response.data;
+      if (raw is! List) return null;
+
+      final entries = <ChangelogEntry>[];
+      for (final item in raw) {
+        if (item is! Map<String, dynamic>) continue;
+        final tag = (item['tag_name'] ?? '').toString();
+        final match = RegExp(r'build-(\d+)').firstMatch(tag);
+        // Bỏ qua release không đúng định dạng "build-<số>" (release tạo thủ
+        // công) — chỉ liệt kê những bản thật sự do workflow build-apk.yml
+        // phát hành, khớp với logic ở checkForUpdateVerbose.
+        if (match == null) continue;
+        final buildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
+        if (buildNumber <= 0) continue;
+
+        entries.add(ChangelogEntry(
+          buildNumber: buildNumber,
+          versionName: (item['name'] ?? tag).toString(),
+          notes: (item['body'] ?? '').toString(),
+          publishedAt: DateTime.tryParse((item['published_at'] ?? '').toString()),
+        ));
+      }
+      // Sắp theo build mới nhất trước — GitHub API thường đã trả đúng thứ
+      // tự này, nhưng sắp lại tường minh để không phụ thuộc vào giả định đó.
+      entries.sort((a, b) => b.buildNumber.compareTo(a.buildNumber));
+      return entries;
+    } on DioException catch (e) {
+      debugPrint('[UpdateService] Gọi GitHub API (changelog) thất bại: ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('[UpdateService] Lỗi không xác định khi tải nhật ký cập nhật: $e');
+      return null;
     }
   }
 

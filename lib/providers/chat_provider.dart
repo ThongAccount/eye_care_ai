@@ -48,12 +48,19 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Ghi đè toàn bộ nội dung tin nhắn CUỐI CÙNG — dùng sau khi stream xong để
-  // xoá khối %%ACTION%%...%%END%% (nếu có) khỏi văn bản hiển thị, mà không
-  // cần tạo lại tin nhắn mới (giữ nguyên vị trí, tránh giật list).
+  // Ghi đè toàn bộ nội dung tin nhắn CUỐI CÙNG — dùng khi stream đang chạy để
+  // hiện phần text ĐÃ CHẮC CHẮN an toàn (không dính khối %%ACTION%%...%%END%%,
+  // xem ChatScreen._send) và sau khi stream xong để xoá khối action khỏi văn
+  // bản hiển thị — không cần tạo lại tin nhắn mới (giữ nguyên vị trí, tránh
+  // giật list). `last.text` có thể NGẮN HƠN lần gọi trước nếu cleanedText sau
+  // extract() ngắn hơn phần preview lúc đang stream — đó là hành vi đúng.
   void setLastMessageText(String text) {
     if (messages.isEmpty) return;
-    messages.last.text = text;
+    final last = messages.last;
+    last.text = text;
+    // Text không rỗng (hoặc chuẩn bị không rỗng ngay sau) -> không còn ở
+    // trạng thái "đang gõ..." (TypingDots) nữa, dù được gọi từ đường nào.
+    if (text.isNotEmpty) last.isTyping = false;
     notifyListeners();
   }
 
@@ -79,13 +86,24 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Chuyển lịch sử hội thoại hiện có (bỏ qua bong bóng "đang gõ...") sang
-  // đúng định dạng Anthropic Messages API để gửi lên EyeChatService, giữ
-  // ngữ cảnh nhiều lượt hỏi-đáp thay vì chỉ gửi mỗi câu hỏi mới nhất.
+  // Số tin nhắn GẦN NHẤT gửi kèm lên API (không tính system prompt/contextInfo
+  // — 2 thứ đó được EyeChatService ghép riêng, luôn có mặt đầy đủ). Chỉ giới
+  // hạn phần GỬI LÊN NIM để hội thoại dài không kéo dài thời gian tới token
+  // đầu tiên — KHÔNG xoá gì khỏi `messages` (UI vẫn hiện đủ, người dùng cuộn
+  // lên vẫn thấy toàn bộ lịch sử như cũ). 16 tin nhắn ~ 8 lượt hỏi-đáp gần
+  // nhất, đủ giữ mạch hội thoại cho use-case tư vấn ngắn của app này.
+  static const int _maxHistoryMessagesForApi = 16;
+
+  // Chuyển lịch sử hội thoại hiện có (bỏ qua bong bóng "đang gõ..."/action)
+  // sang đúng định dạng Messages API để gửi lên EyeChatService, giữ ngữ cảnh
+  // nhiều lượt hỏi-đáp thay vì chỉ gửi mỗi câu hỏi mới nhất — nhưng CẮT BỚT
+  // nếu hội thoại đã dài, chỉ giữ [_maxHistoryMessagesForApi] tin gần nhất.
   List<Map<String, String>> toApiHistory() {
-    return messages
+    final full = messages
         .where((m) => !m.isTyping && !m.isAction && m.text.trim().isNotEmpty)
         .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
         .toList();
+    if (full.length <= _maxHistoryMessagesForApi) return full;
+    return full.sublist(full.length - _maxHistoryMessagesForApi);
   }
 }
