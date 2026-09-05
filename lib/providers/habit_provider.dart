@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -71,12 +73,11 @@ class HabitProvider extends ChangeNotifier {
     HabitData(
       id: 'reading',
       title: 'Eye Test Count',
-      subtitle: 'Coming soon',
+      subtitle: 'Counted over the last 7 days',
       icon: '🧪',
       unit: 'times',
       target: 1,
       color: 0xFF3B82F6,
-      isComingSoon: true,
     ),
     HabitData(
       id: 'phone',
@@ -90,7 +91,11 @@ class HabitProvider extends ChangeNotifier {
     HabitData(
       id: 'sleep',
       title: 'Sleep',
-      subtitle: 'Health Connect or manual entry',
+      // LƯU Ý: field này không thực sự hiển thị trên UI — habits_screen.dart
+      // dùng strings.habitSubtitle(habit.id) (app_strings.dart) để có bản
+      // dịch Việt/Anh đầy đủ. Giữ chuỗi này khớp nghĩa để không gây hiểu
+      // lầm nếu sau này có chỗ khác đọc trực tiếp field này.
+      subtitle: 'Estimated from usage times, or tap to enter',
       icon: '😴',
       unit: 'hrs',
       target: 9,
@@ -138,6 +143,23 @@ class HabitProvider extends ChangeNotifier {
 
   int get eyeHealthScore => habitsCompletionPercent;
   double get screenTimeHours => totalScreenTimeHoursToday;
+
+  // ---------------- Eye Health Score 2.0: breakdown 5 yếu tố ----------------
+  // Mỗi yếu tố là % 0-100 độc lập (null = CHƯA có đủ dữ liệu để tính, khác
+  // với 0% = có dữ liệu nhưng đang xấu) — xem _updateHabitsCompletion() bên
+  // dưới để biết công thức từng yếu tố. `habitsCompletionPercent` (điểm
+  // tổng) = trung bình cộng của các yếu tố ĐANG CÓ dữ liệu (bỏ qua null,
+  // không tính là 0 — tránh phạt oan người dùng chưa cấp đủ quyền/chưa đủ
+  // mẫu, ví dụ mới cài app được vài phút).
+  double? screenTimeScore;
+  double? distanceScore;
+  double? environmentScore;
+  double? eyeBreaksScore;
+  double? sleepScore;
+  // Chênh lệch điểm tổng so với snapshot NGÀY HÔM QUA (dương = tăng, âm =
+  // giảm, null = chưa có snapshot hôm qua để so sánh — ví dụ ngày đầu dùng
+  // app). Cập nhật trong refreshHabitsFromDevice() sau khi có điểm hôm nay.
+  int? eyeHealthScoreDelta;
 
   // Tổng thời gian dùng điện thoại THẬT của hôm nay, lấy TRỰC TIẾP từ tổng
   // appUsageBreakdown (KHÔNG qua clamp) — dùng riêng cho việc HIỂN THỊ (thẻ
@@ -190,6 +212,12 @@ class HabitProvider extends ChangeNotifier {
     // đổi thành "Eye Test Count" (đang phát triển, xem HabitData(id: 'reading')
     // ở trên), không có nguồn dữ liệu thật để bật lên.
     service.startOutdoorTracking();
+    // Lấy mẫu môi trường (lux) + khoảng cách mắt-màn hình định kỳ, dùng cho
+    // 2 yếu tố "🌙 Môi trường" / "📏 Khoảng cách" trong Eye Health Score 2.0
+    // (xem DeviceDataService.startEnvironmentMonitoring để biết các ràng
+    // buộc an toàn riêng tư/pin — không tự xin quyền camera, không giữ
+    // camera mở liên tục).
+    service.startEnvironmentMonitoring();
     // Cảnh báo dùng điện thoại trong bóng tối: gửi thông báo hệ thống khi
     // môi trường xung quanh tối liên tục quá lâu trong lúc app đang mở.
     service.startDarkRoomMonitoring(() async {
@@ -223,6 +251,7 @@ class HabitProvider extends ChangeNotifier {
       service.getSleepHours().timeout(const Duration(seconds: 6), onTimeout: () => null),
       service.getOutdoorMinutesToday().timeout(const Duration(seconds: 6), onTimeout: () => 0),
       service.getEyeBreaksToday().timeout(const Duration(seconds: 6), onTimeout: () => 0),
+      _getEyeTestCountLast7Days().timeout(const Duration(seconds: 6), onTimeout: () => 0),
     ]);
 
     appUsageBreakdown = results[0] as List<AppUsageBreakdownEntry>;
@@ -232,16 +261,19 @@ class HabitProvider extends ChangeNotifier {
     // appUsageBreakdown, cùng 1 con số với thẻ "Sử dụng theo ứng dụng".
     totalScreenTimeHoursToday = phoneHours ?? 0;
 
-    // 'reading' giờ là "Eye Test Count" — tính năng đang phát triển, chưa có
-    // nguồn dữ liệu thật nên không gọi getReadingMinutesToday()/áp giá trị
-    // nữa, giữ nguyên current = 0 do UI đã làm mờ + khoá thẻ này.
+    // 'reading' giờ là "Eye Test Count" — đếm số lần người dùng đã hoàn
+    // thành bài Kiểm tra mắt (EyeTestScreen) trong 7 ngày gần nhất, lấy từ
+    // lịch sử lưu ở SharedPreferences key 'eye_test_history'.
+    final eyeTestCount = results[4] as int;
+    _applyHabitValue('reading', eyeTestCount.toDouble());
     _applyHabitValue('phone', phoneHours);
-    // Health Connect chỉ ĐỌC được dữ liệu ngủ nếu có app khác (Samsung
-    // Health, Google Fit, Fitbit...) đã ghi vào đó — nếu máy không cài Health
-    // Connect hoặc chưa có app nào ghi dữ liệu ngủ, kết quả sẽ luôn là null
-    // (không phải lỗi, chỉ đơn giản là KHÔNG CÓ NGUỒN). Dùng số giờ ngủ nhập
-    // tay hôm nay (nếu có) làm phương án dự phòng để habit này luôn dùng
-    // được thay vì mãi hiện "Chưa có nguồn dữ liệu".
+    // Ước lượng tự động (suy luận từ giờ dùng máy tối qua/sáng nay, xem
+    // UsageStatsHandler.getSleepEstimate() phía native) có thể null nếu
+    // người dùng không chạm máy đủ rõ ràng ở 2 đầu mút đêm-sáng. Dùng số giờ
+    // ngủ nhập tay hôm nay (nếu có, xem _showManualSleepSheet ở
+    // habits_screen.dart — bấm vào thẻ Giấc ngủ để nhập) làm phương án dự
+    // phòng, để habit này luôn dùng được thay vì mãi hiện "Chưa có nguồn dữ
+    // liệu".
     double? sleepValue = results[1] as double?;
     sleepValue ??= await _getManualSleepHoursToday();
     _applyHabitValue('sleep', sleepValue);
@@ -251,9 +283,21 @@ class HabitProvider extends ChangeNotifier {
     eyeBreaksTakenToday = breaks;
     totalEyeBreaksAllTime = await service.getTotalEyeBreaksAllTime();
 
-    _updateHabitsCompletion();
+    await _updateHabitsCompletion();
     habitsLastUpdated = DateTime.now();
     isRefreshingHabits = false;
+
+    // Chênh lệch điểm tổng so với hôm qua — đọc TRƯỚC khi ghi đè snapshot
+    // hôm nay bên dưới (2 key khác nhau nên thứ tự không ảnh hưởng, nhưng
+    // đọc trước cho rõ ý: đang so với NGÀY HÔM QUA, không phải bản ghi vừa
+    // lưu). null nếu hôm qua không mở app / chưa có snapshot để so sánh.
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final yesterdaySnapshot = await service.loadDailySnapshot(
+      DateTime(yesterday.year, yesterday.month, yesterday.day),
+    );
+    eyeHealthScoreDelta = yesterdaySnapshot == null
+        ? null
+        : habitsCompletionPercent - yesterdaySnapshot.score;
 
     // Lưu snapshot thật của hôm nay + tính lại streak thật (thay cho số liệu
     // giả cố định trước đây).
@@ -298,6 +342,28 @@ class HabitProvider extends ChangeNotifier {
     }
   }
 
+  // Đếm số lần hoàn thành bài Kiểm tra mắt (EyeTestScreen) trong 7 ngày gần
+  // nhất, đọc từ cùng key 'eye_test_history' mà eye_test_screen.dart dùng để
+  // lưu lịch sử (tối đa 10 lần gần nhất, mỗi entry có field 'date' dạng ISO8601).
+  Future<int> _getEyeTestCountLast7Days() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('eye_test_history');
+    if (raw == null) return 0;
+    try {
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      final cutoff = DateTime.now().subtract(const Duration(days: 7));
+      return list.where((e) {
+        final dateStr = e['date'] as String?;
+        if (dateStr == null) return false;
+        final date = DateTime.tryParse(dateStr);
+        return date != null && date.isAfter(cutoff);
+      }).length;
+    } catch (_) {
+      // Dữ liệu cũ hỏng/không đọc được -> coi như chưa có lần test nào.
+      return 0;
+    }
+  }
+
   void _applyHabitValue(String id, double? value) {
     final habit = habits.firstWhere((h) => h.id == id);
     if (value == null) {
@@ -308,57 +374,84 @@ class HabitProvider extends ChangeNotifier {
     habit.isLive = true;
   }
 
-  // Mức thưởng/phạt tối đa cho việc dùng ít/nhiều điện thoại hơn mục tiêu —
-  // xem _updateHabitsCompletion() để biết cách 2 hằng số này được dùng.
-  static const _phoneBonusMaxPoints = 50.0; // dùng 0 giờ (so với target) -> +50 điểm
-  static const _phonePenaltyPerHourOver = 10.0; // mỗi giờ dùng vượt target -> -10 điểm
+  // Ngưỡng "ngủ quá nhiều" đã khai báo ở trên (_sleepOversleepMultiplier) —
+  // dùng lại cho công thức %sleepScore bên dưới.
 
-  void _updateHabitsCompletion() {
-    // "Eye Test Count" (id: reading) chưa có tính năng đứng sau, current
-    // luôn = 0 vĩnh viễn -> nếu tính chung vào điểm trung bình sẽ kéo trần
-    // điểm sức khỏe mắt xuống tối đa ~80% MÃI MÃI dù 4 habit còn lại đều
-    // hoàn hảo. Loại hẳn các habit "isComingSoon" ra khỏi công thức tính điểm.
-    final scored = habits.where((h) => !h.isComingSoon).toList();
-    if (scored.isEmpty) {
-      habitsCompletionPercent = 0;
-      return;
-    }
+  // ---------------- Eye Health Score 2.0: công thức từng yếu tố ----------------
+  // Mỗi hàm trả về % 0-100 (không null — null chỉ xảy ra ở TẦNG GỌI khi
+  // habit chưa isLive/chưa có mẫu, xem _updateHabitsCompletion).
+  //
+  // 📱 Thời gian màn hình: dùng CÀNG ÍT so với target càng tốt. Mốc 70% ứng
+  // với đúng bằng target (không phải 0%, vì "đạt đúng mục tiêu" vẫn nên được
+  // coi là ổn, không phải thất bại) — dưới target thì cộng dần lên tối đa
+  // 100% (ở 0 giờ), vượt target thì trừ dần về 0% (ở gấp đôi target).
+  double _screenTimeScoreFor(double hours, double target) {
+    if (target <= 0) return 100;
+    final ratio = hours / target;
+    if (ratio <= 1) return (70 + (1 - ratio) * 30).clamp(0, 100).toDouble();
+    return (70 - (ratio - 1) * 70).clamp(0, 100).toDouble();
+  }
 
-    double sum = 0;
-    for (final h in scored) {
-      if (h.id == 'phone') {
-        // Điện thoại được đánh giá RIÊNG qua thưởng/phạt bên dưới (chiều
-        // "tốt" ngược với 3 habit còn lại: current thấp = tốt, không phải
-        // current cao = tốt) — ở bước tính điểm nền này chỉ cần biết "có dữ
-        // liệu hay không", tránh cộng dồn 2 lần logic thưởng/phạt vào cùng
-        // 1 habit (1 lần trong average, 1 lần trong phoneAdjustment).
-        sum += h.isLive ? 1.0 : 0.0;
-      } else {
-        sum += h.progress;
-      }
-    }
-    final baseScore = (sum / scored.length) * 100;
+  // 😴 Giấc ngủ: ngủ càng gần/trong khoảng mục tiêu càng tốt — thiếu ngủ
+  // (dưới target) trừ điểm tuyến tính, NGỦ TRONG KHOẢNG [target, ngưỡng ngủ
+  // quá nhiều] coi là 100% (không phạt ngủ hơn target một chút), vượt hẳn
+  // ngưỡng oversleep mới bắt đầu trừ điểm trở lại.
+  double _sleepScoreFor(double hours, double target) {
+    if (target <= 0) return 100;
+    if (hours < target) return ((hours / target) * 100).clamp(0, 100).toDouble();
+    final oversleepAt = target * _sleepOversleepMultiplier;
+    if (hours <= oversleepAt) return 100;
+    final over = hours - oversleepAt;
+    return (100 - (over / target) * 100).clamp(0, 100).toDouble();
+  }
 
-    // Thưởng/phạt riêng cho thói quen dùng điện thoại, CỘNG/TRỪ THẲNG vào
-    // điểm tổng (không pha loãng qua trung bình 4 habit) — đúng theo yêu
-    // cầu: dùng ít hơn target thì được CỘNG THÊM điểm (tối đa +50, đạt được
-    // khi dùng 0 giờ), dùng nhiều hơn target thì bị TRỪ điểm hiện có, mỗi
-    // giờ vượt target trừ 10 điểm. Dùng totalScreenTimeHoursToday (số giờ
-    // dùng THẬT, không bị clamp) để nhất quán với thẻ "Sử dụng theo ứng dụng".
+  // 💧 Nghỉ mắt: càng gần/vượt target càng tốt, đơn giản là % hoàn thành
+  // (giống HabitData.progress, nhân rõ ra 0-100 thay vì 0-1).
+  double _simpleProgressScoreFor(double current, double target) {
+    if (target <= 0) return 0;
+    return ((current / target) * 100).clamp(0, 100).toDouble();
+  }
+
+  Future<void> _updateHabitsCompletion() async {
     final phone = habits.firstWhere((h) => h.id == 'phone');
-    double phoneAdjustment = 0;
-    if (phone.isLive) {
-      final hours = totalScreenTimeHoursToday;
-      if (hours < phone.target) {
-        final unusedRatio = (phone.target - hours) / phone.target;
-        phoneAdjustment = (unusedRatio * _phoneBonusMaxPoints).clamp(0, _phoneBonusMaxPoints);
-      } else if (hours > phone.target) {
-        final hoursOver = hours - phone.target;
-        phoneAdjustment = -(hoursOver * _phonePenaltyPerHourOver);
-      }
-    }
+    final sleep = habits.firstWhere((h) => h.id == 'sleep');
+    final breaks = habits.firstWhere((h) => h.id == 'breaks');
 
-    habitsCompletionPercent = (baseScore + phoneAdjustment).clamp(0, 100).round();
+    // 📱 Thời gian màn hình — dùng số giờ THẬT (không bị clamp) để nhất
+    // quán với thẻ "Sử dụng theo ứng dụng".
+    screenTimeScore = phone.isLive
+        ? _screenTimeScoreFor(totalScreenTimeHoursToday, phone.target)
+        : null;
+
+    // 😴 Giấc ngủ.
+    sleepScore = sleep.isLive ? _sleepScoreFor(sleep.current, sleep.target) : null;
+
+    // 💧 Nghỉ mắt.
+    eyeBreaksScore = breaks.isLive
+        ? _simpleProgressScoreFor(breaks.current, breaks.target)
+        : null;
+
+    // 📏 Khoảng cách + 🌙 Môi trường — lấy từ mẫu lux/khoảng cách thu thập
+    // được trong ngày (xem DeviceDataService.startEnvironmentMonitoring).
+    // null nếu CHƯA có mẫu nào hôm nay (chưa cấp quyền camera, máy không có
+    // cảm biến ánh sáng, hoặc mới mở app chưa tới chu kỳ lấy mẫu đầu).
+    final service = DeviceDataService.instance;
+    distanceScore = await service.getDistanceScoreToday();
+    environmentScore = await service.getEnvironmentScoreToday();
+
+    // Điểm tổng = trung bình cộng CÁC YẾU TỐ ĐANG CÓ DỮ LIỆU — bỏ qua (không
+    // tính là 0) những yếu tố null, để không phạt oan người dùng chưa cấp đủ
+    // quyền/chưa đủ mẫu trong ngày.
+    final available = <double>[
+      if (screenTimeScore != null) screenTimeScore!,
+      if (distanceScore != null) distanceScore!,
+      if (environmentScore != null) environmentScore!,
+      if (eyeBreaksScore != null) eyeBreaksScore!,
+      if (sleepScore != null) sleepScore!,
+    ];
+    habitsCompletionPercent = available.isEmpty
+        ? 0
+        : (available.reduce((a, b) => a + b) / available.length).round();
   }
 
   Future<double?> _getManualSleepHoursToday() async {
@@ -381,7 +474,7 @@ class HabitProvider extends ChangeNotifier {
     await prefs.setString(_kManualSleepDateKey, todayKey);
 
     _applyHabitValue('sleep', hours);
-    _updateHabitsCompletion();
+    await _updateHabitsCompletion();
     notifyListeners();
   }
 
@@ -392,7 +485,7 @@ class HabitProvider extends ChangeNotifier {
     final habit = habits.firstWhere((h) => h.id == 'breaks');
     habit.current = total.toDouble();
     habit.isLive = true;
-    _updateHabitsCompletion();
+    await _updateHabitsCompletion();
     notifyListeners();
   }
 
@@ -424,7 +517,7 @@ class HabitProvider extends ChangeNotifier {
     await _saveHabitTarget(habitId, value);
     hasCustomHabitTargets = true;
     await _saveHasCustomHabitTargets();
-    _updateHabitsCompletion();
+    await _updateHabitsCompletion();
     notifyListeners();
   }
 
@@ -437,7 +530,7 @@ class HabitProvider extends ChangeNotifier {
     }
     hasCustomHabitTargets = true;
     await _saveHasCustomHabitTargets();
-    _updateHabitsCompletion();
+    await _updateHabitsCompletion();
     notifyListeners();
   }
 }

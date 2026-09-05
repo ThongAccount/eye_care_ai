@@ -32,6 +32,39 @@ class AppStrings {
   String get goodProgress => vi ? 'Tiến triển tốt! Giữ vững.' : 'Good progress! Keep it up.';
   String get fromLastWeek => vi ? '+5 so với tuần trước' : '+5 from last week';
 
+  // Nhãn 5 yếu tố breakdown của Eye Health Score 2.0 (xem _ScoreCard trong
+  // home_screen.dart) — mỗi yếu tố là 1 thanh %, kèm 1 emoji cố định (không
+  // đổi theo ngôn ngữ) để dễ nhận diện nhanh.
+  String get scoreFactorScreenTime => vi ? 'Thời gian màn hình' : 'Screen Time';
+  String get scoreFactorDistance => vi ? 'Khoảng cách' : 'Distance';
+  String get scoreFactorEnvironment => vi ? 'Môi trường' : 'Environment';
+  String get scoreFactorEyeBreaks => vi ? 'Nghỉ mắt' : 'Eye Breaks';
+  String get scoreFactorSleep => vi ? 'Giấc ngủ' : 'Sleep';
+  // Hiện khi 1 yếu tố CHƯA có đủ dữ liệu (khác 0%) — ví dụ chưa cấp quyền
+  // camera nên chưa đo được Khoảng cách/Môi trường lần nào trong hôm nay.
+  String get scoreFactorNoData => vi ? 'Chưa có dữ liệu' : 'No data yet';
+
+  // Giải thích cách tính từng yếu tố — hiện khi người dùng chạm vào 1 dòng
+  // trong _ScoreCard (xem _ScoreFactorRow trong home_screen.dart), vì tên
+  // ngắn gọn như "Khoảng cách"/"Môi trường" một mình không đủ rõ % này được
+  // tính ra sao (đặc biệt 2 yếu tố này dựa vào camera/cảm biến, không trực
+  // quan như "Thời gian màn hình" hay "Giấc ngủ").
+  String get scoreFactorScreenTimeExplain => vi
+      ? 'So sánh tổng thời gian dùng điện thoại hôm nay với mục tiêu bạn đặt trong phần Thói quen. Dùng càng gần hoặc ít hơn mục tiêu, điểm càng cao.'
+      : 'Compares your total phone screen time today against the target you set in Habits. The closer to or under target, the higher the score.';
+  String get scoreFactorDistanceExplain => vi
+      ? 'App dùng camera trước để ước lượng khoảng cách từ mắt bạn đến màn hình theo từng đợt lấy mẫu trong ngày. % này là tỉ lệ số lần đo được khoảng cách an toàn (≥30cm) trên tổng số lần đo. Cần cấp quyền camera để đo được.'
+      : 'The app uses the front camera to estimate the distance from your eyes to the screen, sampled periodically throughout the day. This % is the share of samples where the distance was safe (≥30cm). Camera permission is required for this to work.';
+  String get scoreFactorEnvironmentExplain => vi
+      ? 'App dùng cảm biến ánh sáng của máy để đo độ sáng xung quanh theo từng đợt lấy mẫu trong ngày. % này là tỉ lệ số lần đo được ánh sáng đủ tốt (không quá tối, không quá chói) trên tổng số lần đo.'
+      : 'The app uses your device\'s light sensor to measure ambient brightness, sampled periodically throughout the day. This % is the share of samples where lighting was good (not too dark, not too glaring).';
+  String get scoreFactorEyeBreaksExplain => vi
+      ? 'Tính theo số lần bạn nghỉ mắt thật sự (bấm "Đã nghỉ mắt" khi có thông báo nhắc) so với số lần nhắc nghỉ mắt trong hôm nay.'
+      : 'Based on how many break reminders you actually completed (tapped "Eye rest done") compared to how many reminders fired today.';
+  String get scoreFactorSleepExplain => vi
+      ? 'So sánh số giờ ngủ bạn ghi nhận đêm qua với mục tiêu giờ ngủ bạn đặt trong phần Thói quen.'
+      : 'Compares your logged sleep hours last night against the sleep target you set in Habits.';
+
   String get screenTime => vi ? 'Thời gian màn hình' : 'Screen Time';
   String get outdoor => vi ? 'Ngoài trời' : 'Outdoor';
   String get breaks => vi ? 'Nghỉ ngơi' : 'Breaks';
@@ -339,6 +372,13 @@ class AppStrings {
   String get eyeTestDistanceHint => vi
       ? 'Giữ điện thoại cách mắt khoảng 30-55cm (tầm sải cẳng tay), giữ nguyên khoảng cách suốt bài test để kết quả nhất quán giữa các lần đo.'
       : 'Hold the phone about 30-55cm (arm\'s length) from your eyes, and keep that distance steady through the test so results stay consistent between attempts.';
+  // Nhắc tháo kính (cận/viễn/áp tròng có độ) TRƯỚC khi bắt đầu — bài test đo
+  // thị lực TỰ NHIÊN của mắt, đeo kính vào sẽ cho kết quả sai lệch (thường
+  // là "tốt hơn thực tế"), khiến người dùng chủ quan không đi khám dù mắt
+  // thực sự đã kém đi.
+  String get eyeTestGlassesReminder => vi
+      ? 'Tháo kính cận/viễn hoặc kính áp tròng có độ trước khi bắt đầu — bài test cần đo đúng thị lực tự nhiên của mắt, đeo kính vào kết quả sẽ không chính xác.'
+      : 'Take off your glasses or corrective contact lenses before starting — this test needs to measure your natural vision; wearing them will skew the result.';
   String get eyeTestCameraPermissionHint => vi
       ? 'Cho phép dùng camera trước để đo khoảng cách mắt-màn hình theo thời gian thực, giúp kết quả kiểm tra chính xác hơn. Ảnh không được lưu lại hay gửi đi đâu cả.'
       : 'Allow the front camera to measure your eye-to-screen distance in real time, for a more accurate test. No images are saved or sent anywhere.';
@@ -347,6 +387,12 @@ class AppStrings {
   String get eyeTestTooClose => vi ? 'Đang quá gần — lùi điện thoại ra một chút' : 'Too close — move the phone a bit further away';
   String get eyeTestTooFar => vi ? 'Đang quá xa — đưa điện thoại lại gần một chút' : 'Too far — bring the phone a bit closer';
   String get eyeTestPausedTitle => vi ? 'Đã tạm dừng bài kiểm tra' : 'Test paused';
+  // Nhắc che/nhắm đúng mắt còn lại — hiện khi camera phát hiện mắt lẽ ra
+  // phải nhắm vẫn đang mở trong lúc đo thị lực mắt kia (che sai/quên che).
+  String get eyeTestCoverLeftEye =>
+      vi ? 'Hãy nhắm hoặc che MẮT TRÁI lại để đo đúng mắt phải' : 'Close or cover your LEFT eye to test the right eye correctly';
+  String get eyeTestCoverRightEye =>
+      vi ? 'Hãy nhắm hoặc che MẮT PHẢI lại để đo đúng mắt trái' : 'Close or cover your RIGHT eye to test the left eye correctly';
   String get eyeTestStart => vi ? 'Bắt đầu kiểm tra' : 'Start test';
   String get eyeTestDisclaimer => vi
       ? 'Đây là công cụ sàng lọc nhanh tại nhà, không thay thế khám mắt chuyên khoa. Nếu nghi ngờ có vấn đề về thị lực, hãy gặp bác sĩ nhãn khoa.'
@@ -395,6 +441,15 @@ class AppStrings {
   String get autoDetectEyeBreakDescription => vi
       ? 'Khoá màn hình / rời app từ 20 giây trở lên sẽ tự tính là 1 lần nghỉ mắt, không cần bấm "Xong" thủ công.'
       : 'Locking the screen or leaving the app for 20+ seconds automatically counts as an eye break — no need to tap "Done".';
+    // Cài đặt "Nhắc uống nước" kèm theo mỗi lần nghỉ mắt.
+  String get waterReminderTitle => vi ? 'Nhắc uống nước' : 'Water reminder';
+  String get waterReminderDescription => vi
+      ? 'Kèm thêm lời nhắc uống một ly nước mỗi lần thông báo nghỉ mắt hiện ra'
+      : 'Add a reminder to drink a glass of water with each eye-break notification';
+  // Câu ngắn ghép vào cuối nội dung thông báo nghỉ mắt khi bật cờ trên (xem
+  // _scheduleRepeatingAlarm trong eye_break_screen.dart — nơi gọi
+  // ' ${strings.eyeBreakWaterHint}.' nên KHÔNG kèm dấu chấm ở đây).
+  String get eyeBreakWaterHint => vi ? 'Nhớ uống thêm một ly nước nhé' : 'Remember to drink a glass of water too';
   String get focusModeTitle => vi ? 'Chế độ Focus' : 'Focus mode';
   String get focusModeDescription => vi
       ? 'Chặn thông báo từ app khác trong lúc đang đếm ngược, giảm giật mình/mất tập trung — tự tắt lại khi đến giờ nghỉ mắt.'
@@ -531,7 +586,7 @@ class AppStrings {
       case 'phone':
         return vi ? 'Thời gian màn hình (hệ điều hành)' : 'Screen-on time (OS)';
       case 'sleep':
-        return vi ? 'Health Connect hoặc nhập tay' : 'Health Connect or manual entry';
+        return vi ? 'Ước lượng từ giờ dùng máy — bấm để nhập tay' : 'Estimated from usage times — tap to enter manually';
       case 'outdoor':
         return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':
@@ -908,4 +963,16 @@ class AppStrings {
   String get checkForUpdate => vi ? 'Kiểm tra bản cập nhật' : 'Check for update';
   String get noUpdateAvailable => vi ? 'Bạn đang dùng bản mới nhất.' : 'You are on the latest version.';
   String get updateCheckFailed => vi ? 'Không kiểm tra được bản cập nhật. Vui lòng thử lại sau.' : 'Unable to check for updates. Please try again later.';
+
+  // ---------------- Changelog (Nhật ký cập nhật) ----------------
+  String get changelog => vi ? 'Nhật ký cập nhật' : 'Changelog';
+  String get changelogTitle => vi ? 'Nhật ký cập nhật' : 'Changelog';
+  String get changelogSubtitle =>
+      vi ? 'Những gì đã thay đổi qua từng bản cập nhật' : 'What changed in each update';
+  String get changelogCurrentVersionTag => vi ? 'Đang dùng' : 'Current';
+  String get changelogEmpty => vi ? 'Chưa có nhật ký cập nhật nào.' : 'No changelog entries yet.';
+  String get changelogLoadFailed =>
+      vi ? 'Không tải được nhật ký cập nhật. Vui lòng thử lại.' : 'Failed to load the changelog. Please try again.';
+  String get changelogRetry => vi ? 'Thử lại' : 'Retry';
+  String get changelogNoNotes => vi ? 'Không có ghi chú cho bản này.' : 'No notes for this release.';
 }

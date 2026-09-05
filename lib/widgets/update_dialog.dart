@@ -12,17 +12,28 @@ import '../utils/app_icon.dart';
 /// cài đặt gói của hệ thống (OpenFilex) — người dùng chỉ cần bấm "Cài đặt"
 /// ở màn hình hệ thống hiện ra sau đó, không cần vào Google Play.
 class UpdateDialog extends StatefulWidget {
-  const UpdateDialog({super.key, required this.update, required this.strings});
+  const UpdateDialog({super.key, required this.update, required this.strings, this.onDismissed});
 
   final UpdateInfo update;
   final AppStrings strings;
+  // Gọi khi dialog đóng mà CHƯA hoàn tất cài đặt (bấm "Để sau", chạm ra
+  // ngoài, hoặc back) — dùng để ghi nhớ "đã dismiss bản này", đỡ hiện lại
+  // dialog ở lần mở app kế tiếp cho cùng 1 bản build (xem UpdateProvider).
+  // Không gọi nếu người dùng đã mở trình cài đặt hệ thống thành công, vì
+  // lúc đó coi như họ đang xử lý bản cập nhật rồi, không cần "nhắc nhẹ" nữa.
+  final VoidCallback? onDismissed;
 
   /// Tiện ích gọi nhanh từ nơi khác: `UpdateDialog.show(context, update, strings)`.
-  static Future<void> show(BuildContext context, UpdateInfo update, AppStrings strings) {
+  static Future<void> show(
+    BuildContext context,
+    UpdateInfo update,
+    AppStrings strings, {
+    VoidCallback? onDismissed,
+  }) {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => UpdateDialog(update: update, strings: strings),
+      builder: (_) => UpdateDialog(update: update, strings: strings, onDismissed: onDismissed),
     );
   }
 
@@ -36,6 +47,15 @@ class _UpdateDialogState extends State<UpdateDialog> {
   _DownloadState _state = _DownloadState.idle;
   double _progress = 0;
   String? _downloadedPath;
+  bool _dismissedCallbackFired = false;
+
+  // Gọi onDismissed ĐÚNG 1 LẦN — dùng chung cho mọi đường đóng dialog mà
+  // chưa cài xong (nút "Để sau", chạm ra ngoài, back cứng).
+  void _fireDismissedOnce() {
+    if (_dismissedCallbackFired) return;
+    _dismissedCallbackFired = true;
+    widget.onDismissed?.call();
+  }
 
   Future<void> _startDownload() async {
     setState(() {
@@ -69,7 +89,15 @@ class _UpdateDialogState extends State<UpdateDialog> {
     final strings = widget.strings;
     final update = widget.update;
 
-    return AlertDialog(
+    return PopScope(
+      canPop: true,
+      // Bắt được TẤT CẢ đường đóng dialog: nút "Để sau" (Navigator.pop bên
+      // dưới), chạm ra ngoài (barrierDismissible), và nút back cứng của
+      // Android — cả 3 đều trigger pop route này, chỉ cần xử lý 1 chỗ.
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _fireDismissedOnce();
+      },
+      child: AlertDialog(
       title: Row(
         children: [
           const AppIcon('🚀', size: 22, color: AppColors.primaryBlue),
@@ -136,6 +164,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             child: Text(strings.updateOpenInstaller),
           ),
       ],
+      ),
     );
   }
 }

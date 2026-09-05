@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/device_data_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_icon.dart';
@@ -30,6 +31,7 @@ class HomeScreen extends StatelessWidget {
     final habit = context.watch<HabitProvider>();
     final language = context.watch<LanguageProvider>();
     final strings = language.strings;
+    final hasUpdate = context.watch<UpdateProvider>().hasUpdateAvailable;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -54,30 +56,30 @@ class HomeScreen extends StatelessWidget {
               ),
               Row(
                 children: [
-                  // Badge chuỗi (streak) — trước đây chỉ hiện ở trang Thống
-                  // kê, giờ thêm ở Trang chủ luôn để thấy ngay không cần vào
-                  // sâu. Chỉ hiện khi có streak > 0 (streak = 0 hiện ra
-                  // "🔥 0 ngày" trông kỳ, không cần thiết ngay từ đầu).
-                  if (habit.streakDays > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
+                  // Biểu tượng báo "có bản cập nhật đang chờ" — thay cho
+                  // chấm đỏ trước đây gắn trên ô Cài đặt trong lưới tính
+                  // năng (dễ bị hiểu nhầm là lỗi UI khi tràn ra ngoài ô).
+                  // Đặt hẳn lên góc trên Trang chủ, bấm vào mở luôn Cài đặt
+                  // (đã có sẵn mục "Kiểm tra bản cập nhật" trong đó).
+                  if (hasUpdate) ...[
+                    InkWell(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon('🔥', size: 16, color: AppColors.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${habit.streakDays}',
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                  color: AppColors.warning,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ],
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.system_update_rounded,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -103,7 +105,7 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const SetupStatusBanner(),
-          _ScoreCard(score: habit.eyeHealthScore),
+          _ScoreCard(habit: habit),
           const SizedBox(height: 18),
           _FeatureHubCard(),
           const SizedBox(height: 20),
@@ -672,14 +674,15 @@ class _AchievementItem {
 }
 
 class _ScoreCard extends StatelessWidget {
-  const _ScoreCard({required this.score});
+  const _ScoreCard({required this.habit});
 
-  final int score;
+  final HabitProvider habit;
 
   @override
   Widget build(BuildContext context) {
     final strings = context.watch<LanguageProvider>().strings;
     final accent = Theme.of(context).colorScheme.primary;
+    final delta = habit.eyeHealthScoreDelta;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -694,47 +697,278 @@ class _ScoreCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.eyeHealthScore,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      strings.goodProgress,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.75),
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Badge chênh lệch điểm THẬT so với hôm qua (xem
+                    // HabitProvider.eyeHealthScoreDelta) — không hiện gì nếu
+                    // chưa có snapshot hôm qua để so sánh (ví dụ ngày đầu
+                    // dùng app), thay vì bịa số cố định như trước.
+                    // Đặt cùng hàng với badge chuỗi ngày (streak) — người
+                    // dùng trước đây chỉ thấy chuỗi ở trang Xếp hạng, không
+                    // biết chuỗi hiện tại của mình ngay ở Trang chủ.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (delta != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  delta >= 0 ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                  size: 13,
+                                  color: Colors.white,
+                                ),
+                                Text(
+                                  '${delta >= 0 ? '+' : ''}$delta',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (habit.streakDays > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('🔥', style: TextStyle(fontSize: 12)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${habit.streakDays} ${strings.dayStreak}',
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              ScoreRing(score: habit.eyeHealthScore),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.18))),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _ScoreFactorRow(
+            icon: '📱',
+            label: strings.scoreFactorScreenTime,
+            percent: habit.screenTimeScore,
+            noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorScreenTimeExplain,
+          ),
+          _ScoreFactorRow(
+            icon: '📏',
+            label: strings.scoreFactorDistance,
+            percent: habit.distanceScore,
+            noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorDistanceExplain,
+          ),
+          _ScoreFactorRow(
+            icon: '🌙',
+            label: strings.scoreFactorEnvironment,
+            percent: habit.environmentScore,
+            noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorEnvironmentExplain,
+          ),
+          _ScoreFactorRow(
+            icon: '💧',
+            label: strings.scoreFactorEyeBreaks,
+            percent: habit.eyeBreaksScore,
+            noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorEyeBreaksExplain,
+          ),
+          _ScoreFactorRow(
+            icon: '😴',
+            label: strings.scoreFactorSleep,
+            percent: habit.sleepScore,
+            noDataLabel: strings.scoreFactorNoData,
+            explanation: strings.scoreFactorSleepExplain,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// 1 dòng breakdown trong _ScoreCard: icon + tên yếu tố + thanh % + số %.
+// `percent == null` -> yếu tố CHƯA có dữ liệu hôm nay (khác 0%, xem
+// HabitProvider) -> hiện label "Chưa có dữ liệu" + thanh rỗng thay vì 0%
+// gây hiểu lầm là "đang tệ".
+class _ScoreFactorRow extends StatelessWidget {
+  const _ScoreFactorRow({
+    required this.icon,
+    required this.label,
+    required this.percent,
+    required this.noDataLabel,
+    required this.explanation,
+  });
+
+  final String icon;
+  final String label;
+  final double? percent;
+  final String noDataLabel;
+  // Giải thích cách tính % của yếu tố này — hiện trong bottom sheet khi
+  // người dùng chạm vào dòng này. Thêm vì "Khoảng cách"/"Môi trường" một
+  // mình không đủ rõ ràng người dùng tính bằng cách nào (dựa vào camera/cảm
+  // biến ánh sáng, không trực quan như thời gian màn hình hay giấc ngủ).
+  final String explanation;
+
+  void _showExplanation(BuildContext context) {
+    final strings = context.read<LanguageProvider>().strings;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final hasData = percent != null;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  strings.eyeHealthScore,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.9),
+                Row(
+                  children: [
+                    Text(icon, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: Theme.of(sheetContext).textTheme.titleMedium,
                       ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  strings.goodProgress,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.75),
-                      ),
+                    ),
+                    Text(
+                      hasData ? '${percent!.round()}%' : strings.scoreFactorNoData,
+                      style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(sheetContext).colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    strings.fromLastWeek,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                        ),
-                  ),
+                Text(
+                  explanation,
+                  style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
                 ),
               ],
             ),
           ),
-          ScoreRing(score: score),
-        ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = percent != null;
+    final displayPercent = (percent ?? 0).round();
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _showExplanation(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 15)),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 88,
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              Icons.info_outline_rounded,
+              size: 13,
+              color: Colors.white.withValues(alpha: 0.55),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: hasData ? (percent! / 100).clamp(0.0, 1.0) : 0,
+                  minHeight: 6,
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  valueColor: AlwaysStoppedAnimation(
+                    Colors.white.withValues(alpha: hasData ? 1.0 : 0.35),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 40,
+              child: Text(
+                hasData ? '$displayPercent%' : '—',
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -907,28 +1141,52 @@ class _WeeklyOverviewChartState extends State<_WeeklyOverviewChart> {
     setState(() => _snapshots = snapshots);
   }
 
+  // Nội suy màu theo ĐIỂM SỐ (không phải theo có/không có dữ liệu như
+  // trước): đỏ (kém/chưa có dữ liệu) -> cam -> vàng -> xanh lá (tốt) — nhìn
+  // cột là biết ngay hôm đó tốt/xấu, không cần chạm vào xem số. Ngày CHƯA
+  // CÓ dữ liệu được coi như điểm 0 cho MỤC ĐÍCH MÀU SẮC (ra màu đỏ, đúng yêu
+  // cầu "cột thấp thì đỏ"), tách biệt với chiều cao hiển thị (xem _bar bên
+  // dưới — chiều cao có sàn tối thiểu riêng để LUÔN NHÌN THẤY được cột, kể
+  // cả điểm 0 thật).
+  Color _colorForScore(double score) {
+    final clamped = score.clamp(0, 100).toDouble();
+    const stops = [
+      Colors.redAccent,
+      Colors.deepOrange,
+      Colors.amber,
+      Colors.lightGreen,
+      Colors.green,
+    ];
+    final t = clamped / 100 * (stops.length - 1);
+    final index = t.floor().clamp(0, stops.length - 2);
+    final localT = t - index;
+    return Color.lerp(stops[index], stops[index + 1], localT)!;
+  }
+
   BarChartGroupData _bar(int x, double? y, {bool isToday = false}) {
-    final value = y ?? 4.0; // chưa có dữ liệu -> cột rất thấp thay vì bịa số
-    final accent = Theme.of(context).colorScheme.primary;
-    final accentEnd = AppTheme.gradientFor(accent).colors.last;
+    // BUG ĐÃ SỬA: bản cũ dùng chiều cao 4.0 CỐ ĐỊNH cho ngày chưa có dữ
+    // liệu, cộng màu xám nhạt (AppColors.border) — trên thang maxY=100 cao
+    // 132px, 4 đơn vị gần như không nhìn thấy gì, trông như "không có cột".
+    // Giờ có SÀN TỐI THIỂU riêng (8 đơn vị, gấp đôi trước) + màu đỏ (điểm 0
+    // cho mục đích màu) để LUÔN thấy rõ 1 cột đỏ ngắn thay vì biến mất.
+    final rawValue = y ?? 0.0;
+    final displayHeight = rawValue < 8.0 ? 8.0 : rawValue;
+    final baseColor = _colorForScore(rawValue);
+    final topColor = isToday ? baseColor : baseColor.withValues(alpha: 0.75);
+    final bottomColor = isToday
+        ? Color.lerp(baseColor, Colors.black, 0.15)!
+        : Color.lerp(baseColor, Colors.black, 0.15)!.withValues(alpha: 0.75);
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
-          toY: value,
+          toY: displayHeight,
           width: 18,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
           gradient: LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
-            colors: y == null
-                ? [AppColors.border, AppColors.border]
-                : isToday
-                    ? [accent, accentEnd]
-                    : [
-                        accent.withValues(alpha: 0.4),
-                        accentEnd.withValues(alpha: 0.4),
-                      ],
+            colors: [bottomColor, topColor],
           ),
         ),
       ],
