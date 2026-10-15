@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'models/app_strings.dart';
 import 'providers/accent_color_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/auto_break_provider.dart';
 import 'providers/auto_brightness_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/font_provider.dart';
@@ -67,6 +70,33 @@ Future<void> main() async {
   } catch (_) {
     // Báo thức nghỉ mắt có thể khởi tạo lại sau khi vào app.
   }
+  // Đăng ký lại 2 báo thức lặp (kiểm tra mắt hàng tuần / thói quen hàng
+  // ngày) nếu người dùng đã bật trước đó — cần làm lại mỗi lần app khởi
+  // động vì zonedSchedule không tự tồn tại qua việc app bị cập nhật/gỡ cài
+  // đặt, và để đảm bảo giờ hẹn luôn được tính từ "hiện tại" (an toàn để gọi
+  // lặp lại nhiều lần, cùng ID sẽ tự ghi đè). Đọc thẳng SharedPreferences ở
+  // đây (thay vì chờ SettingsProvider khởi tạo xong) vì bước này cần chạy
+  // sớm, trước runApp().
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final isVietnamese = prefs.getBool('pref_vietnamese') ?? true;
+    final strings = AppStrings(isVietnamese);
+    if (prefs.getBool('pref_notify_tests') ?? true) {
+      await NotificationService.instance.scheduleWeeklyEyeTestReminder(
+        title: strings.eyeTestReminderNotifTitle,
+        body: strings.eyeTestReminderNotifBody,
+      );
+    }
+    if (prefs.getBool('pref_notify_habits') ?? true) {
+      await NotificationService.instance.scheduleDailyHabitReminder(
+        title: strings.habitReminderNotifTitle,
+        body: strings.habitReminderNotifBody,
+      );
+    }
+  } catch (_) {
+    // Không chặn khởi động app nếu bước đăng ký lại báo thức thất bại — các
+    // báo thức này sẽ được đặt lại ở lần mở app kế tiếp.
+  }
   // Đăng ký kiểm tra "dùng điện thoại trong bóng tối" chạy NỀN ĐỊNH KỲ (mỗi
   // ~15 phút, kể cả khi app đã đóng hẳn) — không await/không có timeout
   // riêng: đây chỉ là ĐĂNG KÝ lịch với hệ thống (rất nhanh), KHÔNG phải bản
@@ -104,6 +134,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => SetupProvider()),
         ChangeNotifierProvider(create: (_) => UsageLimitProvider()),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
+        ChangeNotifierProvider(create: (_) => AutoBreakProvider()),
         ChangeNotifierProxyProvider<AuthProvider, ProfileProvider>(
           create: (_) => ProfileProvider(),
           update: (_, auth, profile) => profile!..syncFromUser(auth.user),

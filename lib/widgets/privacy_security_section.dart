@@ -43,6 +43,16 @@ class PrivacySecuritySection extends StatelessWidget {
           value: settings.personalizedAI,
           onChanged: isLoggedIn ? settings.setPersonalizedAI : null,
         ),
+        const Divider(height: 1),
+        // "Hỏi trước khi AI tự thao tác" — không phụ thuộc đăng nhập, vì đây
+        // là quyền kiểm soát hành vi AI trong app, khác với các toggle trên
+        // (cloud backup, personalized AI) vốn cần tài khoản để có ý nghĩa.
+        SettingsToggleTile(
+          title: strings.aiConfirmBeforeActingTitle,
+          description: strings.aiConfirmBeforeActingDesc,
+          value: settings.aiConfirmBeforeActing,
+          onChanged: settings.setAiConfirmBeforeActing,
+        ),
         SettingsSectionLabel(strings.sectionSecurity),
         SettingsNavTile(
           title: strings.changePasswordTitle,

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/auto_break_provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/settings_more_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/ai_action_handler.dart';
 import '../services/eye_chat_service.dart';
 import '../theme/app_colors.dart';
@@ -81,12 +84,27 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  // Tóm tắt mục tiêu (target) hiện tại của người dùng thành vài dòng text
-  // ngắn gọn, gửi kèm mỗi lượt hỏi để AI đề xuất số hợp lý (ví dụ biết mục
-  // tiêu Phone Usage đang là 6 giờ thì mới hạ xuống 4 giờ được, chứ không
-  // đoán mò) — xem cách dùng ở EyeChatService.sendMessageStream(contextInfo:).
+  // Tóm tắt mục tiêu (target) hiện tại + Hồ sơ thị lực + Kiểu nhắc nhở +
+  // trạng thái Tự động nhắc nghỉ mắt của người dùng thành vài dòng text
+  // ngắn gọn, gửi kèm mỗi lượt hỏi để AI đề xuất số hợp lý và cá nhân hoá
+  // gợi ý theo đúng hồ sơ/thói quen hiện tại (ví dụ biết mục tiêu Phone
+  // Usage đang là 6 giờ thì mới hạ xuống 4 giờ được, chứ không đoán mò; biết
+  // người dùng đang "no_correction" thì có thể nhắc khám mắt định kỳ hơn) —
+  // xem cách dùng ở EyeChatService.sendMessageStream(contextInfo:).
   String _buildHabitContext(HabitProvider habits, bool isVi) {
     final buffer = StringBuffer();
+    final settings = context.read<SettingsProvider>();
+    final autoBreak = context.read<AutoBreakProvider>();
+
+    buffer.writeln(
+      '- Hồ sơ thị lực (vision profile): "${settings.visionProfile}" (glasses/contact_lens/no_correction)',
+    );
+    buffer.writeln(
+      '- Kiểu nhắc nhở hiện tại (reminder style): "${settings.reminderStyle}" (gentle/normal/strict)',
+    );
+    buffer.writeln(
+      '- Tự động nhắc nghỉ mắt (auto break): ${autoBreak.enabled ? "đang BẬT" : "đang TẮT"}',
+    );
     for (final habit in habits.habits) {
       if (habit.isComingSoon) continue;
       final unit = switch (habit.id) {
@@ -177,19 +195,37 @@ class _ChatScreenState extends State<ChatScreen> {
         // (xem system prompt trong eye_chat_service.dart) — tách nó ra khỏi
         // văn bản hiển thị (dùng rawBuffer đầy đủ, không phải text đang hiện,
         // vì text đang hiện có thể đã bị chốt sớm hơn ở nhánh actionMarkerFound
-        // phía trên) rồi THỰC SỰ áp dụng thay đổi vào app.
+        // phía trên) rồi quyết định: hỏi xác nhận trước, hay áp dụng ngay.
         final result = AiActionHandler.extract(rawBuffer);
         chat.setLastMessageText(result.cleanedText);
         if (result.actions.isNotEmpty) {
-          final confirmations = await AiActionHandler.execute(
-            result.actions,
-            habits: habits,
-            isVietnamese: isVi,
-          );
-          for (final line in confirmations) {
-            chat.addActionMessage(line);
+          final requireConfirm =
+              context.read<SettingsMoreProvider>().aiConfirmBeforeActing;
+          if (requireConfirm) {
+            final previewLines = AiActionHandler.describeActions(
+              result.actions,
+              habits: habits,
+              isVietnamese: isVi,
+            );
+            if (previewLines.isNotEmpty) {
+              final previewText = '${strings.aiPendingActionsTitle}\n'
+                  '${previewLines.map((l) => '• $l').join('\n')}';
+              chat.addConfirmationMessage(previewText, result.actions);
+              _scrollToBottom();
+            }
+          } else {
+            final confirmations = await AiActionHandler.execute(
+              result.actions,
+              habits: habits,
+              isVietnamese: isVi,
+              settings: context.read<SettingsProvider>(),
+              autoBreak: context.read<AutoBreakProvider>(),
+            );
+            for (final line in confirmations) {
+              chat.addActionMessage(line);
+            }
+            _scrollToBottom();
           }
-          _scrollToBottom();
         }
       }
     } catch (e) {
@@ -211,6 +247,35 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) setState(() => _sending = false);
       _scrollToBottom();
     }
+  }
+
+  // Người dùng bấm "Đồng ý" trên bong bóng xác nhận -> thực sự áp dụng
+  // action lúc này (gọi AiActionHandler.execute), rồi hiện các dòng xác
+  // nhận "đã làm gì" y hệt như luồng auto-apply.
+  Future<void> _acceptPendingAction(ChatMessage message) async {
+    final actions = message.pendingActions;
+    if (actions == null) return;
+    final chat = context.read<ChatProvider>();
+    chat.resolveConfirmation(message);
+    final habits = context.read<HabitProvider>();
+    final isVi = context.read<LanguageProvider>().isVietnamese;
+    final confirmations = await AiActionHandler.execute(
+      actions,
+      habits: habits,
+      isVietnamese: isVi,
+      settings: context.read<SettingsProvider>(),
+      autoBreak: context.read<AutoBreakProvider>(),
+    );
+    for (final line in confirmations) {
+      chat.addActionMessage(line);
+    }
+    _scrollToBottom();
+  }
+
+  // Người dùng bấm "Từ chối" -> chỉ đóng bong bóng xác nhận lại, KHÔNG áp
+  // dụng bất kỳ thay đổi nào.
+  void _declinePendingAction(ChatMessage message) {
+    context.read<ChatProvider>().resolveConfirmation(message);
   }
 
   @override
@@ -290,7 +355,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: chat.messages.length,
                     itemBuilder: (context, index) {
                       final message = chat.messages[index];
-                      return _ChatBubble(message: message, isDark: isDark);
+                      return _ChatBubble(
+                        message: message,
+                        isDark: isDark,
+                        onAccept: _acceptPendingAction,
+                        onDecline: _declinePendingAction,
+                      );
                     },
                   );
                 },
@@ -338,15 +408,73 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _ChatBubble extends StatelessWidget {
-  const _ChatBubble({required this.message, required this.isDark});
+  const _ChatBubble({
+    required this.message,
+    required this.isDark,
+    required this.onAccept,
+    required this.onDecline,
+  });
 
   final ChatMessage message;
   final bool isDark;
+  final void Function(ChatMessage) onAccept;
+  final void Function(ChatMessage) onDecline;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final isUser = message.isUser;
+    final strings = context.watch<LanguageProvider>().strings;
+
+    // Bong bóng "AI muốn thực hiện: ..." kèm 2 nút Đồng ý/Từ chối — chỉ
+    // xuất hiện khi cài đặt "Hỏi trước khi AI tự thao tác" đang bật. Đặt
+    // check này TRƯỚC isAction để ưu tiên đúng loại bong bóng.
+    if (message.isConfirmation) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: primary.withValues(alpha: isDark ? 0.14 : 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primary.withValues(alpha: 0.35)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message.text,
+                style: TextStyle(
+                  height: 1.4,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => onDecline(message),
+                      child: Text(strings.aiPendingActionsDecline),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: primary),
+                      onPressed: () => onAccept(message),
+                      child: Text(strings.aiPendingActionsAccept),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // Bong bóng xác nhận AI vừa thao tác thật với app (đổi target, bật Focus
     // Mode...) — hiện dạng pill xanh lá nhạt, căn giữa, tách biệt hẳn khỏi

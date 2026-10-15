@@ -77,19 +77,28 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
         children: [
           const SizedBox(height: 60),
           Center(
-            child: Icon(Icons.cloud_off_rounded, size: 40, color: AppColors.textMuted),
+            child: Icon(
+              Icons.cloud_off_rounded,
+              size: 40,
+              color: AppColors.textMuted,
+            ),
           ),
           const SizedBox(height: 12),
           Center(
             child: Text(
               strings.changelogLoadFailed,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
             ),
           ),
           const SizedBox(height: 12),
           Center(
-            child: OutlinedButton(onPressed: _load, child: Text(strings.changelogRetry)),
+            child: OutlinedButton(
+              onPressed: _load,
+              child: Text(strings.changelogRetry),
+            ),
           ),
         ],
       );
@@ -104,7 +113,9 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
           Center(
             child: Text(
               strings.changelogEmpty,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
             ),
           ),
         ],
@@ -114,27 +125,37 @@ class _ChangelogScreenState extends State<ChangelogScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(20),
       itemCount: entries.length + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         if (index == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               strings.changelogSubtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
             ),
           );
         }
         final entry = entries[index - 1];
         final isCurrent = entry.buildNumber == _currentBuildNumber;
-        return _ChangelogCard(entry: entry, isCurrent: isCurrent, strings: strings);
+        return _ChangelogCard(
+          entry: entry,
+          isCurrent: isCurrent,
+          strings: strings,
+        );
       },
     );
   }
 }
 
 class _ChangelogCard extends StatelessWidget {
-  const _ChangelogCard({required this.entry, required this.isCurrent, required this.strings});
+  const _ChangelogCard({
+    required this.entry,
+    required this.isCurrent,
+    required this.strings,
+  });
 
   final ChangelogEntry entry;
   final bool isCurrent;
@@ -155,11 +176,11 @@ class _ChangelogCard extends StatelessWidget {
     final lines = notes.isEmpty
         ? <String>[]
         : notes
-            .split('\n')
-            .map((l) => l.trim())
-            .where((l) => l.isNotEmpty)
-            .map((l) => l.replaceFirst(RegExp(r'^[-*•]\s*'), ''))
-            .toList();
+              .split('\n')
+              .map((l) => l.trim())
+              .where((l) => l.isNotEmpty)
+              .map((l) => l.replaceFirst(RegExp(r'^[-*•]\s*'), ''))
+              .toList();
 
     return SectionCard(
       child: Column(
@@ -175,17 +196,22 @@ class _ChangelogCard extends StatelessWidget {
               ),
               if (isCurrent)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     strings.changelogCurrentVersionTag,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
             ],
@@ -194,14 +220,18 @@ class _ChangelogCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               _formatDate(entry.publishedAt),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
             ),
           ],
           const SizedBox(height: 10),
           if (lines.isEmpty)
             Text(
               strings.changelogNoNotes,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
             )
           else
             ...lines.map(
@@ -212,7 +242,10 @@ class _ChangelogCard extends StatelessWidget {
                   children: [
                     Text('•  ', style: Theme.of(context).textTheme.bodyMedium),
                     Expanded(
-                      child: Text(line, style: Theme.of(context).textTheme.bodyMedium),
+                      child: Text(
+                        line,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ],
                 ),

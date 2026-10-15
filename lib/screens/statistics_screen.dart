@@ -257,6 +257,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       onSelected: (_) => state.setStatsMetricIndex(i),
                       selectedColor: AppColors.statsAccent.withValues(alpha: 0.15),
                       checkmarkColor: AppColors.statsAccent,
+                      // Tắt checkmark mặc định — cùng lý do đã sửa ở các
+                      // ChoiceChip khác trong app (survey, nhắc nghỉ mắt):
+                      // dấu ✓ chèn vào đột ngột làm chip đổi kích thước,
+                      // gây cảm giác giật khi chuyển giữa Score/Screen
+                      // Time/Sleep.
+                      showCheckmark: false,
                       labelStyle: TextStyle(
                         color: selected
                             ? AppColors.statsAccent

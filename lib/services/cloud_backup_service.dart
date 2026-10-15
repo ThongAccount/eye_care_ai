@@ -29,12 +29,24 @@ class CloudBackupService {
     'pref_', // mọi tuỳ chọn: theme, ngôn ngữ, đơn vị đo, target habit, accent color, font, reminder...
     'eye_breaks_', // số lần nghỉ mắt hôm nay + tổng cộng dồn (dùng cho Thành tựu)
     'daily_snapshot_', // snapshot điểm số/screen time/sleep từng ngày (dùng tính streak + biểu đồ Thống kê)
+    'daily_factors_', // snapshot % từng yếu tố từng ngày — dùng so sánh hôm qua vs hôm nay
+    'daily_checkin_', // điểm danh mở app từng ngày (dùng tính streak)
     'outdoor_minutes_',
     'reading_minutes_',
     'survey_completed',
     'consent_given',
     'consent_timestamp',
     'data_collection_enabled',
+  ];
+
+  // Nhóm key mục tiêu thói quen + kết quả khảo sát: được khôi phục THEO CẢ
+  // NHÓM và chỉ khi bản trên đám mây MỚI HƠN bản trên máy (xem pullAndApply).
+  static const String _targetsUpdatedAtKey = 'pref_habit_targets_updated_at';
+  static const List<String> _targetKeyPrefixes = [
+    'pref_habit_target_',
+    'pref_has_custom_habit_targets',
+    'pref_survey_result',
+    _targetsUpdatedAtKey,
   ];
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
@@ -46,6 +58,7 @@ class CloudBackupService {
   }
 
   bool _matchesBackupPrefix(String key) => _backupPrefixes.any(key.startsWith);
+  bool _isTargetKey(String key) => _targetKeyPrefixes.any(key.startsWith);
 
   /// Đẩy toàn bộ dữ liệu cục bộ (khớp whitelist ở trên) lên Firestore. Gọi
   /// định kỳ + khi app xuống nền (xem MainShell) — KHÔNG await/chặn UI vì
@@ -62,8 +75,6 @@ class CloudBackupService {
       if (value is bool || value is int || value is double || value is String) {
         data[key] = value;
       }
-      // (App không dùng List<String> cho các key thuộc whitelist này nên
-      // không cần xử lý riêng StringList.)
     }
     data['_updatedAt'] = FieldValue.serverTimestamp();
 
@@ -78,6 +89,13 @@ class CloudBackupService {
   /// bộ — gọi ngay sau khi đăng nhập thành công, TRƯỚC khi vào MainShell.
   /// Trả về true nếu có dữ liệu và đã áp dụng (để nơi gọi biết mà refresh
   /// lại các provider đang cầm dữ liệu cũ trong bộ nhớ).
+  ///
+  /// BUG ĐÃ SỬA (mục tiêu từ khảo sát bị quay về mặc định/giá trị cũ): khảo
+  /// sát bắt buộc diễn ra TRƯỚC màn đăng nhập, rồi pullAndApply ghi đè mọi
+  /// key — kể cả mục tiêu vừa chọn — bằng bản cũ trên đám mây của chính tài
+  /// khoản đó. Giờ nhóm mục tiêu chỉ được khôi phục khi bản trên mây MỚI HƠN
+  /// (so `pref_habit_targets_updated_at`); nếu máy có mục tiêu mới hơn hoặc
+  /// bằng, GIỮ NGUYÊN mục tiêu trên máy.
   Future<bool> pullAndApply() async {
     final doc = _doc;
     if (doc == null) return false;
@@ -92,11 +110,18 @@ class CloudBackupService {
     if (remote == null || remote.isEmpty) return false;
 
     final prefs = await SharedPreferences.getInstance();
+    final localTs = prefs.getInt(_targetsUpdatedAtKey);
+    final remoteTsRaw = remote[_targetsUpdatedAtKey];
+    final remoteTs = remoteTsRaw is num ? remoteTsRaw.toInt() : null;
+    // Giữ mục tiêu trên máy nếu máy có dấu thời gian và bản mây không mới hơn.
+    final keepLocalTargets = localTs != null && (remoteTs == null || localTs >= remoteTs);
+
     var appliedAny = false;
     for (final entry in remote.entries) {
       final key = entry.key;
       final value = entry.value;
       if (key == '_updatedAt' || !_matchesBackupPrefix(key)) continue;
+      if (keepLocalTargets && _isTargetKey(key)) continue;
       if (value is bool) {
         await prefs.setBool(key, value);
         appliedAny = true;
@@ -107,8 +132,7 @@ class CloudBackupService {
         await prefs.setDouble(key, value);
         appliedAny = true;
       } else if (value is num) {
-        // Firestore có thể trả int gốc thành double hoặc ngược lại tuỳ SDK
-        // -> ưu tiên giữ nguyên kiểu double an toàn cho mọi trường hợp số.
+        // Firestore có thể trả int gốc thành double hoặc ngược lại tuỳ SDK.
         await prefs.setDouble(key, value.toDouble());
         appliedAny = true;
       } else if (value is String) {
@@ -128,8 +152,7 @@ class CloudBackupService {
     try {
       await doc.delete();
     } catch (_) {
-      // Không có mạng lúc xoá tài khoản -> bỏ qua, không được chặn việc xoá
-      // tài khoản (quan trọng hơn) chỉ vì dọn dẹp backup thất bại.
+      // Không có mạng lúc xoá tài khoản -> bỏ qua, không được chặn việc xoá tài khoản.
     }
   }
 }

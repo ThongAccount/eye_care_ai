@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/auto_break_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/reminder_provider.dart';
@@ -20,6 +21,26 @@ import '../widgets/shared_widgets.dart';
 // người dùng nhìn xa trong 20 giây, sau đó tự xác nhận đã nghỉ — số lần nghỉ
 // này được ghi nhận THẬT (qua HabitProvider.recordEyeBreak) và đồng bộ với habit
 // "Eye Breaks" ở trang Habits.
+//
+// THÊM MỚI: card "Tự động nhắc nghỉ mắt" (AutoBreakProvider) — khác hẳn bộ
+// đếm thủ công ở trên (người dùng phải tự bấm "Bắt đầu" và chọn khoảng thời
+// gian cố định). Ở chế độ tự động: countdown được TÍNH RA từ mục tiêu số
+// lần nghỉ/ngày (habit 'breaks') chia cho thời gian dùng máy thật, và việc
+// "đã nghỉ mắt hay chưa" được suy luận tự động qua UsageStatsManager (nếu
+// sau khi nhắc mà máy KHÔNG ghi nhận thêm thao tác trong 20 giây, coi như
+// người dùng đã rời mắt khỏi màn hình) — không cần camera, không cần bấm
+// xác nhận thủ công.
+//
+// BUG ĐÃ SỬA (2 đồng hồ đếm ngược hiển thị 2 con số khác nhau): trước đây
+// "Tự động nhắc nghỉ mắt" (AutoBreakProvider) và "Nhắc nghỉ mắt" thủ công
+// (ReminderProvider, đặt hẹn giờ cố định) là 2 cơ chế HOÀN TOÀN ĐỘC LẬP,
+// không có gì ngăn cả 2 cùng bật một lúc — mỗi cái tự đếm ngược theo lịch
+// riêng (thủ công thì cố định, tự động thì tính lại theo usage thật), ra 2
+// con số/2 thông báo khác nhau ngay trong cùng 1 lúc, khiến người dùng tưởng
+// app bị lỗi "đếm sai". Giờ 2 cơ chế LOẠI TRỪ LẪN NHAU: bật bên nào sẽ tự
+// tắt bên còn lại (xem _ensureOnlyOneReminderActive), và khi "Tự động" đang
+// bật, phần đếm ngược thủ công bị làm mờ + khoá thao tác kèm ghi chú lý do,
+// thay vì vẫn hiển thị số liệu cũ gây hiểu lầm là đang chạy song song.
 class EyeBreakScreen extends StatefulWidget {
   const EyeBreakScreen({super.key});
 
@@ -27,21 +48,16 @@ class EyeBreakScreen extends StatefulWidget {
   State<EyeBreakScreen> createState() => _EyeBreakScreenState();
 }
 
-class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObserver {
+class _EyeBreakScreenState extends State<EyeBreakScreen>
+    with WidgetsBindingObserver {
   Timer? _countdownTimer;
   int _secondsRemaining = 0;
   bool _breakPromptShowing = false;
-  // Mốc thời gian tuyệt đối lúc hết giờ — đây là NGUỒN SỰ THẬT DUY NHẤT cho
-  // thời gian còn lại. _secondsRemaining chỉ là giá trị hiển thị được TÍNH
-  // LẠI từ mốc này mỗi tick, không phải đếm lùi độc lập — vì Timer.periodic
-  // có thể bị hệ điều hành tạm dừng khi app chạy nền một lúc rồi mở lại, nếu
-  // chỉ đếm lùi theo số tick thực sự chạy được thì sẽ bị "đứng hình" giống
-  // lỗi trước đây (thoát app lúc còn 24:39, quay lại vẫn thấy 24:39).
   DateTime? _endAt;
-  // Khoảng lặp hiện tại (phút) — cần lưu lại để khi hết giờ có thể tính NGAY
-  // mốc giờ nhắc kế tiếp (endAt cũ + interval) mà không phải chờ người dùng
-  // xác nhận đã nghỉ mắt mới cập nhật thông báo ghim.
   int _intervalMinutes = 20;
+  // Mỗi chu kỳ đếm ngược chỉ được tính 1 lần nghỉ mắt (tránh cộng đôi khi cả
+  // Timer lẫn lúc app mở lại từ nền cùng phát hiện đã hết giờ).
+  bool _cycleCounted = false;
 
   static const _intervalOptions = [10, 20, 30, 45];
 
@@ -61,16 +77,9 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Khi app quay lại foreground, tính lại ngay lập tức từ đồng hồ thực thay
-    // vì chờ tick tiếp theo của Timer (Timer có thể đã bị hệ điều hành tạm
-    // dừng trong lúc app ở nền).
     if (state == AppLifecycleState.resumed && _endAt != null) {
       _syncWithRealNextFireTime();
     } else if (state == AppLifecycleState.paused && _endAt != null) {
-      // Timer.periodic sẽ ngừng tick khi app xuống nền -> đổi thông báo ghim
-      // sang giờ hẹn CỐ ĐỊNH thay vì để lại con số mm:ss "đứng hình" gây hiểu
-      // lầm app bị treo. Báo thức hệ thống (đã lên lịch từ trước) không phụ
-      // thuộc vào việc này, vẫn tự bắn đúng giờ.
       final strings = context.read<LanguageProvider>().strings;
       NotificationService.instance.showStaticOngoingUntil(
         endAt: _endAt!,
@@ -85,25 +94,25 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
     final remaining = _endAt!.difference(DateTime.now()).inSeconds;
     if (remaining <= 0) {
       _countdownTimer?.cancel();
-      // Đã hết giờ trong lúc app chạy nền (chỉ giờ mở app lại mới biết) ->
-      // tắt DND ngay, đừng để bị kẹt "chặn thông báo" quá thời gian dự định.
       FocusModeService.instance.disable();
       setState(() {
         _secondsRemaining = 0;
         _breakPromptShowing = true;
       });
+      _countBreakOnce();
     } else {
       setState(() => _secondsRemaining = remaining);
     }
   }
 
-  // Báo thức lặp thật (chạy hoàn toàn native, xem notification_service.dart)
-  // có thể đã bắn thêm 1 hoặc nhiều chu kỳ trong lúc app ở nền/đóng — nếu
-  // chỉ tính từ `_endAt` cũ (chốt lúc Start lần đầu) thì UI trong app sẽ
-  // hiển thị SAI, lệch hẳn với báo thức thật đang chạy. Tính lại mốc giờ kế
-  // tiếp THẬT (dựa trên mốc bắt đầu + interval) để đồng bộ đúng.
   Future<void> _syncWithRealNextFireTime() async {
-    final realNext = await NotificationService.instance.getNextRepeatingFireAt();
+    // Đếm ngược đã hết trong lúc app ở nền (báo thức native đã báo) -> tính 1
+    // lần nghỉ mắt trước khi mốc _endAt bị ghi đè bằng lần nhắc kế tiếp.
+    if (_endAt != null && !_endAt!.isAfter(DateTime.now())) {
+      await _countBreakOnce();
+    }
+    final realNext = await NotificationService.instance
+        .getNextRepeatingFireAt();
     if (!mounted) return;
     if (realNext != null) {
       _endAt = realNext;
@@ -117,16 +126,17 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
   Future<void> _loadSavedReminder() async {
     final reminder = context.read<ReminderProvider>();
     final endAt = await DeviceDataService.instance.loadBreakReminderEnd();
-    final interval = await DeviceDataService.instance.loadBreakReminderIntervalMinutes();
+    final interval = await DeviceDataService.instance
+        .loadBreakReminderIntervalMinutes();
     if (endAt != null && interval != null) {
       final now = DateTime.now();
       final secondsLeft = endAt.difference(now).inSeconds;
       _endAt = endAt;
       _intervalMinutes = interval;
       if (secondsLeft > 0) {
-        reminder.toggleEyeBreakReminder(true);
+        await reminder.toggleEyeBreakReminder(true);
         _secondsRemaining = secondsLeft;
-        _scheduleRepeatingAlarm(interval);
+        await _scheduleRepeatingAlarm(interval);
         _startCountdown(reminder);
         _updateOngoingNotification();
       } else {
@@ -137,50 +147,56 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
     }
   }
 
-  // ---------------- Chế độ Focus (chặn thông báo app khác lúc làm việc) ----------------
-  // GIỚI HẠN THỰC TẾ CẦN BIẾT: báo thức hết-giờ-nghỉ-mắt bắn HOÀN TOÀN
-  // NATIVE (qua flutter_local_notifications.periodicallyShowWithDuration,
-  // xem notification_service.dart) — KHÔNG có đoạn code Dart nào chạy đúng
-  // lúc báo thức đó bắn. Vì vậy nếu hệ điều hành đã ĐÓNG HẲN tiến trình app
-  // (không chỉ đưa xuống nền), DND sẽ không tự tắt đúng lúc báo thức bắn,
-  // mà chỉ tắt lại khi người dùng MỞ APP LẦN KẾ TIẾP (đã xử lý ở
-  // _recomputeFromEndAt/_syncWithRealNextFireTime bên trên) — chấp nhận
-  // được vì đa số trường hợp app vẫn còn tiến trình chạy nền.
-
-  // Chỉ dùng cho nút "Bắt đầu" người dùng BẤM TAY (không dùng cho các lần tự
-  // động chuyển vòng kế tiếp trong _confirmBreakTaken/_dismissPrompt) — nếu
-  // lúc bấm mà đã đạt/vượt mục tiêu ngày, coi như người dùng CHỦ Ý muốn tiếp
-  // tục dù đã đủ, kích hoạt "không giới hạn" cho hết ngày hôm nay luôn.
-  Future<void> _startFromButton(ReminderProvider reminder) async {
-    final habitProvider = context.read<HabitProvider>();
-    final target = habitProvider.habits.firstWhere((h) => h.id == 'breaks').target;
-    if (habitProvider.eyeBreaksTakenToday >= target && !reminder.unlimitedOverrideToday) {
-      await reminder.activateUnlimitedForToday();
+  // Đảm bảo CHỈ MỘT trong 2 cơ chế nhắc nghỉ mắt (thủ công / tự động) đang
+  // hoạt động tại một thời điểm — tắt bên còn lại trước khi bật bên mới, để
+  // không bao giờ có 2 đồng hồ đếm ngược khác nhau chạy song song.
+  Future<void> _ensureOnlyOneReminderActive({required bool keepAuto}) async {
+    final reminder = context.read<ReminderProvider>();
+    final autoBreak = context.read<AutoBreakProvider>();
+    if (keepAuto) {
+      if (reminder.isEyeBreakReminderActive) {
+        _stopReminder(reminder);
+      }
+    } else {
+      if (autoBreak.enabled) {
+        await autoBreak.setEnabled(false);
+      }
     }
-    _startReminder(reminder);
   }
 
-  void _startReminder(ReminderProvider reminder) {
+  Future<void> _startFromButton(ReminderProvider reminder) async {
+    await _ensureOnlyOneReminderActive(keepAuto: false);
+    final habitProvider = context.read<HabitProvider>();
+    final target = habitProvider.habits
+        .firstWhere((h) => h.id == 'breaks')
+        .target;
+    if (habitProvider.eyeBreaksTakenToday >= target &&
+        !reminder.unlimitedOverrideToday) {
+      await reminder.activateUnlimitedForToday();
+    }
+    await _startReminder(reminder);
+  }
+
+  Future<void> _startReminder(ReminderProvider reminder) async {
     _countdownTimer?.cancel();
-    final endAt = DateTime.now().add(Duration(minutes: reminder.reminderMinutes));
+    _cycleCounted = false;
+    final endAt = DateTime.now().add(
+      Duration(minutes: reminder.reminderMinutes),
+    );
     _endAt = endAt;
     _intervalMinutes = reminder.reminderMinutes;
     _secondsRemaining = reminder.reminderMinutes * 60;
-    reminder.toggleEyeBreakReminder(true);
-    _saveReminderEnd(reminder.reminderMinutes, endAt);
-    _scheduleRepeatingAlarm(reminder.reminderMinutes);
+    await reminder.toggleEyeBreakReminder(true);
+    await _saveReminderEnd(reminder.reminderMinutes, endAt);
+    await _scheduleRepeatingAlarm(reminder.reminderMinutes);
     _startCountdown(reminder);
     _updateOngoingNotification();
-    // Chế độ Focus: bắt đầu 1 chu kỳ "đang làm việc" -> bật DND nếu người
-    // dùng đã bật tính năng này (và đã cấp quyền notification policy access
-    // — nếu chưa, FocusModeService.enable() tự trả về false, không làm gì).
     if (reminder.focusModeEnabled) {
       FocusModeService.instance.enable();
     }
     setState(() {});
   }
 
-  // Cập nhật nội dung thông báo ghim với số giây còn lại hiện tại.
   void _updateOngoingNotification() {
     if (!mounted) return;
     final strings = context.read<LanguageProvider>().strings;
@@ -192,29 +208,17 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
     );
   }
 
-  // Lên lịch báo thức LẶP LẠI mỗi `intervalMinutes` phút — hệ điều hành tự
-  // bắn (và tự lặp lại) kể cả khi app đang ở nền hoặc đã bị đóng hẳn, không
-  // phụ thuộc vào Timer trong bộ nhớ. Đây là NGUỒN DUY NHẤT bắn thông báo
-  // hết-giờ-nghỉ-mắt thật sự — cứ thế lặp lại cho tới khi người dùng vào app
-  // và bấm "Tắt" (xem _stopReminder), không cần app phải luôn mở.
-  void _scheduleRepeatingAlarm(int intervalMinutes) {
+  Future<void> _scheduleRepeatingAlarm(int intervalMinutes) async {
     final strings = context.read<LanguageProvider>().strings;
     final reminder = context.read<ReminderProvider>();
-    // Body thông báo lặp là CỐ ĐỊNH ngay từ lúc đặt lịch (báo thức lặp chạy
-    // hoàn toàn native, không có callback Dart nào chạy mỗi lần bắn để đổi
-    // nội dung — xem giải thích ở scheduleRepeatingBreakAlarm trong
-    // notification_service.dart). Vì vậy câu nhắc uống nước được ghép vào
-    // ĐÂY, một lần, dựa theo cờ waterReminderEnabled tại thời điểm bấm "Bắt
-    // đầu" — nếu người dùng đổi cờ này giữa chừng lúc đang đếm ngược, chỉ có
-    // hiệu lực từ lần bấm Start tiếp theo (cùng trade-off với đổi ngôn ngữ).
-    final waterHint = reminder.waterReminderEnabled ? ' ${strings.eyeBreakWaterHint}.' : '';
-    NotificationService.instance.scheduleRepeatingBreakAlarm(
+    final waterHint = reminder.waterReminderEnabled
+        ? ' ${strings.eyeBreakWaterHint}.'
+        : '';
+    await NotificationService.instance.scheduleRepeatingBreakAlarm(
       intervalMinutes: intervalMinutes,
       title: strings.eyeBreakTimeUp,
-      // Kèm câu gợi ý chạm vào thông báo để mở thẳng Break Reminder — xem
-      // NotificationService.onBreakReminderTapped (gán trong main.dart) xử
-      // lý điều hướng thật khi người dùng nhấn.
-      body: '${strings.eyeBreakLookAway}. ${strings.eyeBreakTapToOpen}.$waterHint',
+      body:
+          '${strings.eyeBreakLookAway}. ${strings.eyeBreakTapToOpen}.$waterHint',
       ongoingTitle: strings.breakNotificationTitle,
       ongoingRemainingSuffix: strings.breakNotificationUntil,
     );
@@ -223,10 +227,6 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
   void _startCountdown(ReminderProvider reminder) {
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      // QUAN TRỌNG: tính lại từ _endAt (đồng hồ thực) mỗi tick, KHÔNG đơn
-      // thuần trừ 1 mỗi lần tick — nếu Timer bị hệ điều hành tạm dừng một lúc
-      // (app chạy nền) rồi mở lại, tick tiếp theo sẽ tự nhảy về đúng giá trị
-      // thực tế thay vì tiếp tục đếm từ chỗ "đóng băng" trước đó.
       if (_endAt == null) return;
       final remaining = _endAt!.difference(DateTime.now()).inSeconds;
       setState(() {
@@ -234,24 +234,7 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
         if (remaining <= 0) {
           _breakPromptShowing = true;
           _countdownTimer?.cancel();
-          // Chế độ Focus: hết giờ "làm việc", tới lúc nghỉ mắt -> tắt DND
-          // ngay, không lý do gì tiếp tục chặn thông báo trong lúc nghỉ.
           FocusModeService.instance.disable();
-          // KHÔNG tự bắn thêm thông báo tay ở đây nữa: báo thức LẶP LẠI
-          // (scheduleRepeatingBreakAlarm) đã là nguồn duy nhất bắn thông
-          // báo hết-giờ-nghỉ-mắt, chạy độc lập trong isolate nền của hệ
-          // điều hành — kể cả khi Timer này đang chạy vì app đang mở. Tự
-          // bắn thêm ở đây từng gây trùng thông báo/rung 2 lần liền nhau.
-          // Màn hình "confirm break" ở đây chỉ để GHI NHẬN lần nghỉ vào
-          // Habits khi người dùng đang mở app đúng lúc hết giờ.
-
-          // BUG ĐÃ SỬA: thông báo ghim trên thanh trạng thái trước đây đứng
-          // yên ở giờ cũ (VD "Sẽ nhắc lúc 10:10") cho tới khi người dùng tự
-          // bấm xác nhận đã nghỉ mắt — gây cảm giác thông báo "bị treo".
-          // Báo thức lặp thật của hệ điều hành vẫn chạy đúng chu kỳ cố định
-          // bất kể người dùng có xác nhận hay không, nên ngay khi tới mốc
-          // hết giờ này, cập nhật NGAY thông báo ghim sang mốc kế tiếp
-          // (endAt cũ + interval) để luôn khớp với báo thức thật.
           final nextFireAt = _endAt!.add(Duration(minutes: _intervalMinutes));
           _endAt = nextFireAt;
           final strings = context.read<LanguageProvider>().strings;
@@ -262,6 +245,7 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
           );
         }
       });
+      if (remaining <= 0) _countBreakOnce();
       if (_secondsRemaining > 0) {
         _updateOngoingNotification();
       }
@@ -273,12 +257,7 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
     _endAt = null;
     reminder.toggleEyeBreakReminder(false);
     DeviceDataService.instance.clearBreakReminderEnd();
-    // Đây là cách DUY NHẤT vòng lặp nhắc nghỉ mắt dừng lại — huỷ báo thức
-    // LẶP LẠI đã đăng ký với hệ điều hành, nếu không nó sẽ tiếp tục tự bắn
-    // mỗi `intervalMinutes` phút vô thời hạn kể cả khi app đã đóng.
     NotificationService.instance.cancelRepeatingBreakAlarm();
-    // Chế độ Focus: dừng nhắc hẳn -> tắt DND, không để bị kẹt "chặn thông
-    // báo" mãi mãi sau khi người dùng đã tắt tính năng nhắc nghỉ mắt.
     FocusModeService.instance.disable();
     setState(() {
       _secondsRemaining = 0;
@@ -286,39 +265,46 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
     });
   }
 
-  Future<void> _confirmBreakTaken(ReminderProvider reminder) async {
+  // Đếm ngược về 0 = tính ĐÚNG 1 lần nghỉ mắt (theo yêu cầu), không cần bấm
+  // xác nhận. Nếu vừa đạt mục tiêu ngày và chưa bật "không giới hạn" thì tự
+  // dừng nhắc như trước.
+  Future<void> _countBreakOnce() async {
+    if (_cycleCounted || !mounted) return;
+    _cycleCounted = true;
     final habitProvider = context.read<HabitProvider>();
+    final reminder = context.read<ReminderProvider>();
     await habitProvider.recordEyeBreak();
     if (!mounted) return;
-    setState(() => _breakPromptShowing = false);
 
-    // Đã đạt/vượt mục tiêu số lần nghỉ mắt hôm nay (lấy từ target habit
-    // 'breaks' trong Habits) VÀ chưa bật chế độ "không giới hạn" cho hôm
-    // nay -> tự dừng nhắc, không tiếp tục vòng đếm ngược tiếp theo nữa.
     final target = habitProvider.habits.firstWhere((h) => h.id == 'breaks').target;
     final reachedTarget = habitProvider.eyeBreaksTakenToday >= target;
     if (reachedTarget && !reminder.unlimitedOverrideToday) {
       final strings = context.read<LanguageProvider>().strings;
       _stopReminder(reminder);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(strings.eyeBreakTargetReached(target as int))),
-        );
-      }
-      return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        // `target` là double -> phải .round(), bản cũ `target as int` sẽ crash.
+        SnackBar(content: Text(strings.eyeBreakTargetReached(target.round()))),
+      );
     }
+  }
 
-    // Tự động bắt đầu chu kỳ đếm ngược tiếp theo.
-    _startReminder(reminder);
+  // Nút "Xong" ở màn nhìn xa 20 giây: lần nghỉ đã được tính lúc hết giờ, nên
+  // chỉ đóng màn và bắt đầu chu kỳ kế tiếp.
+  Future<void> _confirmBreakTaken(ReminderProvider reminder) async {
+    setState(() => _breakPromptShowing = false);
+    await _startReminder(reminder);
   }
 
   Future<void> _saveReminderEnd(int intervalMinutes, DateTime endAt) async {
-    await DeviceDataService.instance.saveBreakReminderEnd(endAt, intervalMinutes);
+    await DeviceDataService.instance.saveBreakReminderEnd(
+      endAt,
+      intervalMinutes,
+    );
   }
 
-  void _dismissPrompt(ReminderProvider reminder) {
+  Future<void> _dismissPrompt(ReminderProvider reminder) async {
     setState(() => _breakPromptShowing = false);
-    _startReminder(reminder);
+    await _startReminder(reminder);
   }
 
   String _formatCountdown(int seconds) {
@@ -327,11 +313,22 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
     return '$m:$s';
   }
 
+  String _formatAutoCountdown(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   @override
   Widget build(BuildContext context) {
     final reminder = context.watch<ReminderProvider>();
+    final autoBreak = context.watch<AutoBreakProvider>();
     final language = context.watch<LanguageProvider>();
     final strings = language.strings;
+    // Khi "Tự động nhắc nghỉ mắt" đang bật, phần đếm ngược THỦ CÔNG bên dưới
+    // bị khoá + làm mờ (xem giải thích ở đầu file) — 2 cơ chế không bao giờ
+    // cùng hiển thị số liệu một lúc nữa.
+    final manualLockedByAuto = autoBreak.enabled;
 
     if (_breakPromptShowing) {
       return Scaffold(
@@ -346,10 +343,12 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
             tooltip: language.isVietnamese ? 'Quay lại' : 'Back',
           ),
         ),
-        body: SafeArea(child: _BreakPromptView(
-          onDone: () => _confirmBreakTaken(reminder),
-          onSkip: () => _dismissPrompt(reminder),
-        )),
+        body: SafeArea(
+          child: _BreakPromptView(
+            onDone: () => _confirmBreakTaken(reminder),
+            onSkip: () => _dismissPrompt(reminder),
+          ),
+        ),
       );
     }
 
@@ -372,92 +371,220 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(strings.eyeBreakTitle, style: Theme.of(context).textTheme.headlineMedium),
+              Text(
+                strings.eyeBreakTitle,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
               const SizedBox(height: 4),
-              Text(strings.eyeBreakSubtitle, style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                strings.eyeBreakSubtitle,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               const SizedBox(height: 20),
+
+              // ---------------- Tự động nhắc nghỉ mắt (mới) ----------------
               SectionCard(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(
-                      width: 160,
-                      height: 160,
-                      child: Stack(
-                        alignment: Alignment.center,
+                    SettingsToggleTile(
+                      title: strings.vi
+                          ? 'Tự động nhắc nghỉ mắt'
+                          : 'Auto eye-break reminders',
+                      description: strings.vi
+                          ? 'Không cần đặt hẹn giờ — tự chia mục tiêu nghỉ mắt/ngày thành các khoảng đếm ngược đều nhau. Hết giờ mới nhắc và tự tính là 1 lần nghỉ mắt (không cần bấm xác nhận). Bật cái này sẽ tự tắt "Nhắc nghỉ mắt" thủ công bên dưới để tránh 2 đồng hồ đếm ngược khác nhau.'
+                          : "No need to set a timer — splits your daily break goal into even countdowns. When it hits zero you get reminded and it counts as 1 eye break automatically (no confirmation tap). Turning this on will automatically turn off the manual reminder below, so you never see two different countdowns.",
+                      value: autoBreak.enabled,
+                      onChanged: (v) async {
+                        if (v) {
+                          await _ensureOnlyOneReminderActive(keepAuto: true);
+                        }
+                        await autoBreak.setEnabled(v);
+                      },
+                    ),
+                    if (autoBreak.enabled) ...[
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          SizedBox(
-                            width: 160,
-                            height: 160,
-                            child: CircularProgressIndicator(
-                              value: reminder.isEyeBreakReminderActive && reminder.reminderMinutes > 0
-                                  ? _secondsRemaining / (reminder.reminderMinutes * 60)
-                                  : 1,
-                              strokeWidth: 10,
-                              backgroundColor: AppColors.border,
-                              valueColor: const AlwaysStoppedAnimation(AppColors.testAccent),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: autoBreak.progress,
+                                minHeight: 6,
+                                backgroundColor: AppColors.border,
+                                valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.testAccent,
+                                ),
+                              ),
                             ),
                           ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                reminder.isEyeBreakReminderActive
-                                    ? _formatCountdown(_secondsRemaining)
-                                    : '--:--',
-                                style: Theme.of(context).textTheme.headlineMedium,
-                              ),
-                              Text(
-                                reminder.isEyeBreakReminderActive
-                                    ? strings.eyeBreakNextIn
-                                    : strings.eyeBreakStart,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+                          const SizedBox(width: 10),
+                          Text(
+                            _formatAutoCountdown(autoBreak.secondsRemaining),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (!reminder.isEyeBreakReminderActive) ...[
-                      Text(strings.eyeBreakIntervalLabel, style: Theme.of(context).textTheme.titleSmall),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        children: _intervalOptions.map((minutes) {
-                          final selected = reminder.reminderMinutes == minutes;
-                          return ChoiceChip(
-                            label: Text('$minutes ${strings.vi ? "phút" : "min"}'),
-                            selected: selected,
-                            onSelected: (_) => reminder.setReminderMinutes(minutes),
-                            selectedColor: AppColors.testAccent.withValues(alpha: 0.15),
-                            labelStyle: TextStyle(
-                              color: selected ? AppColors.testAccent : null,
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                          );
-                        }).toList(),
+                      const SizedBox(height: 6),
+                      Text(
+                        strings.vi
+                            ? 'Mỗi ${(autoBreak.intervalSeconds / 60).round()} phút nhắc 1 lần và tính 1 lần nghỉ mắt'
+                            : 'Reminds every ${(autoBreak.intervalSeconds / 60).round()} min and counts 1 eye break',
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: AppColors.textMuted),
                       ),
-                      const SizedBox(height: 20),
                     ],
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: reminder.isEyeBreakReminderActive
-                              ? AppColors.error
-                              : AppColors.testAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () => reminder.isEyeBreakReminderActive
-                            ? _stopReminder(reminder)
-                            : _startFromButton(reminder),
-                        child: Text(
-                          reminder.isEyeBreakReminderActive ? strings.eyeBreakStop : strings.eyeBreakStart,
-                        ),
-                      ),
-                    ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (manualLockedByAuto)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            strings.vi
+                                ? 'Đang tắt "Nhắc nghỉ mắt" thủ công vì Tự động nhắc nghỉ mắt đang bật ở trên — tắt Tự động nếu bạn muốn tự đặt hẹn giờ cố định.'
+                                : 'The manual reminder below is off while Auto eye-break reminders is on above — turn Auto off if you want a fixed manual timer instead.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              IgnorePointer(
+                ignoring: manualLockedByAuto,
+                child: Opacity(
+                  opacity: manualLockedByAuto ? 0.4 : 1.0,
+                  child: SectionCard(
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: 160,
+                          height: 160,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                width: 160,
+                                height: 160,
+                                child: CircularProgressIndicator(
+                                  value:
+                                      reminder.isEyeBreakReminderActive &&
+                                          reminder.reminderMinutes > 0
+                                      ? _secondsRemaining /
+                                            (reminder.reminderMinutes * 60)
+                                      : 1,
+                                  strokeWidth: 10,
+                                  backgroundColor: AppColors.border,
+                                  valueColor: const AlwaysStoppedAnimation(
+                                    AppColors.testAccent,
+                                  ),
+                                ),
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    reminder.isEyeBreakReminderActive
+                                        ? _formatCountdown(_secondsRemaining)
+                                        : '--:--',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.headlineMedium,
+                                  ),
+                                  Text(
+                                    reminder.isEyeBreakReminderActive
+                                        ? strings.eyeBreakNextIn
+                                        : strings.eyeBreakStart,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (!reminder.isEyeBreakReminderActive) ...[
+                          Text(
+                            strings.eyeBreakIntervalLabel,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            children: _intervalOptions.map((minutes) {
+                              final selected = reminder.reminderMinutes == minutes;
+                              return ChoiceChip(
+                                label: Text(
+                                  '$minutes ${strings.vi ? "phút" : "min"}',
+                                ),
+                                selected: selected,
+                                onSelected: (_) =>
+                                    reminder.setReminderMinutes(minutes),
+                                selectedColor: AppColors.testAccent.withValues(
+                                  alpha: 0.15,
+                                ),
+                                // BUG ĐÃ SỬA: ChoiceChip mặc định hiện dấu ✓ khi
+                                // được chọn — dấu tích chèn vào đột ngột, cộng
+                                // với fontWeight đổi từ 500 lên 700 (chữ đậm
+                                // rộng hơn chữ thường) khiến cả chip đổi kích
+                                // thước 2 LẦN CÙNG LÚC trong 1 khung hình, tạo
+                                // cảm giác "giật/lag" khi chọn khoảng thời gian
+                                // nhắc. Tắt checkmark + giữ NGUYÊN 1 độ đậm chữ
+                                // cho cả 2 trạng thái (chỉ đổi màu) để chip
+                                // không bao giờ đổi kích thước khi chọn nữa.
+                                showCheckmark: false,
+                                labelStyle: TextStyle(
+                                  color: selected ? AppColors.testAccent : null,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: reminder.isEyeBreakReminderActive
+                                  ? AppColors.error
+                                  : AppColors.testAccent,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () => reminder.isEyeBreakReminderActive
+                                ? _stopReminder(reminder)
+                                : _startFromButton(reminder),
+                            child: Text(
+                              reminder.isEyeBreakReminderActive
+                                  ? strings.eyeBreakStop
+                                  : strings.eyeBreakStart,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -489,7 +616,8 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
                       value: reminder.focusModeEnabled,
                       onChanged: (value) => reminder.setFocusModeEnabled(value),
                     ),
-                    if (reminder.focusModeEnabled) const _FocusModePermissionBanner(),
+                    if (reminder.focusModeEnabled)
+                      const _FocusModePermissionBanner(),
                   ],
                 ),
               ),
@@ -505,17 +633,25 @@ class _EyeBreakScreenState extends State<EyeBreakScreen> with WidgetsBindingObse
                         borderRadius: BorderRadius.circular(12),
                       ),
                       alignment: Alignment.center,
-                      child: const AppIcon('👁️', size: 22, color: AppColors.primaryBlue),
+                      child: const AppIcon(
+                        '👁️',
+                        size: 22,
+                        color: AppColors.primaryBlue,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(strings.eyeBreakTodayCount, style: Theme.of(context).textTheme.bodySmall),
+                          Text(
+                            strings.eyeBreakTodayCount,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                           Text(
                             '${context.watch<HabitProvider>().eyeBreaksTakenToday}',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
                                   color: AppColors.testAccent,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -593,9 +729,9 @@ class _BreakPromptViewState extends State<_BreakPromptView> {
           Text(
             '$_secondsLeft',
             style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  color: AppColors.testAccent,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: AppColors.testAccent,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 32),
           SizedBox(
@@ -604,7 +740,9 @@ class _BreakPromptViewState extends State<_BreakPromptView> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.testAccent,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: widget.onDone,
               child: Text(strings.eyeBreakDone),
@@ -621,20 +759,16 @@ class _BreakPromptViewState extends State<_BreakPromptView> {
   }
 }
 
-// Chỉ hiện khi Chế độ Focus đang BẬT nhưng app CHƯA được cấp quyền
-// "Notification policy access" — quyền đặc biệt của Android, app không tự
-// xin được qua hộp thoại thường, phải dẫn người dùng vào đúng màn hình Cài
-// đặt hệ thống. Tự kiểm tra lại mỗi khi widget được build lại (ví dụ sau khi
-// người dùng quay lại từ màn Cài đặt) để tự ẩn banner ngay khi đã cấp xong,
-// không cần khởi động lại app.
 class _FocusModePermissionBanner extends StatefulWidget {
   const _FocusModePermissionBanner();
 
   @override
-  State<_FocusModePermissionBanner> createState() => _FocusModePermissionBannerState();
+  State<_FocusModePermissionBanner> createState() =>
+      _FocusModePermissionBannerState();
 }
 
-class _FocusModePermissionBannerState extends State<_FocusModePermissionBanner> with WidgetsBindingObserver {
+class _FocusModePermissionBannerState extends State<_FocusModePermissionBanner>
+    with WidgetsBindingObserver {
   bool? _hasAccess;
 
   @override
@@ -652,8 +786,6 @@ class _FocusModePermissionBannerState extends State<_FocusModePermissionBanner> 
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Người dùng có thể vừa quay lại từ màn Cài đặt hệ thống sau khi cấp
-    // quyền -> kiểm tra lại ngay khi app foreground trở lại.
     if (state == AppLifecycleState.resumed) _checkAccess();
   }
 
@@ -677,7 +809,11 @@ class _FocusModePermissionBannerState extends State<_FocusModePermissionBanner> 
         ),
         child: Row(
           children: [
-            const Icon(Icons.notifications_off_rounded, color: AppColors.warning, size: 20),
+            const Icon(
+              Icons.notifications_off_rounded,
+              color: AppColors.warning,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -685,10 +821,15 @@ class _FocusModePermissionBannerState extends State<_FocusModePermissionBanner> 
                 children: [
                   Text(
                     strings.focusModePermissionTitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 2),
-                  Text(strings.focusModePermissionDescription, style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    strings.focusModePermissionDescription,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),
@@ -696,10 +837,6 @@ class _FocusModePermissionBannerState extends State<_FocusModePermissionBanner> 
             TextButton(
               onPressed: () async {
                 await FocusModeService.instance.openAccessSettings();
-                // Người dùng thường bấm rồi quay lại app ngay lập tức trước
-                // khi didChangeAppLifecycleState kịp bắn -> kiểm tra thêm 1
-                // lần nữa sau khi Future openAccessSettings() trả về, phòng
-                // trường hợp OS trả quyền điều khiển về app nhanh hơn dự kiến.
                 _checkAccess();
               },
               child: Text(strings.focusModeGrantAccess),

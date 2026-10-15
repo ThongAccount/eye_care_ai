@@ -2,13 +2,65 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/app_strings.dart';
 import '../models/rank_tier.dart';
 import '../providers/accent_color_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/rank_provider.dart';
 import '../services/leaderboard_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/animated_gradient_border.dart';
+
+/// Bottom sheet giải thích cách tính chuỗi ngày — dùng chung cho banner ở
+/// đầu màn Xếp hạng (icon ❓ cạnh dòng "CÒN X NGÀY LÊN HẠNG") và badge 🔥 ở
+/// Trang chủ (xem _ScoreCard trong home_screen.dart), để người dùng KHÔNG
+/// còn thắc mắc "vì sao chuỗi không lên"/"làm sao để lên chuỗi" — trước đây
+/// không có nơi nào giải thích điều kiện thật (điểm sức khỏe mắt phải đạt
+/// từ 80/100 trong ngày).
+void _showStreakExplanation(BuildContext context, bool vi) {
+  final strings = AppStrings(vi);
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('🔥', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      strings.streakExplainTitle,
+                      style: Theme.of(sheetContext).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                strings.streakExplainBody,
+                style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
 /// Màn hình Xếp hạng, phong cách "League" giống Duolingo: banner giải đấu ở
 /// trên (dải huy hiệu các bậc, bậc hiện tại được phóng to + viền gradient
@@ -238,6 +290,16 @@ class _LeagueBanner extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.4,
                     ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _showStreakExplanation(context, vi),
+                child: Icon(
+                  Icons.help_outline_rounded,
+                  size: 15,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

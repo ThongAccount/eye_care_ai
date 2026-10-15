@@ -23,19 +23,27 @@ class SettingsMoreProvider extends ChangeNotifier {
   // "pref_" để CloudBackupService tự cuốn theo khi sao lưu (xem whitelist
   // tiền tố trong cloud_backup_service.dart).
   static const _kCloudBackupKey = 'pref_cloud_backup_enabled';
+  // Cài đặt "Hỏi trước khi AI tự thao tác" — mặc định BẬT (an toàn hơn):
+  // trước khi AI thật sự đổi mục tiêu/cài đặt thay người dùng (qua
+  // AiActionHandler), luôn hỏi xác nhận trước. Người dùng có thể tắt để AI
+  // tự áp dụng ngay không cần hỏi.
+  static const _kAiConfirmBeforeActingKey = 'pref_ai_confirm_before_acting';
   bool _dataCollection = true;
   bool _cloudBackup = true;
   bool _personalizedAI = false;
+  bool _aiConfirmBeforeActing = true;
 
   bool get dataCollection => _dataCollection;
   bool get cloudBackup => _cloudBackup;
   bool get personalizedAI => _personalizedAI;
+  bool get aiConfirmBeforeActing => _aiConfirmBeforeActing;
 
   /// Load persisted toggle values from SharedPreferences. Call once at app start.
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _dataCollection = prefs.getBool(_kDataCollectionKey) ?? true;
     _cloudBackup = prefs.getBool(_kCloudBackupKey) ?? true;
+    _aiConfirmBeforeActing = prefs.getBool(_kAiConfirmBeforeActingKey) ?? true;
     notifyListeners();
   }
 
@@ -63,6 +71,14 @@ class SettingsMoreProvider extends ChangeNotifier {
 
   void setPersonalizedAI(bool v) {
     _personalizedAI = v;
+    notifyListeners();
+  }
+
+  void setAiConfirmBeforeActing(bool v) {
+    _aiConfirmBeforeActing = v;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool(_kAiConfirmBeforeActingKey, v);
+    });
     notifyListeners();
   }
 

@@ -19,6 +19,7 @@ import androidx.work.WorkManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 // MainActivity thêm một MethodChannel riêng cho các dữ liệu mà package
@@ -39,6 +40,7 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registerNativeDarkRoomWorker()
+        registerNativeDailySnapshotWorker()
         requestBatteryOptimizationExemptionOnce()
         startDarkRoomForegroundServiceIfNeeded()
     }
@@ -101,6 +103,34 @@ class MainActivity : FlutterActivity() {
             .build()
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             DarkRoomWorker.UNIQUE_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    // Đăng ký DailySnapshotWorker: tự tính & lưu snapshot điểm sức khỏe mắt
+    // mỗi ngày lúc ~23:55, HOÀN TOÀN NATIVE — không cần người dùng mở app
+    // ngày đó (xem DailySnapshotWorker.kt để biết lý do không thể làm việc
+    // này qua Dart/workmanager, cùng nguyên nhân đã ghi ở DarkRoomWorker).
+    // ExistingPeriodicWorkPolicy.KEEP: gọi lại mỗi lần mở app là vô hại,
+    // không reset initialDelay/lịch đã đăng ký từ trước.
+    private fun registerNativeDailySnapshotWorker() {
+        val now = Calendar.getInstance()
+        val next = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 55)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (before(now)) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val initialDelay = next.timeInMillis - now.timeInMillis
+
+        val request = PeriodicWorkRequestBuilder<DailySnapshotWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(false).build())
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "daily_snapshot_periodic",
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
@@ -255,7 +285,7 @@ class MainActivity : FlutterActivity() {
             "com.android.systemui",
             launcherPackage,
         )
-    }   
+    }
 
     // Ghép cặp MOVE_TO_FOREGROUND -> MOVE_TO_BACKGROUND (hoặc kết thúc
     // khoảng truy vấn nếu app vẫn đang mở) để tính tổng thời gian foreground

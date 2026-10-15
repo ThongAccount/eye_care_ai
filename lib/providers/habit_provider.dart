@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/cloud_backup_service.dart';
 import '../services/device_data_service.dart';
 import '../services/notification_service.dart';
 
@@ -56,6 +58,13 @@ class HabitProvider extends ChangeNotifier {
   static const _kHabitTargetPrefix = 'pref_habit_target_';
   static const _kManualSleepHoursKey = 'pref_manual_sleep_hours';
   static const _kManualSleepDateKey = 'pref_manual_sleep_date';
+  // Thời điểm (millis) mục tiêu được đổi gần nhất + kết quả khảo sát đã lưu.
+  // Có tiền tố 'pref_' nên được CloudBackupService sao lưu; dấu thời gian cho
+  // phép khi khôi phục từ đám mây KHÔNG ghi đè mục tiêu mới hơn đang có trên
+  // máy (nguyên nhân khiến mục tiêu từ khảo sát bị quay về giá trị cũ/mặc định
+  // sau khi đăng nhập).
+  static const _kTargetsUpdatedAtKey = 'pref_habit_targets_updated_at';
+  static const _kSurveyResultKey = 'pref_survey_result';
 
   HabitProvider() {
     ready = _loadSavedPreferences();
@@ -144,15 +153,18 @@ class HabitProvider extends ChangeNotifier {
   int get eyeHealthScore => habitsCompletionPercent;
   double get screenTimeHours => totalScreenTimeHoursToday;
 
-  // ---------------- Eye Health Score 2.0: breakdown 5 yếu tố ----------------
+  // ---------------- Eye Health Score 2.0: breakdown 4 yếu tố ----------------
   // Mỗi yếu tố là % 0-100 độc lập (null = CHƯA có đủ dữ liệu để tính, khác
   // với 0% = có dữ liệu nhưng đang xấu) — xem _updateHabitsCompletion() bên
   // dưới để biết công thức từng yếu tố. `habitsCompletionPercent` (điểm
   // tổng) = trung bình cộng của các yếu tố ĐANG CÓ dữ liệu (bỏ qua null,
   // không tính là 0 — tránh phạt oan người dùng chưa cấp đủ quyền/chưa đủ
   // mẫu, ví dụ mới cài app được vài phút).
+  //
+  // ĐÃ BỎ yếu tố "Khoảng cách" (đo bằng camera) — không đủ tin cậy để cộng
+  // vào điểm tổng và không đáng chi phí pin/quyền riêng tư, xem
+  // DeviceDataService.
   double? screenTimeScore;
-  double? distanceScore;
   double? environmentScore;
   double? eyeBreaksScore;
   double? sleepScore;
@@ -160,6 +172,13 @@ class HabitProvider extends ChangeNotifier {
   // giảm, null = chưa có snapshot hôm qua để so sánh — ví dụ ngày đầu dùng
   // app). Cập nhật trong refreshHabitsFromDevice() sau khi có điểm hôm nay.
   int? eyeHealthScoreDelta;
+
+  // Chênh lệch % của TỪNG YẾU TỐ so với hôm qua (key khớp tên trong
+  // _updateHabitsCompletion: 'screenTime'/'environment'/'eyeBreaks'/'sleep')
+  // — null nếu yếu tố đó hôm nay hoặc hôm qua chưa có dữ liệu để so sánh.
+  // Dùng để hiện gợi ý/lưu ý cho hôm nay ở Trang chủ (xem
+  // _TodaySuggestionsCard trong home_screen.dart).
+  Map<String, int?> factorDeltas = {};
 
   // Tổng thời gian dùng điện thoại THẬT của hôm nay, lấy TRỰC TIẾP từ tổng
   // appUsageBreakdown (KHÔNG qua clamp) — dùng riêng cho việc HIỂN THỊ (thẻ
@@ -212,11 +231,8 @@ class HabitProvider extends ChangeNotifier {
     // đổi thành "Eye Test Count" (đang phát triển, xem HabitData(id: 'reading')
     // ở trên), không có nguồn dữ liệu thật để bật lên.
     service.startOutdoorTracking();
-    // Lấy mẫu môi trường (lux) + khoảng cách mắt-màn hình định kỳ, dùng cho
-    // 2 yếu tố "🌙 Môi trường" / "📏 Khoảng cách" trong Eye Health Score 2.0
-    // (xem DeviceDataService.startEnvironmentMonitoring để biết các ràng
-    // buộc an toàn riêng tư/pin — không tự xin quyền camera, không giữ
-    // camera mở liên tục).
+    // Lấy mẫu môi trường (lux) định kỳ, dùng cho yếu tố "🌙 Môi trường" trong
+    // Eye Health Score 2.0.
     service.startEnvironmentMonitoring();
     // Cảnh báo dùng điện thoại trong bóng tối: gửi thông báo hệ thống khi
     // môi trường xung quanh tối liên tục quá lâu trong lúc app đang mở.
@@ -234,6 +250,14 @@ class HabitProvider extends ChangeNotifier {
     notifyListeners();
 
     final service = DeviceDataService.instance;
+
+    // THÊM MỚI: "điểm danh" — chỉ cần có MỞ APP hôm nay là đủ để ngày đó
+    // được tính vào chuỗi (streak), không bắt buộc phải đạt điểm sức khỏe
+    // mắt tốt (xem DeviceDataService.calculateStreakDays). Ghi nhận ngay ở
+    // đầu mỗi lần làm mới dữ liệu — rẻ (chỉ set 1 bool trong
+    // SharedPreferences), an toàn để gọi nhiều lần/ngày.
+    await service.recordAppOpenCheckIn();
+
     // Mỗi nguồn dữ liệu có timeout RIÊNG (không dùng chung Future.wait không
     // giới hạn thời gian) — nếu một nguồn bị treo (ví dụ hộp thoại xin quyền
     // sức khỏe/GPS chưa được người dùng phản hồi), nó sẽ tự trả về null sau
@@ -292,12 +316,24 @@ class HabitProvider extends ChangeNotifier {
     // đọc trước cho rõ ý: đang so với NGÀY HÔM QUA, không phải bản ghi vừa
     // lưu). null nếu hôm qua không mở app / chưa có snapshot để so sánh.
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final yesterdaySnapshot = await service.loadDailySnapshot(
-      DateTime(yesterday.year, yesterday.month, yesterday.day),
-    );
+    final yesterdayDate = DateTime(yesterday.year, yesterday.month, yesterday.day);
+    final yesterdaySnapshot = await service.loadDailySnapshot(yesterdayDate);
     eyeHealthScoreDelta = yesterdaySnapshot == null
         ? null
         : habitsCompletionPercent - yesterdaySnapshot.score;
+
+    // Chênh lệch % của TỪNG YẾU TỐ so với hôm qua — cần thiết để đưa ra lưu
+    // ý/gợi ý CỤ THỂ cho hôm nay (VD "Giấc ngủ giảm 15% so với hôm qua"),
+    // thay vì chỉ biết điểm TỔNG tăng/giảm mà không rõ do yếu tố nào.
+    final yesterdayFactors = await service.loadDailyFactorScores(yesterdayDate);
+    int? delta(double? today, double? yest) =>
+        (today == null || yest == null) ? null : (today - yest).round();
+    factorDeltas = {
+      'screenTime': delta(screenTimeScore, yesterdayFactors?.screenTimeScore),
+      'environment': delta(environmentScore, yesterdayFactors?.environmentScore),
+      'eyeBreaks': delta(eyeBreaksScore, yesterdayFactors?.eyeBreaksScore),
+      'sleep': delta(sleepScore, yesterdayFactors?.sleepScore),
+    };
 
     // Lưu snapshot thật của hôm nay + tính lại streak thật (thay cho số liệu
     // giả cố định trước đây).
@@ -306,9 +342,44 @@ class HabitProvider extends ChangeNotifier {
       screenHours: screenTimeHours,
       sleepHours: habits.firstWhere((h) => h.id == 'sleep').current,
     );
+    // Lưu % từng yếu tố của HÔM NAY — để ngày MAI so sánh được (xem
+    // yesterdayFactors ở trên, đọc lại đúng key này vào ngày kế tiếp).
+    await service.saveDailyFactorScores(
+      screenTimeScore: screenTimeScore,
+      environmentScore: environmentScore,
+      eyeBreaksScore: eyeBreaksScore,
+      sleepScore: sleepScore,
+    );
     streakDays = await service.calculateStreakDays();
+    await _syncStreakReminder();
 
     notifyListeners();
+  }
+
+  // Đặt/huỷ thông báo nhắc giữ streak hằng ngày (21:00) theo công tắc "Theo
+  // dõi thói quen" (pref_notify_habits, mặc định bật) — đọc thẳng từ
+  // SharedPreferences vì HabitProvider không có BuildContext để lấy
+  // SettingsProvider. Gọi mỗi lần làm mới để số ngày trong nội dung luôn mới.
+  Future<void> _syncStreakReminder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('pref_notify_habits') ?? true)) {
+        await NotificationService.instance.cancelStreakReminder();
+        return;
+      }
+      final vi = prefs.getBool('pref_vietnamese') ?? true;
+      final title = vi ? 'Đừng để mất chuỗi ngày!' : "Don't lose your streak!";
+      final body = streakDays > 0
+          ? (vi
+              ? 'Bạn đang có chuỗi $streakDays ngày chăm mắt. Mở app hôm nay để giữ chuỗi nhé!'
+              : 'You have a $streakDays-day eye-care streak. Open the app today to keep it!')
+          : (vi
+              ? 'Mở app hôm nay để bắt đầu chuỗi ngày chăm mắt của bạn nhé!'
+              : 'Open the app today to start your eye-care streak!');
+      await NotificationService.instance.scheduleStreakReminder(title: title, body: body);
+    } catch (_) {
+      // Thông báo chỉ là phụ — không để lỗi lập lịch làm hỏng việc làm mới dữ liệu.
+    }
   }
 
   // Ngưỡng "ngủ quá nhiều" — không có trong yêu cầu gốc con số cụ thể, chọn
@@ -431,23 +502,21 @@ class HabitProvider extends ChangeNotifier {
         ? _simpleProgressScoreFor(breaks.current, breaks.target)
         : null;
 
-    // 📏 Khoảng cách + 🌙 Môi trường — lấy từ mẫu lux/khoảng cách thu thập
-    // được trong ngày (xem DeviceDataService.startEnvironmentMonitoring).
-    // null nếu CHƯA có mẫu nào hôm nay (chưa cấp quyền camera, máy không có
-    // cảm biến ánh sáng, hoặc mới mở app chưa tới chu kỳ lấy mẫu đầu).
+    // 🌙 Môi trường — lấy từ mẫu lux thu thập được trong ngày (xem
+    // DeviceDataService.startEnvironmentMonitoring). null nếu CHƯA có mẫu
+    // nào hôm nay (máy không có cảm biến ánh sáng, hoặc mới mở app chưa tới
+    // chu kỳ lấy mẫu đầu).
     final service = DeviceDataService.instance;
-    distanceScore = await service.getDistanceScoreToday();
     environmentScore = await service.getEnvironmentScoreToday();
 
     // Điểm tổng = trung bình cộng CÁC YẾU TỐ ĐANG CÓ DỮ LIỆU — bỏ qua (không
     // tính là 0) những yếu tố null, để không phạt oan người dùng chưa cấp đủ
     // quyền/chưa đủ mẫu trong ngày.
     final available = <double>[
-      if (screenTimeScore != null) screenTimeScore!,
-      if (distanceScore != null) distanceScore!,
-      if (environmentScore != null) environmentScore!,
-      if (eyeBreaksScore != null) eyeBreaksScore!,
-      if (sleepScore != null) sleepScore!,
+      ?screenTimeScore,
+      ?environmentScore,
+      ?eyeBreaksScore,
+      ?sleepScore,
     ];
     habitsCompletionPercent = available.isEmpty
         ? 0
@@ -517,11 +586,18 @@ class HabitProvider extends ChangeNotifier {
     await _saveHabitTarget(habitId, value);
     hasCustomHabitTargets = true;
     await _saveHasCustomHabitTargets();
+    await _stampTargetsUpdated();
     await _updateHabitsCompletion();
     notifyListeners();
+    _pushBackupInBackground();
   }
 
-  Future<void> applySurveyTargets(Map<String, double> targets) async {
+  /// Áp dụng TOÀN BỘ mục tiêu từ khảo sát trong 1 lần (đã await đủ) và lưu cả
+  /// kết quả khảo sát. [surveyAnswers] tuỳ chọn: câu trả lời gốc để lưu kèm.
+  Future<void> applySurveyTargets(
+    Map<String, double> targets, {
+    Map<String, dynamic>? surveyAnswers,
+  }) async {
     for (final entry in targets.entries) {
       final index = habits.indexWhere((h) => h.id == entry.key);
       if (index == -1) continue;
@@ -530,7 +606,35 @@ class HabitProvider extends ChangeNotifier {
     }
     hasCustomHabitTargets = true;
     await _saveHasCustomHabitTargets();
+    await _stampTargetsUpdated();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _kSurveyResultKey,
+      jsonEncode({
+        'appliedAt': DateTime.now().toIso8601String(),
+        'targets': targets,
+        if (surveyAnswers != null) 'answers': surveyAnswers,
+      }),
+    );
+
     await _updateHabitsCompletion();
     notifyListeners();
+    _pushBackupInBackground();
+  }
+
+  Future<void> _stampTargetsUpdated() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kTargetsUpdatedAtKey, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  // Đẩy backup ngay để bản trên đám mây luôn có mục tiêu mới nhất (tôn trọng
+  // công tắc "Sao lưu đám mây"; bỏ qua âm thầm nếu chưa đăng nhập).
+  void _pushBackupInBackground() {
+    unawaited(() async {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('pref_cloud_backup_enabled') ?? true)) return;
+      await CloudBackupService.instance.pushBackup();
+    }());
   }
 }

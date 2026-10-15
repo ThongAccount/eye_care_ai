@@ -40,7 +40,8 @@ class NotificationService {
 
   static final NotificationService instance = NotificationService._();
 
-  final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin notifications =
+      FlutterLocalNotificationsPlugin();
 
   static const _channelId = 'eye_break_channel';
   static const _channelName = 'Eye Break Reminder';
@@ -85,7 +86,24 @@ class NotificationService {
   // thông báo. Vì không có isolate nào được spawn khi báo thức bắn, không
   // thể xảy ra xung đột "duplicate isolate" nữa.
   static const int _repeatingNotificationId = 5001;
-  static const String _kRepeatIntervalMinutesKey = 'pref_break_repeat_interval_minutes';
+  // ID thông báo LẶP HÀNG TUẦN nhắc kiểm tra mắt — cố định thứ 2, 7:00 sáng
+  // (không cho tuỳ chỉnh giờ vì đây là lời nhắc mang tính duy trì thói quen
+  // định kỳ, đặt cứng đầu tuần/sáng sớm để không bị quên trước khi bắt đầu
+  // công việc). Dùng zonedSchedule + matchDateTimeComponents thay vì
+  // periodicallyShowWithDuration (dùng cho break reminder ở trên) vì
+  // periodicallyShowWithDuration chỉ lặp theo MỘT khoảng thời gian cố định
+  // (VD mỗi 20 phút) chứ không có khái niệm "đúng 1 ngày trong tuần, đúng 1
+  // giờ" — matchDateTimeComponents.dayOfWeekAndTime là cách CHÍNH THỐNG của
+  // flutter_local_notifications cho đúng nhu cầu "lặp hàng tuần" này.
+  static const int _weeklyEyeTestNotificationId = 6001;
+  // ID thông báo LẶP HÀNG NGÀY nhắc theo dõi/hoàn thành thói quen — đặt cố
+  // định 20:00 (buổi tối), vì đây là thời điểm hợp lý để người dùng nhìn lại
+  // các thói quen trong ngày (uống nước, ngủ, nghỉ mắt...) trước khi kết
+  // thúc ngày, khác với nhắc nghỉ mắt (xảy ra bất kỳ lúc nào đang dùng máy).
+  static const int _dailyHabitNotificationId = 6002;
+  static const int _dailyHabitReminderHour = 20;
+  static const String _kRepeatIntervalMinutesKey =
+      'pref_break_repeat_interval_minutes';
   static const String _kOngoingTitleKey = 'pref_break_ongoing_title';
   static const String _kOngoingSuffixKey = 'pref_break_ongoing_suffix';
   // Mốc giờ BẮT ĐẦU của chu kỳ lặp (lúc bấm Start) — vì báo thức lặp giờ là
@@ -93,7 +111,8 @@ class NotificationService {
   // lại "lần kế tiếp"), nên mốc giờ nhắc kế tiếp được TÍNH TOÁN LẠI trong
   // Dart (endAt = startedAt + n * interval, với n đủ lớn để > hiện tại) thay
   // vì đọc từ một giá trị được ghi bởi background isolate như trước.
-  static const String _kRepeatStartedAtKey = 'pref_break_repeat_started_at_millis';
+  static const String _kRepeatStartedAtKey =
+      'pref_break_repeat_started_at_millis';
 
   bool _initialized = false;
 
@@ -118,7 +137,9 @@ class NotificationService {
     if (_initialized) return;
     tz_data.initializeTimeZones();
 
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    // Android chỉ hiển thị biểu tượng đơn sắc cho status-bar notification.
+    // Dùng launcher/adaptive icon ở đây khiến nó bị nền đen như ảnh chụp.
+    const android = AndroidInitializationSettings('@drawable/ic_notification');
     const ios = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -132,11 +153,14 @@ class NotificationService {
       // mở lại app bằng cách nhấn vào thông báo — plugin yêu cầu callback nền
       // này phải là 1 hàm TOP-LEVEL hoặc STATIC (không được là closure/method
       // của instance), xem _onBackgroundNotificationResponse bên dưới.
-      onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          _onBackgroundNotificationResponse,
     );
 
-    final androidPlugin =
-        notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
 
     // Tạo kênh thông báo với âm thanh riêng (nếu có file) — phải tạo kênh
     // TRƯỚC khi gửi thông báo đầu tiên, vì Android không cho đổi âm thanh của
@@ -148,7 +172,9 @@ class NotificationService {
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
-      sound: _useCustomSound ? RawResourceAndroidNotificationSound(_customSoundResourceName) : null,
+      sound: _useCustomSound
+          ? RawResourceAndroidNotificationSound(_customSoundResourceName)
+          : null,
       audioAttributesUsage: AudioAttributesUsage.alarm,
     );
     await androidPlugin?.createNotificationChannel(channel);
@@ -166,10 +192,25 @@ class NotificationService {
     );
     await androidPlugin?.createNotificationChannel(ongoingChannel);
 
+    // Kênh cho 2 loại nhắc "nhẹ" (kiểm tra mắt hàng tuần + thói quen hàng
+    // ngày) — xem _gentleDetails() bên dưới để biết lý do tách kênh riêng.
+    const gentleChannel = AndroidNotificationChannel(
+      _reminderChannelId,
+      _reminderChannelName,
+      description:
+          'Nhắc kiểm tra mắt hàng tuần và theo dõi thói quen hàng ngày',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+    await androidPlugin?.createNotificationChannel(gentleChannel);
+
     await androidPlugin?.requestNotificationsPermission();
 
     await notifications
-        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >()
         ?.requestPermissions(alert: true, badge: true, sound: true);
 
     _initialized = true;
@@ -185,8 +226,10 @@ class NotificationService {
   // dụ trong initState() của widget gốc kèm addPostFrameCallback, KHÔNG được
   // gọi trong main() trước runApp().
   Future<void> requestDeferredSystemPermissions() async {
-    final androidPlugin =
-        notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
 
     // requestExactAlarmsPermission() MỞ THẲNG một màn hình Settings của hệ
     // thống (ảnh "Chuông báo và lời nhắc") — nếu gọi lại mỗi lần app khởi
@@ -229,7 +272,9 @@ class NotificationService {
         priority: Priority.high,
         category: AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
-        sound: _useCustomSound ? RawResourceAndroidNotificationSound(_customSoundResourceName) : null,
+        sound: _useCustomSound
+            ? RawResourceAndroidNotificationSound(_customSoundResourceName)
+            : null,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         vibrationPattern: Int64List.fromList([0, 800, 400, 800]),
         // FLAG_INSISTENT (4): lặp lại âm thanh + rung liên tục cho đến khi
@@ -245,6 +290,7 @@ class NotificationService {
       ),
     );
   }
+
   Future<void> showNightModeSuggestion({
     required int currentPercent,
     required int suggestedPercent,
@@ -326,7 +372,9 @@ class NotificationService {
         );
         if (registered) return;
       } catch (e, st) {
-        debugPrint('[NotificationService] scheduleBreakAlarm mode=$mode FAILED: $e\n$st');
+        debugPrint(
+          '[NotificationService] scheduleBreakAlarm mode=$mode FAILED: $e\n$st',
+        );
       }
     }
     debugPrint(
@@ -392,7 +440,9 @@ class NotificationService {
         payload: breakReminderPayload,
       );
     } catch (e, st) {
-      debugPrint('[NotificationService] periodicallyShowWithDuration exact FAILED: $e\n$st');
+      debugPrint(
+        '[NotificationService] periodicallyShowWithDuration exact FAILED: $e\n$st',
+      );
       await notifications.periodicallyShowWithDuration(
         _repeatingNotificationId,
         title,
@@ -429,7 +479,11 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     final startedMillis = prefs.getInt(_kRepeatStartedAtKey);
     final intervalMinutes = prefs.getInt(_kRepeatIntervalMinutesKey);
-    if (startedMillis == null || intervalMinutes == null || intervalMinutes <= 0) return null;
+    if (startedMillis == null ||
+        intervalMinutes == null ||
+        intervalMinutes <= 0) {
+      return null;
+    }
 
     final startedAt = DateTime.fromMillisecondsSinceEpoch(startedMillis);
     final intervalMs = intervalMinutes * 60 * 1000;
@@ -440,6 +494,194 @@ class NotificationService {
     return startedAt.add(Duration(milliseconds: intervalMs * cyclesPassed));
   }
 
+  // Kênh riêng cho 2 loại nhắc "nhẹ" (kiểm tra mắt hàng tuần + theo dõi thói
+  // quen hàng ngày) — importance vừa phải (default), có âm thanh/rung mặc
+  // định của hệ thống nhưng KHÔNG dùng insistent/fullScreenIntent như báo
+  // thức nghỉ mắt, vì đây là lời nhắc thông thường chứ không cần "báo động"
+  // như hết giờ nghỉ mắt.
+  static const _reminderChannelId = 'gentle_reminders_channel';
+  static const _reminderChannelName = 'Nhắc nhở định kỳ';
+
+  NotificationDetails _gentleDetails() {
+    return const NotificationDetails(
+      android: AndroidNotificationDetails(
+        _reminderChannelId,
+        _reminderChannelName,
+        channelDescription:
+            'Nhắc kiểm tra mắt hàng tuần và theo dõi thói quen hàng ngày',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+  }
+
+  // Tính mốc TZDateTime kế tiếp rơi đúng vào `weekday` (1=Thứ 2...7=Chủ nhật,
+  // theo DateTime.monday..DateTime.sunday) lúc `hour:minute` — nếu hôm nay đã
+  // là đúng thứ đó nhưng đã qua giờ hẹn, tự nhảy sang tuần sau.
+  tz.TZDateTime _nextInstanceOfWeekday(int weekday, int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+    while (scheduled.weekday != weekday || !scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
+  }
+
+  // Mốc TZDateTime kế tiếp trong ngày lúc `hour:minute` — nhảy sang ngày mai
+  // nếu hôm nay đã qua giờ đó.
+  tz.TZDateTime _nextInstanceOfDailyTime(int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
+  }
+
+  // Nhắc kiểm tra mắt HÀNG TUẦN — cố định Thứ 2, 7:00 sáng. Gọi lại hàm này
+  // (VD mỗi khi app khởi động và setting đang bật) là AN TOÀN: cùng
+  // `_weeklyEyeTestNotificationId` nên lần đặt sau tự ghi đè lần trước,
+  // không tạo ra 2 báo thức song song.
+  Future<void> scheduleWeeklyEyeTestReminder({
+    required String title,
+    required String body,
+  }) async {
+    await initialize();
+    final scheduledDate = _nextInstanceOfWeekday(DateTime.monday, 7, 0);
+    try {
+      await notifications.zonedSchedule(
+        _weeklyEyeTestNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[NotificationService] scheduleWeeklyEyeTestReminder exact FAILED: $e\n$st',
+      );
+      await notifications.zonedSchedule(
+        _weeklyEyeTestNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    }
+  }
+
+  Future<void> cancelWeeklyEyeTestReminder() async {
+    await notifications.cancel(_weeklyEyeTestNotificationId);
+  }
+
+  // Nhắc theo dõi/hoàn thành thói quen HÀNG NGÀY — cố định 20:00. Cùng cơ
+  // chế ghi-đè-an-toàn như scheduleWeeklyEyeTestReminder ở trên.
+  Future<void> scheduleDailyHabitReminder({
+    required String title,
+    required String body,
+  }) async {
+    await initialize();
+    final scheduledDate = _nextInstanceOfDailyTime(_dailyHabitReminderHour, 0);
+    try {
+      await notifications.zonedSchedule(
+        _dailyHabitNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[NotificationService] scheduleDailyHabitReminder exact FAILED: $e\n$st',
+      );
+      await notifications.zonedSchedule(
+        _dailyHabitNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+  }
+
+  Future<void> cancelDailyHabitReminder() async {
+    await notifications.cancel(_dailyHabitNotificationId);
+  }
+
+  // ===== DÁN VÀO TRONG class NotificationService (lib/services/notification_service.dart) =====
+  // Đặt ngay dưới hàm cancelDailyHabitReminder() là hợp lý.
+
+  // ID + giờ cố định cho nhắc giữ streak — 21:00, sau nhắc thói quen 20:00
+  // để 2 thông báo không dồn vào cùng 1 lúc.
+  static const int _streakReminderNotificationId = 6003;
+  static const int _streakReminderHour = 21;
+
+  // Nhắc giữ chuỗi ngày (streak) HÀNG NGÀY lúc 21:00. Nội dung `body` chứa
+  // số ngày streak tại thời điểm đặt lịch — HabitProvider gọi lại hàm này
+  // mỗi lần làm mới dữ liệu nên số luôn khá mới. Cùng ID nên mỗi lần gọi
+  // lại sẽ tự ghi đè lịch cũ, không bị trùng thông báo.
+  Future<void> scheduleStreakReminder({
+    required String title,
+    required String body,
+  }) async {
+    await initialize();
+    final scheduledDate = _nextInstanceOfDailyTime(_streakReminderHour, 0);
+    try {
+      await notifications.zonedSchedule(
+        _streakReminderNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[NotificationService] scheduleStreakReminder exact FAILED: $e\n$st',
+      );
+      await notifications.zonedSchedule(
+        _streakReminderNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+  }
+
+  Future<void> cancelStreakReminder() async {
+    await notifications.cancel(_streakReminderNotificationId);
+  }
 
   // Yêu cầu quyền hiển thị thông báo (Android 13+ cần popup thật, các bản
   // cũ hơn/iOS thường tự cấp) — dùng riêng cho bước "Thông báo" trong Setup
@@ -447,30 +689,43 @@ class NotificationService {
   // main() (trước runApp), lúc đó gọi lại không hiện popup được nếu quyền
   // đã bị từ chối trước đó (chỉ hỏi được đúng 1 lần theo vòng đời OS).
   Future<bool> requestNotificationPermission() async {
-    final androidPlugin =
-        notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (androidPlugin != null) {
       final granted = await androidPlugin.requestNotificationsPermission();
       return granted ?? await androidPlugin.areNotificationsEnabled() ?? false;
     }
-    final iosPlugin =
-        notifications.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    return await iosPlugin?.requestPermissions(alert: true, badge: true, sound: true) ?? true;
+    final iosPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    return await iosPlugin?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        ) ??
+        true;
   }
 
   // dùng để UI hiện gợi ý bật quyền này nếu bị tắt (khác với lúc mới cài,
   // requestExactAlarmsPermission() chỉ tự hỏi đúng 1 lần).
   Future<bool> canScheduleExactAlarms() async {
-    final androidPlugin =
-        notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     return await androidPlugin?.canScheduleExactNotifications() ?? true;
   }
 
   // Mở thẳng màn hình Settings hệ thống để người dùng tự cấp lại quyền báo
   // thức chính xác nếu trước đó đã từ chối.
   Future<void> openExactAlarmSettings() async {
-    final androidPlugin =
-        notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await androidPlugin?.requestExactAlarmsPermission();
   }
 
@@ -541,7 +796,8 @@ class NotificationService {
     final details = AndroidNotificationDetails(
       _ongoingChannelId,
       _ongoingChannelName,
-      channelDescription: 'Hiển thị thời gian còn lại tới lần nhắc nghỉ mắt tiếp theo',
+      channelDescription:
+          'Hiển thị thời gian còn lại tới lần nhắc nghỉ mắt tiếp theo',
       importance: Importance.low,
       priority: Priority.low,
       ongoing: true,
@@ -590,7 +846,8 @@ class NotificationService {
     const details = AndroidNotificationDetails(
       _ongoingChannelId,
       _ongoingChannelName,
-      channelDescription: 'Hiển thị thời gian còn lại tới lần nhắc nghỉ mắt tiếp theo',
+      channelDescription:
+          'Hiển thị thời gian còn lại tới lần nhắc nghỉ mắt tiếp theo',
       importance: Importance.low,
       priority: Priority.low,
       ongoing: true,

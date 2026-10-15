@@ -130,14 +130,41 @@ class SettingsScreen extends StatelessWidget {
                 title: strings.eyeTestReminders,
                 subtitle: strings.eyeTestRemindersSubtitle,
                 value: settings.notifyTests,
-                onChanged: (v) => settings.setNotification('tests', v),
+                onChanged: (v) async {
+                  await settings.setNotification('tests', v);
+                  // Bật/tắt báo thức lặp HÀNG TUẦN (Thứ 2, 7h sáng) ngay khi
+                  // gạt công tắc — trước đây setNotification() chỉ lưu 1
+                  // bool vào SharedPreferences, KHÔNG thật sự đặt báo thức
+                  // nào cả nên công tắc này không có tác dụng thực tế.
+                  if (v) {
+                    await NotificationService.instance.scheduleWeeklyEyeTestReminder(
+                      title: strings.eyeTestReminderNotifTitle,
+                      body: strings.eyeTestReminderNotifBody,
+                    );
+                  } else {
+                    await NotificationService.instance.cancelWeeklyEyeTestReminder();
+                  }
+                },
               ),
               _ToggleTile(
                 icon: '✅',
                 title: strings.habitTracking,
                 subtitle: strings.habitTrackingSubtitle,
                 value: settings.notifyHabits,
-                onChanged: (v) => settings.setNotification('habits', v),
+                onChanged: (v) async {
+                  await settings.setNotification('habits', v);
+                  // Bật/tắt báo thức lặp HÀNG NGÀY (20:00) — cùng lý do như
+                  // trên, công tắc này trước đây cũng không thật sự đặt báo
+                  // thức nào.
+                  if (v) {
+                    await NotificationService.instance.scheduleDailyHabitReminder(
+                      title: strings.habitReminderNotifTitle,
+                      body: strings.habitReminderNotifBody,
+                    );
+                  } else {
+                    await NotificationService.instance.cancelDailyHabitReminder();
+                  }
+                },
               ),
               _ToggleTile(
                 icon: '💡',
