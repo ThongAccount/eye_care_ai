@@ -21,4 +21,4 @@
 // chuỗi rỗng bên dưới) rồi mỗi người tự điền key cục bộ và KHÔNG commit lại
 // thay đổi của mình (git update-index --assume-unchanged đường dẫn file này
 // cũng là một cách, tuỳ quy trình của team).
-const String localNimApiKey = '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';
+const String localNimApiKey = '';
