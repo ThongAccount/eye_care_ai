@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -163,36 +165,74 @@ class SettingsMoreProvider extends ChangeNotifier {
   }
 
   /// Tạo báo cáo tóm tắt sức khoẻ mắt 7 ngày gần nhất dạng văn bản thuần rồi
-  /// chia sẻ — CỐ Ý không dùng thư viện tạo PDF (rất nặng, làm tăng đáng kể
-  /// dung lượng APK) để giữ app nhẹ theo đúng yêu cầu tối ưu hiệu năng.
+  /// Xuất báo cáo tuần ra file PDF thật (Notion: Export PDF Report) — nút
+  /// Settings đã ghi sẵn "(PDF)" từ trước, giờ mới implement đúng như nhãn.
+  ///
+  /// CỐ Ý viết nội dung bằng TIẾNG ANH: font built-in của PDF (Helvetica)
+  /// không có dấu tiếng Việt; nhúng font Unicode sẽ +~500KB vào APK (đi ngược
+  /// quyết định giữ app nhẹ). Trade-off này được user chốt khi duyệt feature.
   Future<void> downloadEyeHealthReport() async {
     final snapshots = await DeviceDataService.instance.loadCurrentWeekSnapshots();
-    final buffer = StringBuffer()
-      ..writeln('EYECARE AI — BÁO CÁO SỨC KHOẺ MẮT')
-      ..writeln('Xuất lúc: ${DateTime.now()}')
-      ..writeln('=' * 40);
-    const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
-    for (var i = 0; i < snapshots.length; i++) {
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final rows = <List<String>>[];
+    for (var i = 0; i < snapshots.length && i < days.length; i++) {
       final s = snapshots[i];
-      buffer.writeln();
-      buffer.writeln(days[i]);
       if (s == null) {
-        buffer.writeln('  Chưa có dữ liệu');
+        rows.add([days[i], 'No data', '-', '-']);
       } else {
-        buffer.writeln('  Điểm sức khoẻ mắt: ${s.score}%');
-        buffer.writeln('  Thời gian màn hình: ${s.screenHours.toStringAsFixed(1)}h');
-        buffer.writeln('  Giờ ngủ: ${s.sleepHours.toStringAsFixed(1)}h');
+        rows.add([
+          days[i],
+          '${s.score} / 100',
+          '${s.screenHours.toStringAsFixed(1)} h',
+          '${s.sleepHours.toStringAsFixed(1)} h',
+        ]);
       }
     }
 
+    final doc = pw.Document();
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              'EyeCare AI - Weekly Eye Health Report',
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text('Exported: ${DateTime.now()}'),
+            pw.SizedBox(height: 16),
+            pw.TableHelper.fromTextArray(
+              headers: ['Day', 'Eye score', 'Screen time', 'Sleep'],
+              data: rows,
+            ),
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'Score = average of available daily factors (screen time, sleep, eye breaks).',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+            ),
+          ],
+        ),
+      ),
+    );
+
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/eyecare_ai_report.txt');
-    await file.writeAsString(buffer.toString());
+    final file = File('${dir.path}/eyecare_ai_report.pdf');
+    await file.writeAsBytes(await doc.save());
 
     try {
       await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'EyeCare AI — Eye Health Report',
+        [XFile(file.path, mimeType: 'application/pdf')],
+        subject: 'EyeCare AI - Eye Health Report (PDF)',
       );
     } catch (_) {
       // Người dùng huỷ chia sẻ hoặc không có app nhận — bỏ qua im lặng.
