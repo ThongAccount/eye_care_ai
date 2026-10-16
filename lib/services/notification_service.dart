@@ -597,6 +597,50 @@ class NotificationService {
     await notifications.cancel(_weeklyEyeTestNotificationId);
   }
 
+  // ID + giờ cố định cho báo cáo tuần — Thứ 2, 7:30 sáng (sau nhắc kiểm tra
+  // mắt 7:00 để 2 thông báo không dồn vào cùng 1 lúc).
+  static const int _weeklyReportNotificationId = 6005;
+
+  // Báo cáo sức khỏe mắt HÀNG TUẦN (Notion: Weekly Eye Health Report). Nội
+  // dung `body` chứa tổng kết 7 ngày gần nhất tại thời điểm đặt lịch —
+  // HabitProvider gọi lại hàm này mỗi lần làm mới dữ liệu nên số luôn khá
+  // mới. Cùng ID nên lần đặt sau tự ghi đè lịch cũ, không bị trùng.
+  Future<void> scheduleWeeklyReportReminder({
+    required String title,
+    required String body,
+  }) async {
+    await initialize();
+    final scheduledDate = _nextInstanceOfWeekday(DateTime.monday, 7, 30);
+    try {
+      await notifications.zonedSchedule(
+        _weeklyReportNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[NotificationService] scheduleWeeklyReportReminder exact FAILED: $e\n$st',
+      );
+      await notifications.zonedSchedule(
+        _weeklyReportNotificationId,
+        title,
+        body,
+        scheduledDate,
+        _gentleDetails(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    }
+  }
+
+  Future<void> cancelWeeklyReportReminder() async {
+    await notifications.cancel(_weeklyReportNotificationId);
+  }
+
   // Nhắc theo dõi/hoàn thành thói quen HÀNG NGÀY — cố định 20:00. Cùng cơ
   // chế ghi-đè-an-toàn như scheduleWeeklyEyeTestReminder ở trên.
   Future<void> scheduleDailyHabitReminder({

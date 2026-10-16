@@ -352,6 +352,7 @@ class HabitProvider extends ChangeNotifier {
     );
     streakDays = await service.calculateStreakDays();
     await _syncStreakReminder();
+    await _syncWeeklyReport();
 
     notifyListeners();
   }
@@ -377,6 +378,46 @@ class HabitProvider extends ChangeNotifier {
               ? 'Mở app hôm nay để bắt đầu chuỗi ngày chăm mắt của bạn nhé!'
               : 'Open the app today to start your eye-care streak!');
       await NotificationService.instance.scheduleStreakReminder(title: title, body: body);
+    } catch (_) {
+      // Thông báo chỉ là phụ — không để lỗi lập lịch làm hỏng việc làm mới dữ liệu.
+    }
+  }
+
+  // Đặt/huỷ báo cáo tuần (Thứ 2, 7:30) — tổng kết 7 ngày gần nhất (điểm
+  // trung bình + số ngày có dữ liệu), dùng chung công tắc "Theo dõi thói
+  // quen" với nhắc streak (không thêm công tắc mới). Gọi mỗi lần làm mới để
+  // số trong nội dung luôn mới.
+  Future<void> _syncWeeklyReport() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!(prefs.getBool('pref_notify_habits') ?? true)) {
+        await NotificationService.instance.cancelWeeklyReportReminder();
+        return;
+      }
+      final service = DeviceDataService.instance;
+      var totalScore = 0;
+      var daysWithData = 0;
+      final now = DateTime.now();
+      for (var i = 1; i <= 7; i++) {
+        final snap =
+            await service.loadDailySnapshot(now.subtract(Duration(days: i)));
+        if (snap != null) {
+          totalScore += snap.score;
+          daysWithData++;
+        }
+      }
+      final vi = prefs.getBool('pref_vietnamese') ?? true;
+      final title =
+          vi ? 'Báo cáo mắt hàng tuần đã sẵn sàng!' : 'Your weekly eye report is ready!';
+      final body = daysWithData == 0
+          ? (vi
+              ? 'Tuần này chưa có dữ liệu. Mở app mỗi ngày để nhận báo cáo tuần nhé!'
+              : 'No data this week yet. Open the app daily to get your weekly report!')
+          : (vi
+              ? 'Tuần qua: điểm trung bình ${(totalScore / daysWithData).round()}/100, $daysWithData/7 ngày có dữ liệu. Mở app để xem chi tiết nhé!'
+              : 'Last week: average score ${(totalScore / daysWithData).round()}/100 across $daysWithData/7 days. Open the app for details!');
+      await NotificationService.instance
+          .scheduleWeeklyReportReminder(title: title, body: body);
     } catch (_) {
       // Thông báo chỉ là phụ — không để lỗi lập lịch làm hỏng việc làm mới dữ liệu.
     }
