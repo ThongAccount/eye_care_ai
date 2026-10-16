@@ -21,6 +21,7 @@ import '../widgets/setup_status_banner.dart';
 import '../widgets/shared_widgets.dart';
 import 'chat_screen.dart';
 import 'eye_break_screen.dart';
+import 'eye_exercise_screen.dart';
 import 'eye_test_screen.dart';
 import 'habits_screen.dart';
 import 'habits_survey_screen.dart';
@@ -556,6 +557,7 @@ class _FeatureHubCard extends StatelessWidget {
       _FeatureItem(icon: '☕', title: strings.eyeBreakTitle, route: const EyeBreakScreen()),
       _FeatureItem(icon: '💬', title: strings.chat, route: const ChatScreen()),
       _FeatureItem(icon: '⚙️', title: strings.settings, route: const SettingsScreen()),
+      _FeatureItem(icon: '👁️', title: strings.eyeExerciseTitle, route: const EyeExerciseScreen()),
     ];
 
     final accent = Theme.of(context).colorScheme.primary;

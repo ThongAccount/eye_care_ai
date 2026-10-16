@@ -394,6 +394,48 @@ class AppStrings {
   String get eyeTest => vi ? 'Kiểm tra mắt' : 'Eye Test';
   String get stepLabel => vi ? 'Bước' : 'Step';
 
+  // ---------------- Bài tập mắt có hướng dẫn ----------------
+  String get eyeExerciseTitle => vi ? 'Bài tập mắt' : 'Eye exercises';
+  String get eyeExerciseSubtitle => vi
+      ? 'Nhìn theo chấm di chuyển, chớp mắt chủ động — khoảng 80 giây'
+      : 'Follow the moving dot and blink actively — about 80 seconds';
+  String get eyeExerciseStart => vi ? 'Bắt đầu' : 'Start';
+  String get eyeExercisePause => vi ? 'Tạm dừng' : 'Pause';
+  String get eyeExerciseResume => vi ? 'Tiếp tục' : 'Resume';
+  String get eyeExerciseSkip => vi ? 'Bỏ qua bước' : 'Skip step';
+  String get eyeExerciseRestart => vi ? 'Tập lại' : 'Restart';
+  String get eyeExerciseClose => vi ? 'Đóng' : 'Close';
+  String get eyeExerciseDoneTitle => vi ? 'Hoàn thành!' : 'Done!';
+  String eyeExerciseStepCounter(int i, int n) => vi ? 'Bước $i/$n' : 'Step $i of $n';
+  String eyeExerciseTotalDone(int total) =>
+      vi ? 'Đã tập: $total buổi' : 'Completed: $total sessions';
+  String eyeExerciseDoneMessage(int total) => vi
+      ? 'Bạn đã hoàn thành bài tập mắt. Tổng cộng: $total buổi.'
+      : 'Eye exercise session complete. Total: $total sessions.';
+  String eyeExerciseStepName(int i) {
+    const viNames = ['Nhìn trái – phải', 'Nhìn lên – xuống', 'Xoay tròn', 'Chớp mắt chủ động'];
+    const enNames = ['Look left – right', 'Look up – down', 'Circles', 'Active blinking'];
+    final names = vi ? viNames : enNames;
+    return names[i.clamp(0, names.length - 1)];
+  }
+
+  String eyeExerciseStepInstruction(int i) {
+    const viTips = [
+      'Giữ đầu yên, chỉ đảo mắt nhìn theo chấm di chuyển sang hai bên.',
+      'Giữ đầu yên, chỉ đảo mắt nhìn theo chấm di chuyển lên xuống.',
+      'Đảo mắt theo vòng tròn của chấm, chậm rãi, không nhăn trán.',
+      'Chớp mắt chậm rãi theo nhịp to–nhỏ của chấm, giữ ẩm cho mắt.',
+    ];
+    const enTips = [
+      'Keep your head still, follow the dot with your eyes only.',
+      'Keep your head still, follow the dot up and down with your eyes only.',
+      'Roll your eyes along the dot\u2019s circle, slowly, without frowning.',
+      'Blink slowly with the dot\u2019s pulse to keep your eyes moist.',
+    ];
+    final tips = vi ? viTips : enTips;
+    return tips[i.clamp(0, tips.length - 1)];
+  }
+
   // ---------------- Kiểm tra mắt: Tumbling E ----------------
   String get eyeTestIntroTitle => vi ? 'Kiểm tra thị lực nhanh' : 'Quick vision check';
   String get eyeTestIntroBody => vi
