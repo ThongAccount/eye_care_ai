@@ -16,6 +16,7 @@ import '../providers/usage_limit_provider.dart';
 import '../services/app_usage_monitor.dart';
 import '../services/cloud_backup_service.dart';
 import '../services/device_data_service.dart';
+import '../services/home_widget_service.dart';
 import '../services/update_service.dart';
 import '../dialogs/adjust_break_goal_dialog.dart';
 import '../widgets/update_dialog.dart';
@@ -82,6 +83,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // giao diện tối kịp thời (chỉ có tác dụng khi người dùng đã bật công
       // tắc trong Cài đặt > Màn hình).
       unawaited(context.read<ThemeProvider>().refreshNightState());
+      // Widget man hinh chinh: day du lieu moi nhat (diem hom nay, chuoi,
+      // gio nghi ke tiep) len widget. Chua co lam moi nen dinh ky.
+      unawaited(HomeWidgetService.refresh());
       // App-lock: kiểm tra giới hạn sau khi refresh habit (cùng nguồn dữ liệu).
       AppUsageMonitor.instance
           .check(context.read<UsageLimitProvider>());
