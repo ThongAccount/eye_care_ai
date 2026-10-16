@@ -155,6 +155,15 @@ class AppStrings {
         return vi ? 'Theo hệ thống' : 'System';
     }
   }
+  String get nightModeLabel => vi ? 'Chế độ đọc ban đêm' : 'Night reading mode';
+  String get nightModeSubtitle => vi
+      ? 'Tự chuyển giao diện tối theo giờ hoàng hôn / bình minh (dùng vị trí GPS đã có)'
+      : 'Auto-switch to dark theme at sunset / sunrise (uses existing GPS location)';
+  String nightModeOnWithTimes(String times) =>
+      vi ? 'Đang bật · hoàng hôn $times' : 'On · sunset $times';
+  String get nightModeOnFallback => vi
+      ? 'Đang bật · chưa có vị trí GPS (tạm dùng 18:00–06:00)'
+      : 'On · no GPS fix yet (using 18:00–06:00 fallback)';
   // Tự động điều chỉnh độ sáng (liên tục theo cảm biến, khác "Gợi ý độ
   // sáng" ở trên vốn chỉ áp 1 lần khi người dùng tự bấm).
   String get autoBrightnessTitle => vi ? 'Tự động điều chỉnh độ sáng' : 'Auto-adjust brightness';

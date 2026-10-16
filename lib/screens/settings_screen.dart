@@ -271,6 +271,44 @@ class SettingsScreen extends StatelessWidget {
                       valueLabel: strings.themePreferenceLabel(theme.preference),
                       onTap: () => _showThemeDialog(context, theme, strings),
                     ),
+                    const Divider(height: 1, indent: 56),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: [
+                          const AppIcon('🌙', size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(strings.nightModeLabel,
+                                    style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(height: 4),
+                                Text(
+                                  theme.autoNightMode
+                                      ? (theme.tonightLabel != null
+                                          ? strings.nightModeOnWithTimes(theme.tonightLabel!)
+                                          : strings.nightModeOnFallback)
+                                      : strings.nightModeSubtitle,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Switch.adaptive(
+                            value: theme.autoNightMode,
+                            onChanged: (v) => theme.setAutoNightMode(v),
+                            activeTrackColor: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.5),
+                            activeThumbColor: Theme.of(context).colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

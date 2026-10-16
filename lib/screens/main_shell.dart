@@ -9,6 +9,7 @@ import '../providers/language_provider.dart';
 import '../providers/rank_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../providers/settings_more_provider.dart';
+import '../providers/theme_provider.dart';
 
 import '../providers/update_provider.dart';
 import '../providers/usage_limit_provider.dart';
@@ -77,6 +78,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _refreshHabitsAndSyncRank();
       _checkForAppUpdate();
       _checkBreakShortfall();
+      // Chế độ đọc ban đêm: tính lại ngày/đêm mỗi lần mở app để auto-switch
+      // giao diện tối kịp thời (chỉ có tác dụng khi người dùng đã bật công
+      // tắc trong Cài đặt > Màn hình).
+      unawaited(context.read<ThemeProvider>().refreshNightState());
       // App-lock: kiểm tra giới hạn sau khi refresh habit (cùng nguồn dữ liệu).
       AppUsageMonitor.instance
           .check(context.read<UsageLimitProvider>());
