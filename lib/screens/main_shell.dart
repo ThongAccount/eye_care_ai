@@ -3,16 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/auto_break_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/rank_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../providers/settings_more_provider.dart';
+import '../providers/theme_provider.dart';
+
 import '../providers/update_provider.dart';
 import '../providers/usage_limit_provider.dart';
 import '../services/app_usage_monitor.dart';
 import '../services/cloud_backup_service.dart';
+import '../services/device_data_service.dart';
+import '../services/home_widget_service.dart';
 import '../services/update_service.dart';
+import '../dialogs/adjust_break_goal_dialog.dart';
 import '../widgets/update_dialog.dart';
 import 'home_screen.dart';
 
@@ -47,15 +53,42 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   // hợp lý trong khung này.
   static const _autoBreakMaxGap = Duration(minutes: 20);
 
+  // Chỉ hiện gợi ý "điều chỉnh mục tiêu nghỉ mắt" TỐI ĐA 1 LẦN mỗi phiên mở
+  // app — tránh hiện lặp lại dialog mỗi lần _refreshHabitsAndSyncRank() chạy
+  // lại (mỗi 60s) trong cùng 1 lần mở app.
+  bool _shortfallDialogShown = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     final habit = context.read<HabitProvider>();
     habit.startHabitTracking();
+
+    // Nối AutoBreakProvider với mục tiêu 'breaks' hiện tại + callback ghi
+    // nhận nghỉ mắt THẬT vào HabitProvider khi tự phát hiện được (không cần
+    // người dùng bấm xác nhận thủ công).
+    final autoBreak = context.read<AutoBreakProvider>();
+    final breaksTarget = habit.habits.firstWhere((h) => h.id == 'breaks').target;
+    autoBreak.recomputeInterval(breaksTarget);
+    autoBreak.onAutoConfirmed = () async {
+      await context.read<HabitProvider>().recordEyeBreak();
+    };
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshHabitsAndSyncRank();
       _checkForAppUpdate();
+      _checkBreakShortfall();
+      // Chế độ đọc ban đêm: tính lại ngày/đêm mỗi lần mở app để auto-switch
+      // giao diện tối kịp thời (chỉ có tác dụng khi người dùng đã bật công
+      // tắc trong Cài đặt > Màn hình).
+      unawaited(context.read<ThemeProvider>().refreshNightState());
+      // Widget man hinh chinh: day du lieu moi nhat (diem hom nay, chuoi,
+      // gio nghi ke tiep) len widget. Chua co lam moi nen dinh ky.
+      unawaited(HomeWidgetService.refresh());
+      // App-lock: kiểm tra giới hạn sau khi refresh habit (cùng nguồn dữ liệu).
+      AppUsageMonitor.instance
+          .check(context.read<UsageLimitProvider>());
     });
     _usagePollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       _refreshHabitsAndSyncRank();
@@ -107,6 +140,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
+  // Kiểm tra HÔM QUA có bị thiếu số lần nghỉ mắt so với mục tiêu không — nếu
+  // có, gợi ý người dùng hạ mục tiêu hoặc rút ngắn countdown giữa các lần
+  // nhắc để dễ đạt hơn. Chỉ hiện 1 lần/phiên mở app (xem _shortfallDialogShown),
+  // và chỉ khi có dữ liệu thật của hôm qua (không đoán mò).
+  Future<void> _checkBreakShortfall() async {
+    if (_shortfallDialogShown || !mounted) return;
+    final habit = context.read<HabitProvider>();
+    final target = habit.habits.firstWhere((h) => h.id == 'breaks').target.round();
+    final shortfall = await DeviceDataService.instance.checkYesterdayBreaksShortfall(target);
+    if (shortfall == null || !mounted) return;
+    _shortfallDialogShown = true;
+    showAdjustBreakGoalDialog(context, yesterdayCount: shortfall, target: target);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
@@ -143,6 +190,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     await habit.refreshHabitsFromDevice();
     if (!mounted) return;
     context.read<RankProvider>().updateStreak(habit.streakDays);
+    // Mục tiêu 'breaks' có thể vừa đổi (survey, đổi target thủ công, hoặc
+    // vừa áp dụng gợi ý điều chỉnh) -> đồng bộ lại countdown tự động theo
+    // đúng mục tiêu mới nhất.
+    if (!mounted) return;
+    final breaksTarget = habit.habits.firstWhere((h) => h.id == 'breaks').target;
+    context.read<AutoBreakProvider>().recomputeInterval(breaksTarget);
   }
 
   @override

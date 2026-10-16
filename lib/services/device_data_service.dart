@@ -9,7 +9,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'distance_service.dart';
 import 'usage_service.dart';
 
 // Một dòng dữ liệu sử dụng của MỘT app trong ngày hôm nay, dùng cho biểu đồ
@@ -222,8 +221,18 @@ class DeviceDataService {
   // VÀ ánh sáng đủ mạnh — giảm mạnh trường hợp báo nhầm theo cả 2 chiều
   // (không chỉ GPS bị lừa bởi WiFi indoor, mà lux đơn lẻ cũng có thể bị lừa
   // bởi ánh nắng chiếu qua cửa sổ dù đang ngồi trong nhà).
+  //
+  // BUG ĐÃ SỬA (Outdoor Time gần như không bao giờ tăng): ngưỡng cũ (lux
+  // >= 1000 VÀ GPS accuracy <= 30m trong đúng 5 giây) trên thực tế QUÁ KHẮT
+  // KHE — cảm biến ánh sáng của nhiều điện thoại báo thấp hơn ánh sáng thật
+  // khá nhiều (do lớp kính/lớp phủ che cảm biến), nên trời hơi âm u hoặc chỉ
+  // đứng dưới bóng cây vẫn có thể không đạt 1000 lux dù rõ ràng đang ở ngoài
+  // trời; đồng thời GPS lấy fix mới trong vòng 5 giây rất hay bị timeout
+  // (đặc biệt lúc mới bật GPS/tín hiệu yếu), khiến _hasGoodGpsFix() gần như
+  // luôn trả về false. Đã nới các mốc này (vẫn giữ nguyên tắc "cần cả 2 tín
+  // hiệu" để tránh báo nhầm trong nhà) + thêm phương án dự phòng khi thiếu
+  // 1 trong 2 tín hiệu, xem chi tiết ở _detectOutdoorSample/_hasGoodGpsFix.
   static const _kGpsGoodAccuracyMeters = 30.0; // độ chính xác GPS coi là "tốt"
-  static const _kOutdoorLuxThreshold = 1000; // lux tối thiểu coi là "ánh sáng ngoài trời"
 
   Future<double> getOutdoorMinutesToday() async {
     final prefs = await SharedPreferences.getInstance();
@@ -233,9 +242,12 @@ class DeviceDataService {
 
   Future<void> startOutdoorTracking() async {
     _outdoorSampleTimer?.cancel();
-    _outdoorSampleTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+    // Lấy mẫu mỗi 1 phút thay vì 2 phút trước đây — vừa phản hồi nhanh hơn
+    // với việc ra/vào nhà, vừa giảm rủi ro "trót ở ngoài trời 90 giây nhưng
+    // đúng lúc mẫu lấy vào giữa lúc GPS timeout" làm mất nguyên cả mẫu.
+    _outdoorSampleTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
       final elapsedMinutes = _lastOutdoorSample == null
-          ? 2.0
+          ? 1.0
           : DateTime.now().difference(_lastOutdoorSample!).inSeconds / 60.0;
       _lastOutdoorSample = DateTime.now();
 
@@ -248,26 +260,23 @@ class DeviceDataService {
       }
       // isOutdoor == false: trong nhà (thiếu GPS tốt, hoặc đủ GPS nhưng
       // ánh sáng không giống ngoài trời), không cộng dồn.
-      // isOutdoor == null: không đọc được cảm biến ánh sáng (máy không có
-      // cảm biến, hoặc iOS không hỗ trợ) -> bỏ qua mẫu này hoàn toàn thay vì
-      // đoán mò chỉ bằng GPS.
+      // isOutdoor == null: không xác định được (mất quyền/dịch vụ vị trí bị
+      // tắt) -> bỏ qua mẫu này hoàn toàn thay vì đoán mò.
     });
   }
 
-  // Trả về true (ngoài trời) / false (trong nhà) / null (không đọc được
-  // cảm biến ánh sáng để kết luận cho mẫu này — ví dụ máy không có cảm biến).
-  Future<bool?> _detectOutdoorSample() async {
-    final lux = await _readAmbientLuxOnce();
-    if (lux == null) return null; // Không có cảm biến ánh sáng -> không đủ căn cứ, bỏ qua mẫu.
-    if (lux < _kOutdoorLuxThreshold) return false; // Ánh sáng kiểu trong nhà -> chắc chắn không phải ngoài trời.
-    // Ánh sáng đủ mạnh RỒI mới kiểm tra thêm GPS (đỡ tốn pin hơn: GPS luôn
-    // là bước "xin fix vị trí" tốn thời gian/pin hơn hẳn so với đọc lux).
-    return _hasGoodGpsFix();
-  }
+  // CHỈ DÙNG GPS (theo yêu cầu): trước đây yêu cầu thêm ánh sáng (lux) nên
+  // khi người dùng để điện thoại trong cặp/balo/túi (cảm biến ánh sáng bị
+  // che, lux ~0) thì thời gian ngoài trời KHÔNG BAO GIỜ tăng dù đang đứng
+  // ngoài nắng. Giờ chỉ xét việc có bắt được tín hiệu GPS tốt hay không.
+  // Để vẫn phân biệt được trong nhà/ngoài trời mà không cần lux, xem
+  // _hasGoodGpsFix: ép dùng chip GPS thuần (không Wi-Fi/cell), trong nhà
+  // thường không bắt được fix.
+  Future<bool?> _detectOutdoorSample() => _hasGoodGpsFix();
 
   // Đọc đúng 1 mẫu lux rồi hủy lắng nghe ngay — khác với
   // startDarkRoomMonitoring() ở dưới vốn lắng nghe LIÊN TỤC cho mục đích
-  // khác (cảnh báo dùng điện thoại trong bóng tối); ở đây mỗi 2 phút chỉ cần
+  // khác (cảnh báo dùng điện thoại trong bóng tối); ở đây mỗi 1 phút chỉ cần
   // 1 lần đọc tức thời.
   Future<int?> _readAmbientLuxOnce({Duration timeout = const Duration(seconds: 3)}) async {
     if (!Platform.isAndroid) return null; // light sensor not available on iOS
@@ -315,11 +324,17 @@ class DeviceDataService {
         permission == LocationPermission.whileInUse;
   }
 
-  // Lấy nhanh 1 fix GPS (tối đa 5 giây) và đánh giá độ chính xác. Trả về
-  // false (không phải null) khi thiếu quyền/dịch vụ vị trí hoặc không lấy
-  // được fix trong thời gian cho phép, vì trong các trường hợp đó không có
-  // căn cứ để xác nhận "ngoài trời" -> coi như không xác nhận được.
-  Future<bool> _hasGoodGpsFix() async {
+  // Lấy 1 fix GPS và đánh giá độ chính xác. Trả về false khi thiếu quyền/dịch
+  // vụ vị trí đang tắt/không bắt được fix.
+  //
+  // `forceLocationManager: true` ép Android dùng chip GPS THUẦN thay vì
+  // FusedLocationProvider (vốn trộn Wi-Fi + cell tower nên trong nhà vẫn cho
+  // "độ chính xác tốt"). Chip GPS cần nhìn thấy bầu trời: trong nhà/trong
+  // cặp trong nhà thường timeout hoặc sai số lớn -> coi là "không ngoài
+  // trời". Cố ý KHÔNG dùng getLastKnownPosition() làm dự phòng như trước, vì
+  // vị trí cũ thường đến từ Wi-Fi/cell và sẽ làm lọt trường hợp trong nhà.
+  // Timeout 15 giây vì GPS thuần "nguội" cần lâu hơn fused.
+  Future<bool> _hasGoodGpsFix({double accuracyMeters = _kGpsGoodAccuracyMeters}) async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return false;
@@ -327,15 +342,21 @@ class DeviceDataService {
       final hasPermission = await hasLocationPermission();
       if (!hasPermission) return false;
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 5),
-        ),
-      );
-      return position.accuracy <= _kGpsGoodAccuracyMeters;
+      final settings = Platform.isAndroid
+          ? AndroidSettings(
+              accuracy: LocationAccuracy.best,
+              forceLocationManager: true,
+              timeLimit: const Duration(seconds: 15),
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.best,
+              timeLimit: Duration(seconds: 15),
+            );
+      final position = await Geolocator.getCurrentPosition(locationSettings: settings);
+      return position.accuracy <= accuracyMeters;
     } catch (_) {
-      // Timeout, dịch vụ bị tắt giữa chừng, hoặc lỗi phần cứng.
+      // Timeout (không thấy vệ tinh = nhiều khả năng đang trong nhà), dịch vụ
+      // bị tắt giữa chừng, hoặc lỗi phần cứng.
       return false;
     }
   }
@@ -526,6 +547,61 @@ class DeviceDataService {
     );
   }
 
+  // ---------------- Daily FACTOR snapshot (cho so sánh hôm qua vs hôm nay) ----------------
+  // Khác với `daily_snapshot_*` ở trên (chỉ giữ điểm TỔNG + giờ màn hình/ngủ
+  // để vẽ biểu đồ), đây lưu riêng % của TỪNG YẾU TỐ trong Eye Health Score
+  // (Thời gian màn hình, Môi trường, Nghỉ mắt, Giấc ngủ) của MỖI NGÀY — cần
+  // thiết để so sánh "hôm nay so với hôm qua" theo TỪNG yếu tố riêng lẻ (xem
+  // HabitProvider.factorDeltas), thay vì chỉ so được mỗi điểm tổng như trước.
+  // Giá trị null (yếu tố chưa có dữ liệu hôm đó) được lưu thành chuỗi rỗng,
+  // phân biệt với 0% (có dữ liệu nhưng đang xấu).
+  //
+  // LƯU Ý: định dạng lưu trữ vẫn giữ 5 trường (khớp dữ liệu lịch sử đã lưu
+  // trước đây khi còn có "Khoảng cách") để không làm hỏng snapshot cũ trên
+  // máy người dùng — trường thứ 2 (distance) giờ LUÔN được ghi rỗng và
+  // KHÔNG được đọc lại (loadDailyFactorScores trả về null cho distanceScore).
+  static const _kDailyFactorsPrefix = 'daily_factors_';
+
+  Future<void> saveDailyFactorScores({
+    double? screenTimeScore,
+    double? environmentScore,
+    double? eyeBreaksScore,
+    double? sleepScore,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    String enc(double? v) => v == null ? '' : v.toStringAsFixed(2);
+    await prefs.setString(
+      '$_kDailyFactorsPrefix$today',
+      // Trường thứ 2 (giữa screenTimeScore và environmentScore) là ô
+      // "distance" CŨ, luôn để rỗng — giữ nguyên vị trí cột để không phá
+      // định dạng của các snapshot đã lưu từ trước.
+      '${enc(screenTimeScore)}||${enc(environmentScore)}|${enc(eyeBreaksScore)}|${enc(sleepScore)}',
+    );
+  }
+
+  Future<({
+        double? screenTimeScore,
+        double? environmentScore,
+        double? eyeBreaksScore,
+        double? sleepScore,
+      })?> loadDailyFactorScores(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '$_kDailyFactorsPrefix${date.toIso8601String().substring(0, 10)}';
+    final raw = prefs.getString(key);
+    if (raw == null) return null;
+    final parts = raw.split('|');
+    if (parts.length != 5) return null;
+    double? dec(String s) => s.isEmpty ? null : double.tryParse(s);
+    return (
+      screenTimeScore: dec(parts[0]),
+      // parts[1] = ô "distance" cũ — cố tình bỏ qua, không đọc lại.
+      environmentScore: dec(parts[2]),
+      eyeBreaksScore: dec(parts[3]),
+      sleepScore: dec(parts[4]),
+    );
+  }
+
   // Trả về danh sách 7 ngày của TUẦN HIỆN TẠI (Thứ 2 -> Chủ nhật). Với các
   // ngày đã qua/hôm nay: snapshot thật nếu có, null nếu không mở app hôm đó.
   // Với các ngày CHƯA TỚI: luôn null (chưa xảy ra thì không thể có dữ liệu).
@@ -599,16 +675,50 @@ class DeviceDataService {
 
     return result;
   }
+  // BUG ĐÃ SỬA (streak không bao giờ tăng): ngưỡng cũ là 60, nhưng yếu tố
+  // "Nghỉ mắt" trong điểm tổng LUÔN được tính vào trung bình (không bị loại
+  // trừ như các yếu tố thiếu dữ liệu khác) và bắt đầu từ 0% cho tới khi
+  // người dùng thực sự hoàn thành đủ số lần nghỉ mắt trong ngày (mặc định
+  // mục tiêu 12 lần/ngày) — chỉ mở app xem qua, dù 3 yếu tố còn lại đều tốt,
+  // trung bình 4 yếu tố vẫn khó vượt 60 vì bị yếu tố này kéo xuống ngay từ
+  // đầu ngày. Hạ ngưỡng xuống 50 để streak vẫn có ý nghĩa (đòi hỏi thói quen
+  // tốt thật sự) nhưng không yêu cầu gần như hoàn hảo cả 4 yếu tố mới đạt.
+  static const int _kStreakScoreThreshold = 50;
+
+  // ---------------- Điểm danh đơn giản: chỉ cần mở app hôm đó ----------------
+  // THÊM MỚI: ngoài điều kiện điểm sức khỏe mắt tốt, một ngày CŨNG được tính
+  // vào chuỗi nếu người dùng ĐƠN GIẢN LÀ CÓ MỞ APP hôm đó — giống kiểu
+  // "điểm danh" hằng ngày của các app thói quen phổ biến, để streak không bị
+  // quá khắt khe/dễ nản với người mới dùng hoặc những ngày bận không kịp
+  // hoàn thành đủ thói quen. Chỉ cần đúng 1 lần mở app/ngày là đủ, gọi hàm
+  // này mỗi lần HabitProvider làm mới dữ liệu (xem refreshHabitsFromDevice).
+  static const _kCheckInPrefix = 'daily_checkin_';
+
+  Future<void> recordAppOpenCheckIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayKey = DateTime.now().toIso8601String().substring(0, 10);
+    await prefs.setBool('$_kCheckInPrefix$todayKey', true);
+  }
+
+  Future<bool> _hasCheckIn(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '$_kCheckInPrefix${date.toIso8601String().substring(0, 10)}';
+    return prefs.getBool(key) ?? false;
+  }
 
   // Tính chuỗi ngày liên tiếp (streak) thật: đếm ngược từ hôm nay, mỗi ngày
-  // có snapshot với điểm hoàn thành >= 80% thì tính là 1 ngày trong chuỗi,
-  // dừng lại ở ngày đầu tiên không đạt hoặc không có dữ liệu.
+  // được tính vào chuỗi nếu THỎA MÃN ÍT NHẤT MỘT trong 2 điều kiện — điểm
+  // sức khỏe mắt hôm đó đạt ngưỡng, HOẶC người dùng đã mở app hôm đó (điểm
+  // danh) — dừng lại ở ngày đầu tiên không thỏa mãn cả 2.
   Future<int> calculateStreakDays() async {
     var streak = 0;
     var day = DateTime.now();
     for (var i = 0; i < 365; i++) {
-      final snapshot = await loadDailySnapshot(DateTime(day.year, day.month, day.day));
-      if (snapshot == null || snapshot.score < 80) break;
+      final dayOnly = DateTime(day.year, day.month, day.day);
+      final snapshot = await loadDailySnapshot(dayOnly);
+      final goodScore = snapshot != null && snapshot.score >= _kStreakScoreThreshold;
+      final checkedIn = await _hasCheckIn(dayOnly);
+      if (!goodScore && !checkedIn) break;
       streak++;
       day = day.subtract(const Duration(days: 1));
     }
@@ -675,46 +785,41 @@ class DeviceDataService {
     _environmentSampleTimer?.cancel();
   }
 
-  // ---------------- Môi trường (lux) + Khoảng cách: cho Eye Health Score 2.0 ----------------
-  // Gộp CHUNG 1 timer cho 2 yếu tố "🌙 Môi trường" và "📏 Khoảng cách" trong
-  // breakdown điểm sức khỏe mắt — mỗi lần lấy mẫu lux thì NHÂN TIỆN đo luôn
-  // khoảng cách, thay vì chạy 2 timer riêng (đỡ tốn pin hơn, và 2 số liệu đo
-  // cùng lúc phản ánh đúng "trạng thái hiện tại" nhất quán với nhau).
+  // ---------------- Môi trường (lux): cho Eye Health Score 2.0 ----------------
+  // Lấy mẫu lux ánh sáng môi trường định kỳ, dùng cho yếu tố "🌙 Môi trường"
+  // trong breakdown điểm sức khỏe mắt.
   //
-  // AN TOÀN RIÊNG TƯ — ĐỌC KỸ TRƯỚC KHI ĐỔI CHU KỲ:
-  // - Camera trước CHỈ được mở khi (1) đã có quyền camera SẴN (không bao giờ
-  //   tự ý request() ở đây — xin quyền runtime phải do UI chủ động, đúng như
-  //   quy ước của DistanceService/EyeTestScreen), VÀ (2) DistanceService hiện
-  //   KHÔNG có phiên nào khác đang chạy (ví dụ người dùng đang làm Eye Test
-  //   ngay lúc này) — tránh giành camera giữa 2 nơi dùng cùng lúc.
-  // - Camera chỉ mở trong TỐI ĐA vài giây mỗi lần lấy mẫu rồi đóng ngay
-  //   (không giữ stream chạy nền liên tục suốt ngày) — mỗi lần mở camera đều
-  //   hiện chấm báo hiệu camera đang dùng (Android/iOS), nên chu kỳ lấy mẫu
-  //   CỐ Ý thưa (15 phút, tăng từ 5 phút ban đầu theo phản hồi thực tế) để
-  //   giảm tần suất người dùng thấy chấm camera nháy lên khi không thao tác
-  //   gì liên quan tới camera.
-  static const _kEnvironmentSampleInterval = Duration(minutes: 15);
-  // Lux dưới mức này coi là "hơi tối để nhìn màn hình" cho mục đích tính
-  // điểm (khác ngưỡng _kDarkLuxThreshold=10 dùng cho CẢNH BÁO phòng tối —
-  // ở đây chỉ cần "đủ sáng để đọc thoải mái", không cần tối om mới tính xấu).
+  // ĐÃ BỎ đo "📏 Khoảng cách" (dùng camera trước) — tính năng này từng ở
+  // trạng thái thử nghiệm, độ chính xác chưa đủ tin cậy trên nhiều dòng máy
+  // và không mang lại giá trị tương xứng với chi phí pin/quyền riêng tư
+  // (phải mở camera định kỳ). Đã gỡ bỏ hoàn toàn khỏi app.
+  // CÔNG THỨC MỚI (theo yêu cầu): mỗi ngày mới điểm Môi trường BẮT ĐẦU Ở
+  // 100%. Mỗi lần dùng điện thoại, app lấy mẫu lux định kỳ; thời gian dùng
+  // máy ở nơi thiếu sáng (lux < _kGoodLuxThreshold) được cộng vào "dim", mọi
+  // thời gian lấy mẫu cộng vào "total". Điểm = 100% - (dim / total).
+  // VD: dùng máy 5 giờ, trong đó 2 giờ thiếu sáng = 40% -> còn 60%.
+  // Trước đây điểm = % số lần đo "đủ sáng" và là 0% khi chưa có mẫu đủ sáng
+  // nào (xem hình 1: Môi trường 0%), không đúng ý nghĩa "trừ dần từ 100%".
+  static const _kEnvironmentSampleInterval = Duration(minutes: 1);
+  // Dart Timer bị Android tạm dừng khi app xuống nền; kẹp trọng số mỗi mẫu để
+  // khoảng im lặng dài (app bị đóng băng) không bị tính là thời gian dùng máy.
+  static const _kMaxSampleWeightSeconds = 120;
+  // Lux dưới mức này coi là "thiếu sáng để nhìn màn hình" (khác ngưỡng
+  // _kDarkLuxThreshold=10 dùng cho CẢNH BÁO phòng tối).
   static const _kGoodLuxThreshold = 50;
-  // Khoảng cách tối thiểu được coi là ổn — khớp
-  // EyeHealthStandards.minReadingDistanceCm (không import trực tiếp model từ
-  // service để tránh phụ thuộc chéo không cần thiết, chỉ lặp lại đúng giá trị).
-  static const _kGoodDistanceMinCm = 30.0;
 
-  static const _kEnvGoodLuxCountKey = 'env_good_lux_count';
-  static const _kEnvTotalLuxCountKey = 'env_total_lux_count';
-  static const _kEnvGoodDistanceCountKey = 'env_good_distance_count';
-  static const _kEnvTotalDistanceCountKey = 'env_total_distance_count';
+  static const _kEnvDimSecondsKey = 'env_dim_seconds';
+  static const _kEnvTotalSecondsKey = 'env_total_seconds';
   static const _kEnvDateKey = 'env_sample_date';
 
   Timer? _environmentSampleTimer;
+  DateTime? _lastEnvSampleAt;
 
   void startEnvironmentMonitoring() {
     _environmentSampleTimer?.cancel();
+    _sampleEnvironmentOnce(); // lấy mẫu ngay, không chờ hết chu kỳ đầu.
     _environmentSampleTimer = Timer.periodic(_kEnvironmentSampleInterval, (_) {
-      _sampleEnvironmentAndDistanceOnce();
+      _sampleEnvironmentOnce();
     });
   }
 
@@ -723,74 +828,25 @@ class DeviceDataService {
     _environmentSampleTimer = null;
   }
 
-  Future<void> _sampleEnvironmentAndDistanceOnce() async {
+  Future<void> _sampleEnvironmentOnce() async {
     final prefs = await SharedPreferences.getInstance();
     await _resetEnvironmentCountersIfNewDay(prefs);
 
+    final now = DateTime.now();
+    final weight = _lastEnvSampleAt == null
+        ? _kEnvironmentSampleInterval.inSeconds
+        : now.difference(_lastEnvSampleAt!).inSeconds.clamp(1, _kMaxSampleWeightSeconds);
+    _lastEnvSampleAt = now;
+
     final lux = await _readAmbientLuxOnce();
-    if (lux != null) {
-      final total = (prefs.getInt(_kEnvTotalLuxCountKey) ?? 0) + 1;
-      await prefs.setInt(_kEnvTotalLuxCountKey, total);
-      if (lux >= _kGoodLuxThreshold) {
-        final good = (prefs.getInt(_kEnvGoodLuxCountKey) ?? 0) + 1;
-        await prefs.setInt(_kEnvGoodLuxCountKey, good);
-      }
+    if (lux == null) return; // không đọc được cảm biến -> bỏ mẫu, không phạt.
+
+    final total = (prefs.getInt(_kEnvTotalSecondsKey) ?? 0) + weight;
+    await prefs.setInt(_kEnvTotalSecondsKey, total);
+    if (lux < _kGoodLuxThreshold) {
+      final dim = (prefs.getInt(_kEnvDimSecondsKey) ?? 0) + weight;
+      await prefs.setInt(_kEnvDimSecondsKey, dim);
     }
-
-    final distanceCm = await _sampleDistanceOnceIfSafe();
-    if (distanceCm != null) {
-      final total = (prefs.getInt(_kEnvTotalDistanceCountKey) ?? 0) + 1;
-      await prefs.setInt(_kEnvTotalDistanceCountKey, total);
-      if (distanceCm >= _kGoodDistanceMinCm) {
-        final good = (prefs.getInt(_kEnvGoodDistanceCountKey) ?? 0) + 1;
-        await prefs.setInt(_kEnvGoodDistanceCountKey, good);
-      }
-    }
-  }
-
-  // Mở camera trước TỐI ĐA vài giây để lấy 1 mẫu khoảng cách rồi đóng ngay.
-  // Trả về null (bỏ qua mẫu này hoàn toàn, KHÔNG tính là "mẫu xấu") nếu:
-  // chưa có quyền camera, DistanceService đang bận (Eye Test đang chạy),
-  // camera không mở được, hoặc không thấy khuôn mặt trong thời gian chờ.
-  Future<double?> _sampleDistanceOnceIfSafe() async {
-    try {
-      final status = await Permission.camera.status;
-      if (!status.isGranted) return null;
-    } catch (_) {
-      return null;
-    }
-
-    if (DistanceService.instance.isRunning) return null; // đang có nơi khác dùng camera này
-
-    final completer = Completer<double?>();
-    StreamSubscription<FaceMeasurement?>? sub;
-    Timer? timer;
-    var settled = false;
-
-    Future<void> finish(double? value) async {
-      if (settled) return;
-      settled = true;
-      timer?.cancel();
-      await sub?.cancel();
-      await DistanceService.instance.stop();
-      if (!completer.isCompleted) completer.complete(value);
-    }
-
-    final started = await DistanceService.instance.start();
-    if (!started) return null;
-
-    sub = DistanceService.instance.distanceStream.listen(
-      (measurement) {
-        if (measurement?.distanceCm != null) finish(measurement!.distanceCm);
-      },
-      onError: (_) => finish(null),
-    );
-    // Không thấy mặt sau 4 giây (quá tối, ngoài khung hình, không có ai
-    // đang nhìn máy...) -> bỏ mẫu này, không đoán mò, không giữ camera lâu
-    // hơn nữa.
-    timer = Timer(const Duration(seconds: 4), () => finish(null));
-
-    return completer.future;
   }
 
   Future<void> _resetEnvironmentCountersIfNewDay(SharedPreferences prefs) async {
@@ -798,34 +854,34 @@ class DeviceDataService {
     final storedDate = prefs.getString(_kEnvDateKey);
     if (storedDate != today) {
       await prefs.setString(_kEnvDateKey, today);
-      await prefs.setInt(_kEnvGoodLuxCountKey, 0);
-      await prefs.setInt(_kEnvTotalLuxCountKey, 0);
-      await prefs.setInt(_kEnvGoodDistanceCountKey, 0);
-      await prefs.setInt(_kEnvTotalDistanceCountKey, 0);
+      await prefs.setInt(_kEnvDimSecondsKey, 0);
+      await prefs.setInt(_kEnvTotalSecondsKey, 0);
     }
   }
 
-  // % mẫu lux "đủ sáng" trong hôm nay — null nếu CHƯA có mẫu nào (máy không
-  // có cảm biến ánh sáng, hoặc mới mở app, chưa tới chu kỳ lấy mẫu đầu tiên)
-  // -> UI nên hiện "chưa có dữ liệu", không phải 0%.
+  // Luôn trả về số (không còn null): chưa có mẫu nào hôm nay = 100%.
   Future<double?> getEnvironmentScoreToday() async {
     final prefs = await SharedPreferences.getInstance();
     await _resetEnvironmentCountersIfNewDay(prefs);
-    final total = prefs.getInt(_kEnvTotalLuxCountKey) ?? 0;
-    if (total == 0) return null;
-    final good = prefs.getInt(_kEnvGoodLuxCountKey) ?? 0;
-    return (good / total) * 100;
+    final total = prefs.getInt(_kEnvTotalSecondsKey) ?? 0;
+    if (total <= 0) return 100;
+    final dim = prefs.getInt(_kEnvDimSecondsKey) ?? 0;
+    return (100 - (dim / total) * 100).clamp(0, 100).toDouble();
   }
 
-  // % mẫu khoảng cách "đủ xa" (>= 30cm) trong hôm nay — null nếu chưa có mẫu
-  // nào (chưa cấp quyền camera, hoặc chưa lần nào thấy mặt rõ trong lúc lấy
-  // mẫu, hoặc mới mở app).
-  Future<double?> getDistanceScoreToday() async {
+  // ---------------- AI Auto Break: hôm qua có thiếu mục tiêu nghỉ mắt? ----------------
+  // Trả về số lần nghỉ mắt HÔM QUA nếu CHƯA đạt target, null nếu đã đạt hoặc
+  // không có dữ liệu hôm qua. Đọc THẲNG giá trị thô đã lưu (không gọi
+  // getEyeBreaksToday(), vì hàm đó tự RESET về 0 khi phát hiện sang ngày
+  // mới — sẽ mất luôn con số hôm qua cần so sánh).
+  Future<int?> checkYesterdayBreaksShortfall(int target) async {
     final prefs = await SharedPreferences.getInstance();
-    await _resetEnvironmentCountersIfNewDay(prefs);
-    final total = prefs.getInt(_kEnvTotalDistanceCountKey) ?? 0;
-    if (total == 0) return null;
-    final good = prefs.getInt(_kEnvGoodDistanceCountKey) ?? 0;
-    return (good / total) * 100;
+    final storedDate = prefs.getString(_kBreaksDateKey);
+    if (storedDate == null) return null;
+    final yesterdayKey =
+        DateTime.now().subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
+    if (storedDate != yesterdayKey) return null;
+    final count = prefs.getInt(_kBreaksCountKey) ?? 0;
+    return count < target ? count : null;
   }
 }

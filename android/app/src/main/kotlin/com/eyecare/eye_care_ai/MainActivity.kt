@@ -19,6 +19,7 @@ import androidx.work.WorkManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 // MainActivity thêm một MethodChannel riêng cho các dữ liệu mà package
@@ -34,10 +35,12 @@ import java.util.concurrent.TimeUnit
 //    Android gộp dữ liệu theo nhiều khung thời gian chồng lấn.
 class MainActivity : FlutterActivity() {
     private val channelName = "eye_care_ai/usage_events"
+    private val appLockChannelName = "eye_care_ai/app_lock"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         registerNativeDarkRoomWorker()
+        registerNativeDailySnapshotWorker()
         requestBatteryOptimizationExemptionOnce()
         startDarkRoomForegroundServiceIfNeeded()
     }
@@ -105,8 +108,94 @@ class MainActivity : FlutterActivity() {
         )
     }
 
+    // Đăng ký DailySnapshotWorker: tự tính & lưu snapshot điểm sức khỏe mắt
+    // mỗi ngày lúc ~23:55, HOÀN TOÀN NATIVE — không cần người dùng mở app
+    // ngày đó (xem DailySnapshotWorker.kt để biết lý do không thể làm việc
+    // này qua Dart/workmanager, cùng nguyên nhân đã ghi ở DarkRoomWorker).
+    // ExistingPeriodicWorkPolicy.KEEP: gọi lại mỗi lần mở app là vô hại,
+    // không reset initialDelay/lịch đã đăng ký từ trước.
+    private fun registerNativeDailySnapshotWorker() {
+        val now = Calendar.getInstance()
+        val next = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 55)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (before(now)) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val initialDelay = next.timeInMillis - now.timeInMillis
+
+        val request = PeriodicWorkRequestBuilder<DailySnapshotWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(false).build())
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "daily_snapshot_periodic",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Watcher app-lock: poll foreground mỗi 3s, hiện gate khi mở app bị chặn
+        // trong lúc budget đã cạn (armed). Chạy độc lập với vòng đời Dart.
+        AppLockOverlayManager.get(this).startWatcher()
+
+        // Kênh app-lock: kiểm tra/mở quyền Always on top (SYSTEM_ALERT_WINDOW)
+        // cho màn hình chặn app khác khi hết thời gian dùng (Phase 1).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, appLockChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this))
+                    "openOverlaySettings" -> {
+                        try {
+                            startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:$packageName")
+                                )
+                            )
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("OVERLAY_SETTINGS_FAILED", e.message, null)
+                        }
+                    }
+                    "showTestOverlay" ->
+                        result.success(AppLockOverlayManager.get(this).showTestOverlay())
+                    "showGateOverlay" -> {
+                        val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        result.success(AppLockOverlayManager.get(this).showGateOverlay().let {
+                            if (it) {
+                                AppLockOverlayManager.get(this).setBlockedPackages(blocked)
+                            }
+                            it
+                        })
+                    }
+                    "armGate" -> {
+                        val blocked = call.argument<List<String>>("blockedPackages") ?: emptyList()
+                        call.argument<Boolean>("vi")?.let {
+                            AppLockOverlayManager.get(this).setLanguage(it)
+                        }
+                        AppLockOverlayManager.get(this).armGate(blocked)
+                        result.success(true)
+                    }
+                    "setLanguage" -> {
+                        val vi = call.argument<Boolean>("vi") ?: true
+                        AppLockOverlayManager.get(this).setLanguage(vi)
+                        result.success(true)
+                    }
+                    "disarmGate" -> {
+                        AppLockOverlayManager.get(this).disarmGate()
+                        result.success(true)
+                    }
+                    "dismissOverlay" -> {
+                        AppLockOverlayManager.get(this).dismiss()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         // BUG DA SUA: UsageStatsHandler (kenh "eye_care/usage" - dung boi
         // UsageService.dart cho checkUsagePermission/openUsageSettings/
@@ -196,7 +285,7 @@ class MainActivity : FlutterActivity() {
             "com.android.systemui",
             launcherPackage,
         )
-    }   
+    }
 
     // Ghép cặp MOVE_TO_FOREGROUND -> MOVE_TO_BACKGROUND (hoặc kết thúc
     // khoảng truy vấn nếu app vẫn đang mở) để tính tổng thời gian foreground

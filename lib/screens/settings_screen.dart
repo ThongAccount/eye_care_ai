@@ -130,14 +130,41 @@ class SettingsScreen extends StatelessWidget {
                 title: strings.eyeTestReminders,
                 subtitle: strings.eyeTestRemindersSubtitle,
                 value: settings.notifyTests,
-                onChanged: (v) => settings.setNotification('tests', v),
+                onChanged: (v) async {
+                  await settings.setNotification('tests', v);
+                  // Bật/tắt báo thức lặp HÀNG TUẦN (Thứ 2, 7h sáng) ngay khi
+                  // gạt công tắc — trước đây setNotification() chỉ lưu 1
+                  // bool vào SharedPreferences, KHÔNG thật sự đặt báo thức
+                  // nào cả nên công tắc này không có tác dụng thực tế.
+                  if (v) {
+                    await NotificationService.instance.scheduleWeeklyEyeTestReminder(
+                      title: strings.eyeTestReminderNotifTitle,
+                      body: strings.eyeTestReminderNotifBody,
+                    );
+                  } else {
+                    await NotificationService.instance.cancelWeeklyEyeTestReminder();
+                  }
+                },
               ),
               _ToggleTile(
                 icon: '✅',
                 title: strings.habitTracking,
                 subtitle: strings.habitTrackingSubtitle,
                 value: settings.notifyHabits,
-                onChanged: (v) => settings.setNotification('habits', v),
+                onChanged: (v) async {
+                  await settings.setNotification('habits', v);
+                  // Bật/tắt báo thức lặp HÀNG NGÀY (20:00) — cùng lý do như
+                  // trên, công tắc này trước đây cũng không thật sự đặt báo
+                  // thức nào.
+                  if (v) {
+                    await NotificationService.instance.scheduleDailyHabitReminder(
+                      title: strings.habitReminderNotifTitle,
+                      body: strings.habitReminderNotifBody,
+                    );
+                  } else {
+                    await NotificationService.instance.cancelDailyHabitReminder();
+                  }
+                },
               ),
               _ToggleTile(
                 icon: '💡',
@@ -243,6 +270,44 @@ class SettingsScreen extends StatelessWidget {
                       subtitle: strings.themeSubtitle,
                       valueLabel: strings.themePreferenceLabel(theme.preference),
                       onTap: () => _showThemeDialog(context, theme, strings),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: [
+                          const AppIcon('🌙', size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(strings.nightModeLabel,
+                                    style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(height: 4),
+                                Text(
+                                  theme.autoNightMode
+                                      ? (theme.tonightLabel != null
+                                          ? strings.nightModeOnWithTimes(theme.tonightLabel!)
+                                          : strings.nightModeOnFallback)
+                                      : strings.nightModeSubtitle,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Switch.adaptive(
+                            value: theme.autoNightMode,
+                            onChanged: (v) => theme.setAutoNightMode(v),
+                            activeTrackColor: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.5),
+                            activeThumbColor: Theme.of(context).colorScheme.primary,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

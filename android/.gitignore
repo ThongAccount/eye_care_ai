@@ -7,3 +7,4 @@ DerivedData/
 .swiftpm/configuration/project.xcworkspace/
 .swiftpm/xcode/
 .swiftpm/xcode/xcuserdata/
+lib/config/local_env.dart

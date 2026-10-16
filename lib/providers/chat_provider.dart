@@ -1,11 +1,15 @@
 import 'package:flutter/foundation.dart';
 
+import '../services/ai_action_handler.dart';
+
 class ChatMessage {
   ChatMessage({
     required this.text,
     required this.isUser,
     this.isTyping = false,
     this.isAction = false,
+    this.isConfirmation = false,
+    this.pendingActions,
   });
 
   String text;
@@ -15,6 +19,13 @@ class ChatMessage {
   // "Đã hạ mục tiêu dùng điện thoại xuống 4 giờ/ngày"), hiển thị khác màu
   // với bong bóng trả lời thông thường để người dùng dễ nhận ra.
   final bool isAction;
+  // true = đây là bong bóng "AI muốn thực hiện: ..." kèm 2 nút Đồng ý/Từ
+  // chối — chỉ xuất hiện khi cài đặt "Hỏi trước khi AI tự thao tác" đang
+  // bật (xem SettingsMoreProvider.aiConfirmBeforeActing). Sau khi người
+  // dùng bấm 1 trong 2 nút, cờ này được set về false (xem
+  // resolveConfirmation) để 2 nút biến mất, tránh bấm lại nhiều lần.
+  bool isConfirmation;
+  List<AiAction>? pendingActions;
 }
 
 class ChatProvider extends ChangeNotifier {
@@ -69,6 +80,30 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Thêm bong bóng "AI muốn thực hiện: ..." kèm danh sách action đang chờ
+  // xác nhận — dùng khi cài đặt "Hỏi trước khi AI tự thao tác" đang bật
+  // (xem ChatScreen._send). [previewText] là mô tả bằng ngôn ngữ tự nhiên
+  // đã được sinh sẵn (xem AiActionHandler.describeActions), [actions] là
+  // danh sách gốc để execute() dùng khi người dùng bấm "Đồng ý".
+  void addConfirmationMessage(String previewText, List<AiAction> actions) {
+    messages.add(ChatMessage(
+      text: previewText,
+      isUser: false,
+      isConfirmation: true,
+      pendingActions: actions,
+    ));
+    notifyListeners();
+  }
+
+  // Đánh dấu 1 bong bóng xác nhận đã được xử lý (đồng ý/từ chối) — để 2 nút
+  // biến mất khỏi bong bóng đó, tránh người dùng bấm lại nhiều lần cho cùng
+  // 1 lô action.
+  void resolveConfirmation(ChatMessage message) {
+    message.isConfirmation = false;
+    message.pendingActions = null;
+    notifyListeners();
+  }
+
   void setTyping(bool value) {
     isTyping = value;
     notifyListeners();
@@ -94,13 +129,16 @@ class ChatProvider extends ChangeNotifier {
   // nhất, đủ giữ mạch hội thoại cho use-case tư vấn ngắn của app này.
   static const int _maxHistoryMessagesForApi = 16;
 
-  // Chuyển lịch sử hội thoại hiện có (bỏ qua bong bóng "đang gõ..."/action)
-  // sang đúng định dạng Messages API để gửi lên EyeChatService, giữ ngữ cảnh
-  // nhiều lượt hỏi-đáp thay vì chỉ gửi mỗi câu hỏi mới nhất — nhưng CẮT BỚT
-  // nếu hội thoại đã dài, chỉ giữ [_maxHistoryMessagesForApi] tin gần nhất.
+  // Chuyển lịch sử hội thoại hiện có (bỏ qua bong bóng "đang gõ..."/action/
+  // xác nhận) sang đúng định dạng Messages API để gửi lên EyeChatService,
+  // giữ ngữ cảnh nhiều lượt hỏi-đáp thay vì chỉ gửi mỗi câu hỏi mới nhất —
+  // nhưng CẮT BỚT nếu hội thoại đã dài, chỉ giữ [_maxHistoryMessagesForApi]
+  // tin gần nhất. Bong bóng "isConfirmation" bị loại khỏi lịch sử gửi lên vì
+  // nội dung của nó (danh sách gạch đầu dòng "AI muốn thực hiện: ...") không
+  // phải văn phong hội thoại tự nhiên, dễ gây nhiễu ngữ cảnh cho model.
   List<Map<String, String>> toApiHistory() {
     final full = messages
-        .where((m) => !m.isTyping && !m.isAction && m.text.trim().isNotEmpty)
+        .where((m) => !m.isTyping && !m.isAction && !m.isConfirmation && m.text.trim().isNotEmpty)
         .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
         .toList();
     if (full.length <= _maxHistoryMessagesForApi) return full;

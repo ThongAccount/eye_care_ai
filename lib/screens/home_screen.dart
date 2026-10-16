@@ -4,11 +4,16 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/auto_break_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/profile_provider.dart';
+import '../providers/settings_more_provider.dart';
+import '../providers/settings_provider.dart';
 import '../providers/update_provider.dart';
+import '../services/ai_action_handler.dart';
 import '../services/device_data_service.dart';
+import '../services/eye_chat_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_icon.dart';
 import '../theme/app_theme.dart';
@@ -16,12 +21,14 @@ import '../widgets/setup_status_banner.dart';
 import '../widgets/shared_widgets.dart';
 import 'chat_screen.dart';
 import 'eye_break_screen.dart';
+import 'eye_exercise_screen.dart';
 import 'eye_test_screen.dart';
 import 'habits_screen.dart';
 import 'habits_survey_screen.dart';
 import 'rank_screen.dart';
 import 'settings_screen.dart';
 import 'statistics_screen.dart';
+import '../widgets/next_break_countdown_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -92,10 +99,19 @@ class HomeScreen extends StatelessWidget {
                       backgroundColor: accent.withValues(alpha: 0.1),
                       backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
                       child: profile.avatarUrl == null
-                          ? Text(
-                              profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '👤',
-                              style: TextStyle(fontSize: 18, color: accent),
-                            )
+                          ? (profile.name.isNotEmpty
+                              ? Text(
+                                  profile.name[0].toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: accent,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                )
+                              // Chưa có tên (chưa đăng nhập/chế độ khách) ->
+                              // icon người dùng thay vì emoji 👤, đúng yêu
+                              // cầu không dùng emoji làm icon.
+                              : AppIcon('👤', size: 20, color: accent))
                           : null,
                     );
                   }),
@@ -106,6 +122,16 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 20),
           const SetupStatusBanner(),
           _ScoreCard(habit: habit),
+          const SizedBox(height: 12),
+          // Thẻ AI TỰ ĐỘNG rà soát dữ liệu ngay ở Trang chủ — khác với Chat
+          // (phải người dùng chủ động hỏi): thẻ này TỰ chạy phân tích (tối đa
+          // 1 lần mỗi 6 tiếng) và đề xuất/thực hiện điều chỉnh (tôn trọng
+          // đúng cài đặt "Hỏi trước khi AI tự thao tác" ở Settings > Quyền
+          // riêng tư & Bảo mật).
+          const _AiInsightCard(),
+          const NextBreakCountdownCard(),
+          const SizedBox(height: 12),
+          _TodaySuggestionsCard(habit: habit),
           const SizedBox(height: 18),
           _FeatureHubCard(),
           const SizedBox(height: 20),
@@ -251,6 +277,270 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+// ---------------- AI tự động rà soát ngay Trang chủ ----------------
+// Khác với Chat (bạn phải chủ động gõ câu hỏi), thẻ này TỰ CHẠY 1 lượt phân
+// tích dữ liệu hiện tại (điểm sức khỏe mắt, từng habit, hồ sơ thị lực, kiểu
+// nhắc nhở, tự động nhắc nghỉ mắt...) và để AI đề xuất ĐÚNG 1 điều chỉnh cụ
+// thể nếu thấy cần, dùng LẠI đúng cơ chế %%ACTION%%...%%END%% + AiActionHandler
+// đã có sẵn cho Chat — không phát minh cơ chế mới, đảm bảo hành vi nhất quán
+// (tôn trọng cùng 1 cài đặt "Hỏi trước khi AI tự thao tác").
+//
+// Tự chạy tối đa 1 lần mỗi 6 tiếng (lưu mốc giờ vào SharedPreferences) để
+// không tốn quota/pin mỗi lần mở app — người dùng vẫn có thể bấm nút làm mới
+// để phân tích lại ngay bất cứ lúc nào.
+class _AiInsightCard extends StatefulWidget {
+  const _AiInsightCard();
+
+  @override
+  State<_AiInsightCard> createState() => _AiInsightCardState();
+}
+
+enum _AiInsightState { idle, loading, result, error }
+
+class _AiInsightCardState extends State<_AiInsightCard> {
+  _AiInsightState _state = _AiInsightState.idle;
+  String _resultText = '';
+  List<AiAction> _pendingActions = [];
+  bool _actionsResolved = true;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoRunOnOpen());
+  }
+
+  // Theo yêu cầu: VÀO APP LÀ AI BÁO LUÔN, không cần bấm làm mới. Trước đây
+  // có giới hạn tối đa 1 lần/6 tiếng nên nhiều lần mở app không thấy gì.
+  // Giờ chạy MỖI LẦN thẻ này xuất hiện (mỗi lần vào Trang chủ). Chờ tối đa
+  // ~8 giây cho HabitProvider nạp xong dữ liệu thật hôm nay (nếu không AI sẽ
+  // phân tích số 0 lúc app vừa khởi động), rồi mới gọi AI. Lỗi (mạng, key...)
+  // hiện thẳng trong thẻ để người dùng biết, không còn nuốt im lặng.
+  Future<void> _autoRunOnOpen() async {
+    final habit = context.read<HabitProvider>();
+    for (var i = 0; i < 16 && habit.habitsLastUpdated == null; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+    }
+    if (!mounted) return;
+    await _runAnalysis();
+  }
+
+  String _buildContext(BuildContext context) {
+    final habits = context.read<HabitProvider>();
+    final settings = context.read<SettingsProvider>();
+    final autoBreak = context.read<AutoBreakProvider>();
+    final buffer = StringBuffer();
+    buffer.writeln('- Điểm sức khỏe mắt hiện tại: ${habits.eyeHealthScore}/100');
+    buffer.writeln('- Hồ sơ thị lực (vision profile): "${settings.visionProfile}"');
+    buffer.writeln('- Kiểu nhắc nhở hiện tại (reminder style): "${settings.reminderStyle}"');
+    buffer.writeln('- Tự động nhắc nghỉ mắt (auto break): ${autoBreak.enabled ? "đang BẬT" : "đang TẮT"}');
+    for (final habit in habits.habits) {
+      if (habit.isComingSoon) continue;
+      final unit = switch (habit.id) {
+        'phone' || 'sleep' => 'giờ/ngày',
+        'outdoor' => 'phút/ngày',
+        'breaks' => 'lần/ngày',
+        _ => habit.unit,
+      };
+      buffer.writeln(
+        '- ${habit.title} (id: "${habit.id}"): hiện tại = ${habit.current.toStringAsFixed(1)} $unit, '
+        'mục tiêu = ${habit.target.toStringAsFixed(1)} $unit${habit.isLive ? '' : ' (chưa có dữ liệu)'}',
+      );
+    }
+    return buffer.toString();
+  }
+
+  Future<void> _runAnalysis({bool silentOnError = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _state = _AiInsightState.loading;
+      _errorText = null;
+    });
+
+    try {
+      final contextInfo = _buildContext(context);
+      final reply = await EyeChatService.instance.sendMessage(
+        history: [
+          {
+            'role': 'user',
+            'content':
+                'Dựa trên dữ liệu hiện tại của tôi (xem phần "Dữ liệu hiện tại của người dùng"), hãy chủ động '
+                'phân tích và đề xuất ĐÚNG 1 thay đổi cụ thể (nếu thật sự cần thiết) để cải thiện sức khỏe mắt, '
+                'kèm đúng 1 khối lệnh %%ACTION%%...%%END%% cho thay đổi đó. Trả lời trong 1-2 câu ngắn gọn bằng '
+                'tiếng Việt, giải thích lý do đề xuất. Nếu mọi chỉ số đều đang ổn hoặc chưa đủ dữ liệu để kết '
+                'luận, chỉ cần trả lời ngắn gọn 1 câu rằng hiện tại ổn/chưa đủ dữ liệu, KHÔNG chèn khối lệnh nào.',
+          },
+        ],
+        contextInfo: contextInfo,
+      );
+
+      if (!mounted) return;
+      final result = AiActionHandler.extract(reply);
+      setState(() {
+        _resultText = result.cleanedText.isEmpty
+            ? (context.read<LanguageProvider>().strings.vi ? 'Mọi thứ đang ổn.' : 'Everything looks fine.')
+            : result.cleanedText;
+        _pendingActions = result.actions;
+        _actionsResolved = _pendingActions.isEmpty;
+        _state = _AiInsightState.result;
+      });
+
+      if (_pendingActions.isNotEmpty && mounted) {
+        final requireConfirm = context.read<SettingsMoreProvider>().aiConfirmBeforeActing;
+        if (!requireConfirm) {
+          await _applyActions();
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString();
+      final strings = context.read<LanguageProvider>().strings;
+      String friendly;
+      if (message.contains('missing_api_key')) {
+        friendly = strings.chatErrorMissingKey;
+      } else if (message.contains('invalid_api_key')) {
+        friendly = strings.chatErrorInvalidKey;
+      } else if (message.contains('rate_limited')) {
+        friendly = strings.chatErrorRateLimited;
+      } else if (message.contains('network_error')) {
+        friendly = strings.chatErrorNetwork;
+      } else {
+        friendly = strings.chatErrorGeneric;
+      }
+      // Lần tự động chạy nền (silentOnError) thất bại thì lặng lẽ lùi về
+      // trạng thái ban đầu — không làm phiền người dùng bằng lỗi kỹ thuật
+      // ngay khi vừa mở app; chỉ hiện lỗi rõ ràng khi họ chủ động bấm nút
+      // làm mới.
+      setState(() {
+        if (silentOnError) {
+          _state = _AiInsightState.idle;
+        } else {
+          _state = _AiInsightState.error;
+          _errorText = friendly;
+        }
+      });
+    }
+  }
+
+  Future<void> _applyActions() async {
+    final habits = context.read<HabitProvider>();
+    final isVi = context.read<LanguageProvider>().isVietnamese;
+    final confirmations = await AiActionHandler.execute(
+      _pendingActions,
+      habits: habits,
+      isVietnamese: isVi,
+      settings: context.read<SettingsProvider>(),
+      autoBreak: context.read<AutoBreakProvider>(),
+    );
+    if (!mounted) return;
+    setState(() {
+      _actionsResolved = true;
+      if (confirmations.isNotEmpty) {
+        _resultText = '$_resultText\n\n${confirmations.join('\n')}';
+      }
+    });
+  }
+
+  void _declineActions() {
+    setState(() => _actionsResolved = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.watch<LanguageProvider>().strings;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.gradientFor(primary),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.auto_awesome_rounded, size: 18, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    strings.vi ? 'AI tự động rà soát' : 'AI auto check-in',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                if (_state != _AiInsightState.loading)
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    tooltip: strings.vi ? 'Phân tích lại' : 'Re-analyze',
+                    onPressed: () => _runAnalysis(),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (_state == _AiInsightState.idle)
+              Text(
+                strings.vi
+                    ? 'Bấm biểu tượng làm mới để AI xem lại thói quen và tự đề xuất điều chỉnh nếu cần.'
+                    : 'Tap refresh to let AI review your habits and suggest a change if needed.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+              ),
+            if (_state == _AiInsightState.loading)
+              Row(
+                children: [
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      strings.vi ? 'AI đang xem xét dữ liệu của bạn...' : 'AI is reviewing your data...',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            if (_state == _AiInsightState.error)
+              Text(
+                _errorText ?? strings.chatErrorGeneric,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.error),
+              ),
+            if (_state == _AiInsightState.result) ...[
+              Text(_resultText, style: Theme.of(context).textTheme.bodyMedium),
+              if (!_actionsResolved) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _declineActions,
+                        child: Text(strings.aiPendingActionsDecline),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: primary),
+                        onPressed: _applyActions,
+                        child: Text(strings.aiPendingActionsAccept),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FeatureHubCard extends StatelessWidget {
   const _FeatureHubCard();
 
@@ -267,6 +557,7 @@ class _FeatureHubCard extends StatelessWidget {
       _FeatureItem(icon: '☕', title: strings.eyeBreakTitle, route: const EyeBreakScreen()),
       _FeatureItem(icon: '💬', title: strings.chat, route: const ChatScreen()),
       _FeatureItem(icon: '⚙️', title: strings.settings, route: const SettingsScreen()),
+      _FeatureItem(icon: '👁️', title: strings.eyeExerciseTitle, route: const EyeExerciseScreen()),
     ];
 
     final accent = Theme.of(context).colorScheme.primary;
@@ -422,6 +713,26 @@ class _AchievementPageState extends State<_AchievementPage> {
         accent: const Color(0xFFF7C948),
       ),
       _AchievementItem(
+        icon: '🎯',
+        title: 'Eye Break Pro',
+        titleEn: 'Eye Break Pro',
+        description: 'Hoàn thành 50 lần nghỉ mắt.',
+        descriptionEn: 'Complete 50 eye breaks.',
+        progress: totalBreaks.clamp(0, 50),
+        target: 50,
+        accent: const Color(0xFF22D3EE),
+      ),
+      _AchievementItem(
+        icon: '💎',
+        title: 'Trăm lần nghỉ mắt',
+        titleEn: 'Century Rest',
+        description: 'Hoàn thành 100 lần nghỉ mắt.',
+        descriptionEn: 'Complete 100 eye breaks.',
+        progress: totalBreaks.clamp(0, 100),
+        target: 100,
+        accent: const Color(0xFFF472B6),
+      ),
+      _AchievementItem(
         icon: '🏆',
         title: 'Guardian of Vision',
         titleEn: 'Guardian of Vision',
@@ -430,6 +741,16 @@ class _AchievementPageState extends State<_AchievementPage> {
         progress: streak.clamp(0, 30),
         target: 30,
         accent: const Color(0xFF8B5CF6),
+      ),
+      _AchievementItem(
+        icon: '⭐',
+        title: 'Chuỗi khởi đầu',
+        titleEn: 'Streak Starter',
+        description: 'Đạt chuỗi 3 ngày chăm mắt liên tiếp.',
+        descriptionEn: 'Reach a 3-day eye-care streak.',
+        progress: streak.clamp(0, 3),
+        target: 3,
+        accent: const Color(0xFFFACC15),
       ),
       _AchievementItem(
         icon: '🔒',
@@ -678,6 +999,61 @@ class _ScoreCard extends StatelessWidget {
 
   final HabitProvider habit;
 
+  // Hiện bottom sheet giải thích cách tính chuỗi ngày — dùng CHUNG cho cả
+  // trường hợp streak = 0 (người dùng chưa biết bắt đầu từ đâu) lẫn > 0
+  // (muốn biết vì sao chuỗi không tăng/bị đứt), nên badge streak LUÔN hiện
+  // và LUÔN chạm được, không còn ẩn khi = 0 như trước.
+  void _showStreakExplanation(BuildContext context) {
+    final strings = context.read<LanguageProvider>().strings;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.local_fire_department_rounded, size: 20, color: Colors.deepOrange),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        strings.streakExplainTitle,
+                        style: Theme.of(sheetContext).textTheme.titleMedium,
+                      ),
+                    ),
+                    Text(
+                      '${habit.streakDays}',
+                      style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(sheetContext).colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  strings.streakExplainBody,
+                  style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = context.watch<LanguageProvider>().strings;
@@ -685,15 +1061,17 @@ class _ScoreCard extends StatelessWidget {
     final delta = habit.eyeHealthScoreDelta;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: AppTheme.gradientFor(accent),
         borderRadius: BorderRadius.circular(20),
+        // Shadow dịu hơn bản trước (blur/alpha thấp hơn) — thẻ điểm vẫn nổi
+        // bật nhờ gradient + vị trí đầu trang, không cần bóng đổ đậm.
         boxShadow: [
           BoxShadow(
-            color: accent.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: accent.withValues(alpha: 0.22),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -757,8 +1135,10 @@ class _ScoreCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                        if (habit.streakDays > 0)
-                          Container(
+                        InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => _showStreakExplanation(context),
+                          child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
@@ -767,7 +1147,7 @@ class _ScoreCard extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text('🔥', style: TextStyle(fontSize: 12)),
+                                const Icon(Icons.local_fire_department_rounded, size: 13, color: Colors.white),
                                 const SizedBox(width: 3),
                                 Text(
                                   '${habit.streakDays} ${strings.dayStreak}',
@@ -776,18 +1156,29 @@ class _ScoreCard extends StatelessWidget {
                                         fontWeight: FontWeight.w700,
                                       ),
                                 ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 11,
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                ),
                               ],
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              ScoreRing(score: habit.eyeHealthScore),
+              // Vòng tròn điểm nhỏ lại một chút (120 -> 104) để thẻ điểm
+              // không chiếm gần hết màn hình, vẫn là thông tin nổi bật nhất
+              // nhờ vị trí + gradient, nhưng nhường chỗ cho breakdown yếu
+              // tố bên dưới dễ quét mắt hơn.
+              ScoreRing(score: habit.eyeHealthScore, size: 104, strokeWidth: 9),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 2),
             decoration: BoxDecoration(
@@ -801,13 +1192,6 @@ class _ScoreCard extends StatelessWidget {
             percent: habit.screenTimeScore,
             noDataLabel: strings.scoreFactorNoData,
             explanation: strings.scoreFactorScreenTimeExplain,
-          ),
-          _ScoreFactorRow(
-            icon: '📏',
-            label: strings.scoreFactorDistance,
-            percent: habit.distanceScore,
-            noDataLabel: strings.scoreFactorNoData,
-            explanation: strings.scoreFactorDistanceExplain,
           ),
           _ScoreFactorRow(
             icon: '🌙',
@@ -836,6 +1220,96 @@ class _ScoreCard extends StatelessWidget {
   }
 }
 
+// Thẻ "Lưu ý & gợi ý cho hôm nay" — so sánh % từng yếu tố hôm nay với chính
+// nó hôm qua (HabitProvider.factorDeltas) để đưa ra vài dòng gợi ý CỤ THỂ,
+// thay vì chỉ hiện điểm số trần trụi. Ưu tiên hiện yếu tố đang XẤU nhất
+// (percent thấp nhất) hoặc TỤT nhiều nhất trước, tối đa 3 dòng để không rối
+// mắt.
+class _TodaySuggestionsCard extends StatelessWidget {
+  const _TodaySuggestionsCard({required this.habit});
+
+  final HabitProvider habit;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.watch<LanguageProvider>().strings;
+
+    final factors = <String, double?>{
+      'screenTime': habit.screenTimeScore,
+      'environment': habit.environmentScore,
+      'eyeBreaks': habit.eyeBreaksScore,
+      'sleep': habit.sleepScore,
+    };
+    final labels = <String, String>{
+      'screenTime': strings.scoreFactorScreenTime,
+      'environment': strings.scoreFactorEnvironment,
+      'eyeBreaks': strings.scoreFactorEyeBreaks,
+      'sleep': strings.scoreFactorSleep,
+    };
+
+    // Chỉ xét các yếu tố ĐANG CÓ dữ liệu hôm nay, sắp % thấp nhất lên đầu —
+    // đây thường là điều đáng chú ý nhất.
+    final candidates = factors.entries.where((e) => e.value != null).toList()
+      ..sort((a, b) => a.value!.compareTo(b.value!));
+
+    final bullets = <String>[];
+    for (final entry in candidates) {
+      if (bullets.length >= 3) break;
+      final id = entry.key;
+      final percent = entry.value!;
+      final delta = habit.factorDeltas[id];
+      final label = labels[id]!;
+      if (delta != null && delta <= -10) {
+        bullets.add(strings.suggestionDeclined(label, -delta));
+      } else if (percent < 50) {
+        bullets.add(strings.suggestionLow(label));
+      } else if (delta != null && delta >= 10) {
+        bullets.add(strings.suggestionImproved(label, delta));
+      }
+    }
+
+    final hasAnyYesterdayData = habit.factorDeltas.values.any((d) => d != null);
+    final fallbackText =
+        hasAnyYesterdayData ? strings.suggestionsAllGood : strings.suggestionsNoData;
+
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(strings.todaySuggestionsTitle, style: Theme.of(context).textTheme.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (bullets.isEmpty)
+            Text(
+              fallbackText,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+            )
+          else
+            ...bullets.map(
+              (line) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('•  ', style: Theme.of(context).textTheme.bodySmall),
+                    Expanded(
+                      child: Text(line, style: Theme.of(context).textTheme.bodySmall),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // 1 dòng breakdown trong _ScoreCard: icon + tên yếu tố + thanh % + số %.
 // `percent == null` -> yếu tố CHƯA có dữ liệu hôm nay (khác 0%, xem
 // HabitProvider) -> hiện label "Chưa có dữ liệu" + thanh rỗng thay vì 0%
@@ -847,6 +1321,7 @@ class _ScoreFactorRow extends StatelessWidget {
     required this.percent,
     required this.noDataLabel,
     required this.explanation,
+    this.isExperimental = false,
   });
 
   final String icon;
@@ -854,10 +1329,12 @@ class _ScoreFactorRow extends StatelessWidget {
   final double? percent;
   final String noDataLabel;
   // Giải thích cách tính % của yếu tố này — hiện trong bottom sheet khi
-  // người dùng chạm vào dòng này. Thêm vì "Khoảng cách"/"Môi trường" một
-  // mình không đủ rõ ràng người dùng tính bằng cách nào (dựa vào camera/cảm
-  // biến ánh sáng, không trực quan như thời gian màn hình hay giấc ngủ).
+  // người dùng chạm vào dòng này.
   final String explanation;
+  // Giữ lại tham số này để tương thích ngược — không còn yếu tố nào dùng
+  // isExperimental = true nữa (Khoảng cách đã bị gỡ bỏ), nhưng để đây phòng
+  // khi thêm yếu tố thử nghiệm khác trong tương lai.
+  final bool isExperimental;
 
   void _showExplanation(BuildContext context) {
     final strings = context.read<LanguageProvider>().strings;
@@ -878,7 +1355,7 @@ class _ScoreFactorRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(icon, style: const TextStyle(fontSize: 22)),
+                    AppIcon(icon, size: 22, color: Theme.of(sheetContext).colorScheme.primary),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -895,6 +1372,23 @@ class _ScoreFactorRow extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (isExperimental) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      strings.experimentalTag,
+                      style: Theme.of(sheetContext).textTheme.labelSmall?.copyWith(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Text(
                   explanation,
@@ -923,10 +1417,10 @@ class _ScoreFactorRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 15)),
+            AppIcon(icon, size: 16, color: Colors.white.withValues(alpha: 0.9)),
             const SizedBox(width: 8),
             SizedBox(
-              width: 88,
+              width: 78,
               child: Text(
                 label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -936,6 +1430,10 @@ class _ScoreFactorRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (isExperimental) ...[
+              Icon(Icons.science_outlined, size: 12, color: Colors.white.withValues(alpha: 0.7)),
+              const SizedBox(width: 4),
+            ],
             Icon(
               Icons.info_outline_rounded,
               size: 13,
@@ -1098,7 +1596,7 @@ class _SuggestionCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(b.$1, style: const TextStyle(fontSize: 18)),
+                      AppIcon(b.$1, size: 18, color: Theme.of(sheetContext).colorScheme.primary),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(b.$2, style: Theme.of(sheetContext).textTheme.bodyMedium),

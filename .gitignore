@@ -72,3 +72,6 @@ android/.kotlin/
 # Local plan file
 PLAN.md
 .github-artifacts
+
+# Modal dispatcher (local only — kept on feat branches)
+run_build.py

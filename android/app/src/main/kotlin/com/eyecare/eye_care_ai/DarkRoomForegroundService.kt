@@ -13,6 +13,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
+import android.app.usage.UsageStatsManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.core.app.NotificationCompat
 
 // ============================================================================
@@ -68,6 +73,8 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
         private const val REAL_CHANNEL_ID = "dark_room_background_channel"
         private const val REAL_CHANNEL_NAME = "Cảnh báo bóng tối (nền)"
         private const val REAL_NOTIFICATION_ID = 1004
+        private const val BREAK_ONGOING_CHANNEL_ID = "break_ongoing_channel"
+        private const val BREAK_ONGOING_NOTIFICATION_ID = 1002
 
         private const val PREFS_NAME = "FlutterSharedPreferences"
         private const val KEY_IN_DARK_SESSION = "flutter.pref_dark_bg_in_dark_session"
@@ -100,6 +107,10 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
     @Volatile
     private var darkStreakStartMs: Long? = null
     private val minSustainedDarkMs = 900_000L // 15 phút
+    // UsageStats có thể cập nhật trễ vài giây, nhưng vẫn yêu cầu gần trọn
+    // 15 phút màn hình được sử dụng trước khi cảnh báo.
+    private val minActiveUsageMs = minSustainedDarkMs - 30_000L
+    private val usageRetryDelayMs = 30_000L
 
     // Giá trị lux mới nhất, dùng lại trong checkStillDarkAfterDelay() bên
     // dưới — vì lúc Handler chạy tới, có thể KHÔNG có sự kiện lux mới nào
@@ -107,6 +118,15 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
     @Volatile
     private var lastLux: Float? = null
     private val handler = Handler(Looper.getMainLooper())
+
+    // flutter_local_notifications tự lặp được thông báo "đến giờ nghỉ", nhưng
+    // không có Dart callback ở mỗi lần bắn để đổi nội dung notification ghim.
+    // Service nền này cập nhật mốc nhắc kế tiếp ngay sau từng chu kỳ.
+    private val breakCountdownUpdater = object : Runnable {
+        override fun run() {
+            updateBreakCountdownNotification()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -125,6 +145,7 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
         proximitySensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+        handler.post(breakCountdownUpdater)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -221,8 +242,90 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
         val alreadyNotified = prefs.getBoolean(KEY_IN_DARK_SESSION, false)
         if (alreadyNotified) return
 
+        // Lux thấp cũng xuất hiện khi điện thoại nằm trong balo/túi. Chỉ báo
+        // nếu màn hình đang bật và UsageStats ghi nhận đã dùng app trong gần
+        // toàn bộ phiên tối. Thiếu dữ liệu thì chờ, không cảnh báo nhầm.
+        if (!hasActiveScreenUseSince(streakStart)) {
+            handler.postDelayed({ checkStillDarkAfterDelay() }, usageRetryDelayMs)
+            return
+        }
+
         prefs.edit().putBoolean(KEY_IN_DARK_SESSION, true).apply()
         showRealDarkRoomNotification()
+    }
+
+    private fun hasActiveScreenUseSince(startMs: Long): Boolean {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!powerManager.isInteractive) return false
+
+        val usageManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val stats = try {
+            usageManager.queryAndAggregateUsageStats(startMs, System.currentTimeMillis())
+        } catch (_: SecurityException) {
+            // Không có Usage Access: ưu tiên không cảnh báo nhầm.
+            return false
+        }
+        val ignoredPackages = setOf(packageName, "com.android.systemui", "com.google.android.gms")
+        var activeUsageMs = 0L
+        for ((name, usage) in stats) {
+            if (name in ignoredPackages) continue
+            val visibleMs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                usage.totalTimeVisible
+            } else {
+                @Suppress("DEPRECATION")
+                usage.totalTimeInForeground
+            }
+            activeUsageMs += visibleMs
+            if (activeUsageMs >= minActiveUsageMs) return true
+        }
+        return false
+    }
+
+    private fun updateBreakCountdownNotification() {
+        val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val startedAt = prefs.getLong("flutter.pref_break_repeat_started_at_millis", 0L)
+        // shared_preferences lưu Dart int thành Java Long trên Android.
+        val intervalMinutes = prefs.getLong("flutter.pref_break_repeat_interval_minutes", 0L)
+        if (startedAt <= 0L || intervalMinutes <= 0) {
+            // Bộ nhắc có thể được bật sau khi service đã khởi động cùng app.
+            // Dò lại nhẹ nhàng để bắt đầu đồng bộ ngay khi lịch được tạo.
+            handler.postDelayed(breakCountdownUpdater, 30_000L)
+            return
+        }
+
+        val intervalMs = intervalMinutes * 60_000L
+        val now = System.currentTimeMillis()
+        val cyclesPassed = ((now - startedAt) / intervalMs) + 1
+        val nextAt = startedAt + cyclesPassed * intervalMs
+        val title = prefs.getString("flutter.pref_break_ongoing_title", "Đang đếm giờ nghỉ mắt")
+            ?: "Đang đếm giờ nghỉ mắt"
+        val prefix = prefs.getString("flutter.pref_break_ongoing_suffix", "Sẽ nhắc lúc")
+            ?: "Sẽ nhắc lúc"
+        val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(nextAt))
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(NotificationChannel(
+                BREAK_ONGOING_CHANNEL_ID,
+                "Break Reminder Countdown",
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                setSound(null, null)
+                enableVibration(false)
+            })
+        }
+        val notification = NotificationCompat.Builder(applicationContext, BREAK_ONGOING_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText("$prefix $time")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .build()
+        manager.notify(BREAK_ONGOING_NOTIFICATION_ID, notification)
+
+        // Chạy ngay sau mốc báo thức để nội dung đổi từ 23:00 thành 23:10.
+        handler.postDelayed(breakCountdownUpdater, (nextAt - now + 250L).coerceAtLeast(250L))
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -250,7 +353,7 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
             nm.createNotificationChannel(channel)
         }
         return NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(applicationContext.applicationInfo.icon)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("EyeCare AI đang theo dõi ánh sáng")
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
@@ -267,7 +370,7 @@ class DarkRoomForegroundService : Service(), SensorEventListener {
             nm.createNotificationChannel(channel)
         }
         val notification = NotificationCompat.Builder(applicationContext, REAL_CHANNEL_ID)
-            .setSmallIcon(applicationContext.applicationInfo.icon)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("🌙 Bạn đang dùng điện thoại trong bóng tối")
             .setContentText("Ánh sáng yếu khiến mắt phải điều tiết nhiều hơn, dễ gây mỏi mắt. Hãy bật đèn hoặc giảm độ sáng màn hình.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

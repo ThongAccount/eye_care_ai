@@ -20,10 +20,11 @@ import 'package:flutter/material.dart';
 // Emoji nào CHƯA có trong bảng thì tự động fallback về hiện chính emoji đó
 // (không vỡ UI), nên có thể bổ sung ánh xạ dần dần, an toàn.
 //
-// CỐ TÌNH GIỮ NGUYÊN EMOJI (không đưa vào bảng) ở những chỗ mang tính "vui
-// vẻ, thân thiện" theo đúng yêu cầu:
-// - Tin nhắn/avatar chat AI (🤖 trong chat_screen.dart)
-// - Huy chương/vương miện xếp hạng (🏆 🏅 🥇 🥈 🥉 👑 trong home_screen.dart)
+// CẬP NHẬT: theo yêu cầu UI/UX mới (không dùng emoji ở BẤT KỲ đâu, kể cả
+// badge streak, icon gợi ý AI, icon bậc xếp hạng...), bảng ánh xạ được mở
+// rộng để phủ hết các glyph còn dùng rải rác trong app (rank_tier, home
+// suggestion bullets, achievement badges...) — mọi nơi hiển thị các glyph
+// này giờ PHẢI đi qua AppIcon thay vì Text() thô để thực sự hết emoji.
 const Map<String, IconData> _kIconMap = {
   // Habits & quick actions
   '👀': Icons.remove_red_eye_outlined,
@@ -70,6 +71,22 @@ const Map<String, IconData> _kIconMap = {
   '⭐': Icons.star_outline,
   '🔔': Icons.notifications_outlined,
   '🔧': Icons.build_outlined,
+  // Bổ sung: gợi ý AI, thông báo, và huy hiệu bậc xếp hạng (rank tiers) —
+  // trước đây các nơi này vẫn hiện thẳng emoji qua Text(), giờ đi qua bảng
+  // này để thống nhất dùng Material Icons trong toàn app.
+  '✨': Icons.auto_awesome_outlined,
+  '🌤️': Icons.wb_cloudy_outlined,
+  '⚠️': Icons.warning_amber_outlined,
+  '💧': Icons.water_drop_outlined,
+  '🎉': Icons.celebration_outlined,
+  '👋': Icons.waving_hand_outlined,
+  '🥚': Icons.egg_outlined,
+  '🥉': Icons.workspace_premium_outlined,
+  '🥈': Icons.workspace_premium_outlined,
+  '🥇': Icons.workspace_premium_outlined,
+  '💠': Icons.diamond_outlined,
+  '💎': Icons.diamond_outlined,
+  '👑': Icons.workspace_premium_outlined,
 };
 
 // Dùng thay cho `Text(icon, style: TextStyle(fontSize: ...))` ở mọi nơi

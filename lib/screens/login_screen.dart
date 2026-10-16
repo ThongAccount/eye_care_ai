@@ -2,9 +2,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/accent_color_provider.dart';
+import '../providers/font_provider.dart';
+import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/reminder_provider.dart';
+import '../providers/settings_more_provider.dart';
+import '../providers/settings_provider.dart';
 import '../providers/setup_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
+import '../services/cloud_backup_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/shared_widgets.dart';
 import 'main_shell.dart';
@@ -64,6 +72,32 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Sau khi đăng nhập THẬT (không phải chế độ khách), thử kéo bản sao lưu
+  // trên Firestore (nếu có) về máy TRƯỚC KHI vào MainShell — đây là bước
+  // BỊ THIẾU trước đó: CloudBackupService.pullAndApply() đã tồn tại sẵn
+  // nhưng KHÔNG có nơi nào gọi tới, khiến toàn bộ tính năng "khôi phục dữ
+  // liệu khi cài lại app" chỉ tồn tại trên giấy (đẩy dữ liệu LÊN đều đặn,
+  // nhưng chưa bao giờ thực sự kéo dữ liệu XUỐNG). Nếu có bản sao lưu và áp
+  // dụng thành công, phải gọi lại reload() của TỪNG provider đang giữ dữ
+  // liệu trong RAM (được tạo 1 lần khi app khởi động, không tự đọc lại
+  // SharedPreferences) để cài đặt khôi phục có hiệu lực NGAY, không cần
+  // khởi động lại app.
+  Future<void> _restoreCloudBackupIfAny() async {
+    if (!mounted) return;
+    final applied = await CloudBackupService.instance.pullAndApply();
+    if (!applied || !mounted) return;
+    await Future.wait([
+      context.read<ReminderProvider>().reload(),
+      context.read<SettingsProvider>().reload(),
+      context.read<HabitProvider>().reload(),
+      context.read<ThemeProvider>().reload(),
+      context.read<FontProvider>().reload(),
+      context.read<AccentColorProvider>().reload(),
+      context.read<LanguageProvider>().reload(),
+      context.read<SettingsMoreProvider>().init(),
+    ]);
+  }
+
   Future<void> _signIn(bool vi) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -75,6 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      await _restoreCloudBackupIfAny();
       _goToMainShell();
       return;
     } on FirebaseAuthException catch (e) {
@@ -96,6 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
         return;
       }
+      await _restoreCloudBackupIfAny();
       _goToMainShell();
       return;
     } on FirebaseAuthException catch (e) {

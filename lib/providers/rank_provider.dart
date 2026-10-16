@@ -42,11 +42,30 @@ class RankProvider extends ChangeNotifier {
 
   int? get myRank => LeaderboardService.rankOf(leaderboard, FirebaseAuth.instance.currentUser?.uid);
 
-  /// Gọi mỗi khi streak thật của người dùng thay đổi (sau
-  /// HabitProvider.refreshHabitsFromDevice). Cập nhật bậc cục bộ NGAY LẬP
-  /// TỨC để UI phản hồi tức thời, đồng thời đẩy lên Firestore ở nền cho
-  /// bảng xếp hạng chung — việc đồng bộ mạng không được làm chậm/khoá UI.
+  /// Gọi mỗi khi streak thật của người dùng được tính lại (sau
+  /// HabitProvider.refreshHabitsFromDevice) — kể cả khi giá trị KHÔNG đổi so
+  /// với lần trước trong phiên này. Cập nhật bậc cục bộ NGAY LẬP TỨC để UI
+  /// phản hồi tức thời, đồng thời LUÔN đẩy lên Firestore ở nền cho bảng xếp
+  /// hạng chung.
+  ///
+  /// BUG ĐÃ SỬA: bản cũ `if (streakDays == _streakDays) return;` thoát SỚM
+  /// và bỏ qua luôn cả bước đồng bộ Firestore khi giá trị mới trùng với giá
+  /// trị đang giữ trong bộ nhớ — nhưng `_streakDays` LUÔN khởi động lại về 0
+  /// mỗi lần mở app (đây là 1 provider sống trong RAM, không phải giá trị đã
+  /// đồng bộ). Hậu quả: nếu streak thật hôm nay tính ra ĐÚNG BẰNG 0 (ví dụ
+  /// điểm sức khỏe mắt hôm nay chưa đạt 80%, streak bị đứt), và Firestore
+  /// đang lỡ lưu 1 số cũ lớn hơn (ví dụ "1" từ hôm trước) — điều kiện
+  /// `0 == 0` (so với _streakDays mặc định) đúng ngay từ đầu, hàm return
+  /// trước khi kịp gọi syncMyStreak(), nên giá trị SAI trên Firestore không
+  /// bao giờ được sửa lại, khiến Bảng xếp hạng đứng yên mãi mãi ở số cũ dù
+  /// người dùng đã rớt chuỗi thật. Giờ luôn đẩy lên Firestore mỗi lần được
+  /// gọi, chỉ bỏ qua phần cập nhật UI cục bộ (tier/banner lên hạng) nếu giá
+  /// trị không đổi để đỡ rebuild thừa.
   Future<void> updateStreak(int streakDays) async {
+    // Luôn đồng bộ lên Firestore, kể cả khi không đổi so với bộ nhớ cục bộ —
+    // đây là cách DUY NHẤT để tự sửa lại giá trị SAI/CŨ đang lỡ lưu trên đó.
+    unawaited(LeaderboardService.instance.syncMyStreak(streakDays: streakDays));
+
     if (streakDays == _streakDays) return;
 
     final previousTier = _tier;
@@ -57,9 +76,6 @@ class RankProvider extends ChangeNotifier {
       _justPromotedTo = _tier;
     }
     notifyListeners();
-
-    // Không await — lỗi mạng/Firestore chưa bật không được chặn app.
-    unawaited(LeaderboardService.instance.syncMyStreak(streakDays: streakDays));
   }
 
   void clearPromotionBanner() {

@@ -113,6 +113,18 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="eye_care_dark_room_lux_monitoring" />
         </service>
+        <!-- Widget man hinh chinh EyeCare AI (package home_widget): khong can
+             code Kotlin rieng, class provider cua package duoc dung truc tiep. -->
+        <receiver
+            android:exported="false"
+            android:name="es.antonborri.home_widget.HomeWidgetProvider">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/eye_widget_info" />
+        </receiver>
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

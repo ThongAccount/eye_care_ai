@@ -8,6 +8,7 @@ import '../providers/habit_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/setup_provider.dart';
+import '../providers/auto_break_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/shared_widgets.dart';
 import 'login_screen.dart';
@@ -214,7 +215,9 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _QuestionPage(
+                icon: Icons.cake_outlined,
                 question: strings.surveyAgeQuestion,
+                helper: strings.surveyAgeHelper,
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -225,16 +228,27 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                       selected: selected,
                       onSelected: (_) => setState(() => _ageGroup = group),
                       selectedColor: AppColors.habitsAccent.withValues(alpha: 0.15),
+                      // BUG ĐÃ SỬA: ChoiceChip mặc định hiện dấu ✓ khi được
+                      // chọn (showCheckmark: true) — dấu tích này CHÈN THÊM
+                      // vào layout đột ngột, cộng với fontWeight đổi từ 500
+                      // lên 700 (chữ đậm rộng hơn chữ thường) khiến CẢ CHIP
+                      // đổi kích thước 2 LẦN CÙNG LÚC trong 1 khung hình ->
+                      // cảm giác "giật cục". Tắt checkmark + giữ NGUYÊN 1
+                      // độ đậm chữ cho cả 2 trạng thái (chỉ đổi màu) để chip
+                      // không bao giờ đổi kích thước khi chọn/bỏ chọn nữa.
+                      showCheckmark: false,
                       labelStyle: TextStyle(
                         color: selected ? AppColors.habitsAccent : null,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
                     );
                   }).toList(),
                 ),
               ),
               _QuestionPage(
+                icon: Icons.smartphone_outlined,
                 question: strings.surveyScreenQuestion,
+                helper: strings.surveyScreenHelper,
                 child: _StepperInput(
                   value: _screenHours,
                   min: 0,
@@ -242,10 +256,13 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                   step: 0.5,
                   unit: strings.vi ? 'giờ' : 'hrs',
                   onChanged: (v) => setState(() => _screenHours = v),
+                  presets: const [2, 4, 6, 8, 10],
                 ),
               ),
               _QuestionPage(
+                icon: Icons.park_outlined,
                 question: strings.surveyOutdoorQuestion,
+                helper: strings.surveyOutdoorHelper,
                 child: _StepperInput(
                   value: _outdoorMinutes,
                   min: 0,
@@ -253,10 +270,13 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                   step: 10,
                   unit: strings.vi ? 'phút' : 'min',
                   onChanged: (v) => setState(() => _outdoorMinutes = v),
+                  presets: const [15, 30, 60, 90, 120],
                 ),
               ),
               _QuestionPage(
+                icon: Icons.straighten_rounded,
                 question: strings.surveyDistanceQuestion,
+                helper: strings.surveyDistanceHelper,
                 child: _StepperInput(
                   value: _readingDistance,
                   min: 10,
@@ -264,10 +284,13 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                   step: 1,
                   unit: 'cm',
                   onChanged: (v) => setState(() => _readingDistance = v),
+                  presets: const [20, 30, 40, 50],
                 ),
               ),
               _QuestionPage(
+                icon: Icons.bedtime_outlined,
                 question: strings.surveySleepQuestion,
+                helper: strings.surveySleepHelper,
                 child: _StepperInput(
                   value: _sleepHours,
                   min: 3,
@@ -275,10 +298,13 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                   step: 0.5,
                   unit: strings.vi ? 'giờ' : 'hrs',
                   onChanged: (v) => setState(() => _sleepHours = v),
+                  presets: const [6, 7, 8, 9],
                 ),
               ),
               _QuestionPage(
+                icon: Icons.remove_red_eye_outlined,
                 question: strings.surveyBreaksQuestion,
+                helper: strings.surveyBreaksHelper,
                 child: _StepperInput(
                   value: _breaksPerDay,
                   min: 0,
@@ -286,6 +312,7 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                   step: 1,
                   unit: strings.vi ? 'lần' : 'times',
                   onChanged: (v) => setState(() => _breaksPerDay = v),
+                  presets: const [2, 4, 6, 8],
                 ),
               ),
             ],
@@ -753,17 +780,27 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
                   ),
                   onPressed: () async {
                     final habitProvider = context.read<HabitProvider>();
-                    for (final id in _surveyTargetHabitIds) {
-                      final value = _selectedTargetValues[id];
-                      if (value != null) {
-                        habitProvider.setHabitTarget(id, value);
-                      }
-                    }
-                    // QUAN TRỌNG: phải đánh dấu khảo sát đã hoàn thành và lưu
-                    // xuống SharedPreferences — trước đây bước này bị thiếu
-                    // nên _AppGate luôn đọc lại survey_completed = false, bắt
-                    // người dùng làm lại khảo sát mỗi lần mở app.
+                    await habitProvider.applySurveyTargets(
+                      {
+                        for (final id in _surveyTargetHabitIds)
+                          if (_selectedTargetValues[id] != null) id: _selectedTargetValues[id]!,
+                      },
+                      surveyAnswers: {
+                        'ageGroup': _ageGroup.name,
+                        'screenHoursPerDay': _screenHours,
+                        'outdoorMinutesPerDay': _outdoorMinutes,
+                        'readingDistanceCm': _readingDistance,
+                        'sleepHoursPerNight': _sleepHours,
+                        'breaksPerDay': _breaksPerDay,
+                      },
+                    );
                     await habitProvider.markSurveyCompleted();
+                    // Đồng bộ ngay khoảng đếm ngược "Tự động nhắc nghỉ mắt" theo mục tiêu mới.
+                    if (context.mounted) {
+                      context.read<AutoBreakProvider>().recomputeInterval(
+                            habitProvider.habits.firstWhere((h) => h.id == 'breaks').target,
+                          );
+                    }
                     if (!context.mounted) return;
                     if (widget.mandatory) {
                       // Sau khảo sát bắt buộc: nếu đã đăng nhập thì vào thẳng
@@ -811,10 +848,20 @@ class _HabitsSurveyScreenState extends State<HabitsSurveyScreen> {
 }
 
 class _QuestionPage extends StatelessWidget {
-  const _QuestionPage({required this.question, required this.child});
+  const _QuestionPage({
+    required this.question,
+    required this.child,
+    this.icon,
+    this.helper,
+  });
 
   final String question;
   final Widget child;
+  // Icon minh hoạ + câu giải thích ngắn "vì sao câu hỏi này quan trọng" —
+  // thêm để khảo sát dễ hiểu hơn, trước đây chỉ có mỗi câu hỏi trần trụi,
+  // người dùng không biết ước lượng thế nào/vì sao app hỏi điều này.
+  final IconData? icon;
+  final String? helper;
 
   @override
   Widget build(BuildContext context) {
@@ -823,7 +870,30 @@ class _QuestionPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (icon != null) ...[
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: AppColors.habitsAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: AppColors.habitsAccent, size: 26),
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(question, style: Theme.of(context).textTheme.headlineSmall),
+          if (helper != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              helper!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+            ),
+          ],
           const SizedBox(height: 24),
           child,
         ],
@@ -832,8 +902,11 @@ class _QuestionPage extends StatelessWidget {
   }
 }
 
-// _StepperInput: chọn giá trị bằng nút +/- thay vì kéo thanh trượt, dễ căn
-// chỉnh chính xác hơn trên di động.
+// _StepperInput: nút +/- để chỉnh chính xác từng nấc, kèm THANH TRƯỢT để
+// nhảy nhanh tới vùng giá trị mong muốn (trước đây CHỈ có +/-, với khoảng
+// giá trị rộng như 0-240 phút bước 10 phải bấm tới 24 lần mới tới đầu kia —
+// rất chậm và dễ nản). Có thêm dãy CHIP GIÁ TRỊ THƯỜNG GẶP bên dưới để bấm
+// 1 lần ra ngay giá trị phổ biến, không cần kéo/bấm gì thêm.
 class _StepperInput extends StatelessWidget {
   const _StepperInput({
     required this.value,
@@ -842,6 +915,7 @@ class _StepperInput extends StatelessWidget {
     required this.step,
     required this.unit,
     required this.onChanged,
+    this.presets = const [],
   });
 
   final double value;
@@ -850,35 +924,91 @@ class _StepperInput extends StatelessWidget {
   final double step;
   final String unit;
   final ValueChanged<double> onChanged;
+  // Vài giá trị phổ biến để bấm nhanh (VD: 2, 4, 6, 8 giờ) — rỗng thì không
+  // hiện dãy chip này.
+  final List<double> presets;
+
+  String _formatValue(double v) => v % 1 == 0 ? v.round().toString() : v.toStringAsFixed(1);
 
   @override
   Widget build(BuildContext context) {
-    return SectionCard(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _RoundIconButton(
-            icon: Icons.remove_rounded,
-            onTap: value > min ? () => onChanged((value - step).clamp(min, max)) : null,
-          ),
-          Column(
+    final divisions = ((max - min) / step).round().clamp(1, 1000);
+    return Column(
+      children: [
+        SectionCard(
+          child: Column(
             children: [
-              Text(
-                value % 1 == 0 ? value.round().toString() : value.toStringAsFixed(1),
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: AppColors.habitsAccent,
-                      fontWeight: FontWeight.w800,
-                    ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _RoundIconButton(
+                    icon: Icons.remove_rounded,
+                    onTap: value > min ? () => onChanged((value - step).clamp(min, max)) : null,
+                  ),
+                  Column(
+                    children: [
+                      Text(
+                        _formatValue(value),
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              color: AppColors.habitsAccent,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      Text(unit, style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                  _RoundIconButton(
+                    icon: Icons.add_rounded,
+                    onTap: value < max ? () => onChanged((value + step).clamp(min, max)) : null,
+                  ),
+                ],
               ),
-              Text(unit, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 4),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: AppColors.habitsAccent,
+                  thumbColor: AppColors.habitsAccent,
+                  overlayColor: AppColors.habitsAccent.withValues(alpha: 0.15),
+                  inactiveTrackColor: AppColors.border,
+                ),
+                child: Slider(
+                  value: value.clamp(min, max),
+                  min: min,
+                  max: max,
+                  divisions: divisions,
+                  label: '${_formatValue(value)} $unit',
+                  onChanged: (v) => onChanged(v),
+                ),
+              ),
             ],
           ),
-          _RoundIconButton(
-            icon: Icons.add_rounded,
-            onTap: value < max ? () => onChanged((value + step).clamp(min, max)) : null,
+        ),
+        if (presets.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: presets.map((p) {
+              final selected = (value - p).abs() < 0.001;
+              return ChoiceChip(
+                label: Text('${_formatValue(p)} $unit'),
+                selected: selected,
+                onSelected: (_) => onChanged(p),
+                selectedColor: AppColors.habitsAccent.withValues(alpha: 0.15),
+                // Xem giải thích chi tiết ở chip nhóm tuổi phía trên (cùng
+                // file) — tắt checkmark + giữ cố định độ đậm chữ để chip
+                // KHÔNG đổi kích thước khi chọn, tránh cảm giác giật/lag.
+                showCheckmark: false,
+                labelStyle: TextStyle(
+                  color: selected ? AppColors.habitsAccent : null,
+                  fontWeight: FontWeight.w600,
+                ),
+              );
+            }).toList(),
           ),
         ],
-      ),
+      ],
     );
   }
 }
