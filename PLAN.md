@@ -1,8 +1,95 @@
 # EyeCare AI — Master Plan (from Notion Page)
 
 > Source: Notion page "PATCHES" (26/07/2026) + SETTINGS spec + Feature wishlist
-> Status: Based on codebase audit (2026-08-06) — ✅ Done, 🟡 Partial, ❌ Not Started
-> Refreshed: Notion snapshot 2026-10-15 merged in § NOTION REFRESH below — Aug-6 audit preserved as-is underneath.
+> Status legend: ✅ Done · 🟡 Partial · ❌ Not Started
+> **Current truth: § CODE-VERIFIED REFRESH — 2026-10-23 (top of file).**
+> Historical layers kept for provenance:
+> - § NOTION REFRESH (2026-10-15) — Notion snapshot deltas.
+> - § Aug-6 audit (below) — ⚠️ **HISTORICAL, superseded.** Its ❌ rows were re-verified
+>   against the code on 2026-10-23 and several were wrong (features that shipped since).
+>   Sections marked `[HISTORICAL]` are retained verbatim for the record; use the
+>   code-verified tables instead of them.
+
+---
+
+## ✅ CODE-VERIFIED REFRESH — 2026-10-23
+
+> Method: every row below was checked against the actual source tree on 2026-10-23
+> (`main` @ `ba547c0`, after the Eye-Timeline merge). Notion was **not** consulted — this
+> section is ground truth for what is actually in the app today.
+> Legend: ✅ shipped · 🟡 partial/stub · ❌ genuinely absent.
+
+### 📦 Shipped features (verified in code)
+
+| Area | Feature | Evidence |
+|---|---|---|
+| Reminders | 20-20-20 break reminders + persistent countdown notification + repeating native alarm + vibration | `NotificationService`, `ReminderProvider`, `eye_break_screen.dart` |
+| Reminders | Water reminder tied to break cycles | `ReminderProvider`, `eye_break_screen.dart` |
+| Reminders | Focus mode (notification blocking) | `focus_mode_service.dart` |
+| Reminders | Custom notification sound | ❌ still hardcoded off — `eye_break_alert.mp3` missing |
+| Scoring | Eye Health Score (screen / breaks / environment / sleep / outdoor) with day-over-day deltas | `statistics_screen.dart`, `HabitProvider` |
+| Scoring | Streaks + achievements | `HabitProvider.streakDays`, `_AchievementPage` |
+| Scoring | Duolingo-style ranks (7 tiers) + Firestore leaderboard | `rank_screen.dart`, `leaderboard_service.dart` |
+| Environment | Dark-room foreground service (native Kotlin) | `dark_room_background_service.dart` |
+| Environment | Brightness service + auto night mode (sunrise/sunset) | `brightness_service.dart`, `night_mode_advisor_service.dart`, `solar_service.dart` |
+| Camera | Opt-in ML Kit eye-open / distance checks (no auto permission; camera closed after each sample) | `distance_service.dart`, `AndroidManifest` `CAMERA` |
+| Tracking | GPS outdoor tracking | `DeviceDataService.startOutdoorTracking` |
+| Tracking | Eye Health Timeline — sensor-event feed | `eye_timeline_service.dart`, `eye_timeline_screen.dart` *(merged 2026-10-23)* |
+| Testing | Daily Eye Test + history (no self-diagnosis claims) | `eye_test_screen.dart` |
+| Training | Guided eye exercises | `eye_exercise_screen.dart` |
+| Reports | Weekly Eye Health Report + **real PDF export** (`pdf` package → A4 `eyecare_ai_report.pdf`) | `settings_more_provider.dart:203-234` |
+| Home | Home-screen widget: score, streak, next-break countdown | `home_widget_service.dart`, `EyeWidgetProvider.kt` |
+| Updates | In-app update from GitHub Releases + changelog + skip-version memory | `update_service.dart` |
+| Data | Cloud backup/restore + JSON export + reset statistics | `cloud_backup_service.dart`, `settings_more_provider.dart` |
+| Data | Habits survey → personalized 30-day targets, timestamped, newest-wins | `HabitsSurveyScreen.applySurveyTargets()` |
+| AI | NVIDIA NIM chat assistant, ask-before-act confirm UI, auto-analysis on Home | `eye_chat_service.dart`, `chat_screen.dart`, `home_screen.dart` |
+| AI | AI Sensitivity / AI Voice | ❌ spec only, not implemented |
+| i18n | English + Tiếng Việt | `LanguageProvider`, `AppStrings` |
+| UX | App border/frame, dark mode, accent colour + font, units (m/cm/ft/in) | `ThemeProvider`, `SettingsProvider` |
+
+### ⚙️ Settings — code-verified truth
+
+- ✅ **Brightness Tips** — live (`settings_screen.dart:261`); the Aug-6 audit marked it ❌ wrongly.
+- ✅ **Eye Exercise** — live (`eye_exercise_screen.dart`); Aug-6 audit marked it ❌ wrongly.
+- ✅ **Backup / Restore** — live cloud backup (`cloud_backup_service.dart`); Aug-6 audit marked it ❌ wrongly.
+- ✅ **AI Suggestions** — live NVIDIA NIM chat + Home auto-analysis; Aug-6 audit's "AI Chat disabled" was wrong.
+- ✅ **Camera Permission** — declared and used (opt-in ML Kit checks). The Aug-6 note
+  "not used (no camera features)" was **wrong**.
+- 🟡 **Analytics** — `analytics_service.dart` is a **stub**: 2 open TODOs (`:57`, `:63`), no real event logging.
+- 🟡 **AI Reminder Style** — the user's reminder style is injected into AI context
+  (`chat_screen.dart:103`, `home_screen.dart:337`); no dedicated AI setting screen.
+- 🟡 **Privacy Policy / Terms** — in-app static text only; hosted pages being built on `feat/web-legal`.
+- ❌ **Snooze Duration** — genuinely absent (zero references anywhere in the tree).
+- ❌ **Blink Reminder** — genuinely absent; "blink" appears only as exercise/achievement copy.
+- ❌ **Blue Light Filter** — strings only in `AppStrings`, no implementation (OS-level).
+- ❌ **Rate App** — no store link yet (handoff in flight on `docs/growth-store-launch`).
+- ❌ **Custom notification sound** — `_useCustomSound` hardcoded false.
+
+### 🧹 Dead code — corrected (the old list was wrong)
+
+| File | Verdict |
+|---|---|
+| `lib/providers/usage_provider.dart` | ❌ truly unreferenced → safe to delete |
+| `lib/widgets/usage_pie_chart.dart` | ❌ truly unreferenced → safe to delete |
+| `lib/services/storage_service.dart` | ❌ truly unreferenced → safe to delete |
+| `lib/services/usage_service.dart` | ⚠️ **KEEP** — used by `setup_provider.dart:8` |
+| `lib/services/eye_chat_service.dart` | ⚠️ **KEEP** — used by `chat_screen.dart:11` (live AI chat) |
+
+> The Aug-6 list ("remove `UsageService`, `eye_chat_service.dart`") would have broken the
+> setup flow and the AI assistant. Do not delete those two.
+
+### 🧱 Remaining technical debt
+
+- Custom notification sound (`eye_break_alert.mp3` in `res/raw/`).
+- Guardian email: UI + `mailto:` only — no background trigger, no real send.
+- Analytics logging stub (2 TODOs).
+- Stale string `habitSubtitle('breaks')` ("Front camera gaze detection" vs manual/auto-detect).
+- Health Connect setup guide missing from the Permissions sheet.
+- Focus-mode DND grant state not persisted (re-check banner reappears).
+- iOS build blocked on Mac/Apple Developer account.
+- No crash reporting (Sentry/Crashlytics).
+- Keystore rotation still pending.
+- Gradle 8.14 / AGP 8.11.1 / Kotlin 2.2.20 — Flutter warns these will be dropped soon.
 
 ---
 
@@ -112,7 +199,8 @@ eef9226 merge: integrate upstream eye-test nav, dark-room service, changelog (5 
 7cb31a6 feat: Implement DarkRoomForegroundService for continuous light monitoring and enhance battery optimization handling
 ```
 Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin/main`
-(Oct-16 session). `main-merger` sync still pending.
+(Oct-16 session). *Correction 2026-10-23: `main-merger` sync done; the remaining upstream commit
+(Eye Timeline, `eb39a7c`) was merged as `3bdfe1a` → `ba547c0` on `main` and shipped via Modal build 109.*
 
 ---
 
@@ -152,6 +240,9 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 
 ## 📋 PATCHES (26/07/2026)
 
+> ⚠️ [HISTORICAL — Aug-6 audit body; superseded by § CODE-VERIFIED REFRESH.
+> Rows below are kept verbatim except where a code-verified correction was applied on 2026-10-23.]
+
 ### Core UI/UX
 - [x] **Viền app** — App border/frame styling
 - [x] **Cài thêm ngôn ngữ Tiếng Việt** — Vietnamese localization (`LanguageProvider`, `AppStrings`)
@@ -162,9 +253,10 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 - [x] **Habits Survey wizard** — Per-question flow, mandatory on first launch, retry from Home (`HabitsSurveyScreen`, `_AppGate`)
 
 ### Guardian & Notifications
-- [ ] **Thêm mục liên kết với email người bảo hộ** → Gửi mail nhắc nhở khi quá giờ dùng thiết bị
+- [~] **Thêm mục liên kết với email người bảo hộ** → Gửi mail nhắc nhở khi quá giờ dùng thiết bị
   - UI exists: `SettingsProvider.guardianEmail`, dialog in `SettingsScreen`
   - **Missing**: Background trigger when screen time > target; actual email send (currently only `mailto:` test)
+  - *2026-10-23: mobile track is adding a `GUARDIAN_EMAIL_ENDPOINT` dart-define as the real send path.*
 - [x] **Break Reminder: quay lại app vẫn hiện còn bao nhiêu phút, hết giờ hiện thông báo + chuông báo thức cho đến khi tắt**
   - Ongoing notification countdown (`NotificationService.updateOngoingCountdown`)
   - Repeating native alarm with `insistent` flag (`scheduleRepeatingBreakAlarm`)
@@ -175,8 +267,9 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 - [x] **Đổi đơn vị toàn bộ dự án vào Settings** — Metric/Imperial toggle (`SettingsProvider.useMetric`)
 
 ### Auto-Update
-- [ ] **Cập nhật ứng dụng không cần xóa cài lại** — Auto-update via GitHub Releases checking
-  - **Not implemented**: No `upgrader` package, no version check on startup
+- [x] **Cập nhật ứng dụng không cần xóa cài lại** — In-app update via GitHub Releases
+  - `update_service.dart`; manual "check for updates" button, changelog screen, skip-version memory
+  - *The Aug-6 note "Not implemented" was stale — verified 2026-10-23.*
 
 ### Permissions & App Usage
 - [x] **Quyền dữ liệu sử dụng ứng dụng trong Settings, giảm bước** — Direct intent to Usage Access (`DeviceDataService.openUsageAccessSettings`), brand-specific guides (`_showUsagePermissionGuide`)
@@ -217,6 +310,9 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 
 ## ⚙️ SETTINGS SPEC (from Notion)
 
+> ⚠️ [HISTORICAL — Aug-6 audit body; corrected against the code on 2026-10-23.
+> See § CODE-VERIFIED REFRESH for the authoritative settings table.]
+
 ### 👤 Account / Tài khoản
 - [x] Account / Tài khoản — Profile header in `SettingsScreen` (tap → `EditProfileScreen`)
 - [x] Edit Profile / Chỉnh sửa hồ sơ — `EditProfileScreen` (name, avatar)
@@ -227,11 +323,11 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 - [x] Eye Reminder / Nhắc nghỉ mắt — `EyeBreakScreen` (interval, start/stop)
 - [x] Reminder Interval / Chu kỳ nhắc — ChoiceChips (10/20/30/45 min) in `EyeBreakScreen` + `ReminderProvider`
 - [x] 20-20-20 Rule / Quy tắc 20-20-20 — Core logic in `EyeHealthStandards`, `EyeBreakScreen` UI
-- [ ] Eye Exercise / Bài tập mắt — **Not implemented** (placeholder in `HabitData.reading` = "Eye Test Count", `isComingSoon: true`)
-- [ ] Blink Reminder / Nhắc chớp mắt — **Not implemented**
+- [x] Eye Exercise / Bài tập mắt — **Implemented** (`eye_exercise_screen.dart`, guided exercises with moving dot)
+- [ ] Blink Reminder / Nhắc chớp mắt — **Not implemented** (only exercise/achievement copy mentions "blink")
 
 ### 📱 Screen
-- [ ] Brightness Tips / Gợi ý độ sáng — **Not implemented**
+- [x] Brightness Tips / Gợi ý độ sáng — **Implemented** (`settings_screen.dart:261` + `brightnessTipsBody`)
 - [ ] Blue Light Filter / Bộ lọc ánh sáng xanh — **Not implemented** (OS-level only)
 - [x] Dark Mode / Chế độ tối — `ThemeProvider` (Light/Dark/System)
 - [x] Theme / Giao diện — Accent color (`AccentColorProvider`), Font (`FontProvider`)
@@ -247,7 +343,7 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 - [x] Enable Notifications / Bật thông báo — Master toggle via individual toggles
 - [x] Sound / Âm thanh — **Partial**: uses system alarm sound; [ ] Custom sound (see PATCHES)
 - [x] Vibration / Rung — `vibrationPattern` in `NotificationService._details`
-- [ ] Snooze Duration / Thời gian hoãn — **Not implemented**
+- [ ] Snooze Duration / Thời gian hoãn — **Not implemented** (confirmed still absent 2026-10-23 — zero references in the tree)
 
 ### 🌐 Language / Ngôn ngữ
 - [x] English
@@ -259,30 +355,31 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 
 ### 📊 Data
 - [x] Export Data / Xuất dữ liệu — `SettingsMoreProvider.exportMyData` (JSON + snapshots)
-- [ ] Backup / Sao lưu — **Not implemented** (Firebase sync only for leaderboard)
-- [ ] Restore / Khôi phục — **Not implemented**
+- [x] Backup / Sao lưu — **Implemented** (`cloud_backup_service.dart`, auto-backup on habit/break-setting change)
+- [x] Restore / Khôi phục — **Implemented** (auto-download on re-login)
 - [x] Reset Statistics / Đặt lại thống kê — `SettingsMoreProvider.deleteAllLocalData` (clears SharedPreferences)
 
 ### 🤖 AI
-- [ ] AI Suggestions / Gợi ý AI — **Disabled** (NVIDIA NIM test only)
-- [ ] AI Reminder Style / Kiểu nhắc của AI — **Not implemented**
+- [x] AI Suggestions / Gợi ý AI — **Live** (NVIDIA NIM chat, ask-before-act confirm UI, auto-analysis on Home)
+- [~] AI Reminder Style / Kiểu nhắc của AI — **Partial**: the current reminder style is injected into the AI
+  context (`chat_screen.dart:103`, `home_screen.dart:337`); no dedicated AI setting screen
 - [ ] AI Voice / Giọng AI — **Not implemented**
-- [ ] AI Sensitivity / Độ nhạy AI (Low/Medium/High) — **Not implemented**
+- [ ] AI Sensitivity / Độ nhạy AI (Low/Medium/High) — **Not implemented** (spec only)
 
 ### 🔒 Privacy
 - [x] Privacy / Quyền riêng tư — `SettingsMorePage` (Privacy section)
 - [x] Permissions / Quyền truy cập — `_showPermissionSettings` bottom sheet (Usage, Location, Activity, Full-screen, Battery)
-- [ ] Camera Permission / Quyền Camera — **Not used** (no camera features)
+- [x] Camera Permission / Quyền Camera — **Used** (opt-in ML Kit eye-open/distance checks; declared in AndroidManifest, never auto-requested)
 - [x] Usage Access / Quyền truy cập sử dụng — Direct intent + guides
-- [x] Analytics / Chia sẻ dữ liệu phân tích — `SettingsMoreProvider.dataCollection` → `AnalyticsService`
+- [~] Analytics / Chia sẻ dữ liệu phân tích — `SettingsMoreProvider.dataCollection` → `AnalyticsService` — **STUB**: 2 open TODOs (`analytics_service.dart:57`, `:63`), no real event logging yet
 
 ### ℹ️ About
 - [x] About / Giới thiệu — `SettingsMorePage` (Help section)
 - [x] Version / Phiên bản — Footer in `SettingsScreen`
 - [x] Contact Us / Liên hệ — `feedback_form.dart` → email
-- [x] Rate App / Đánh giá ứng dụng — **Not implemented** (no store link)
-- [ ] Privacy Policy / Chính sách quyền riêng tư — **Not implemented** (no web URL)
-- [ ] Terms of Service / Điều khoản sử dụng — `SettingsMorePage` (Terms section, static content)
+- [ ] Rate App / Đánh giá ứng dụng — **Not implemented** (no store link; handoff in flight on `docs/growth-store-launch`)
+- [~] Privacy Policy / Chính sách quyền riêng tư — in-app static text only; hosted page in flight on `feat/web-legal`
+- [~] Terms of Service / Điều khoản sử dụng — in-app static text only; hosted page in flight on `feat/web-legal`
 
 ---
 
@@ -306,6 +403,8 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 
 ## 🚀 FEATURE WISHLIST (from Notion "Cho riêng app EyeCare")
 
+> ⚠️ [HISTORICAL — table below re-verified against the code on 2026-10-23.]
+
 ### 1. Habits Survey (✅ Done)
 - [x] Questions: phone hrs, PC hrs, break freq, distance, sleep hrs, outdoor mins, brightness, glasses
 - [x] Score + 30-day targets with progress bar
@@ -320,31 +419,36 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| 📊 Weekly Eye Health Report | ❌ | Email/PDF export not implemented |
+| 📊 Weekly Eye Health Report | ✅ | Weekly report + PDF export via the `pdf` package |
 | 📈 Streak cho Habits | ✅ | `HabitProvider.streakDays`, `RankProvider`, leaderboard |
-| 🏆 Achievement/Badges (20%) | 🟡 | `_AchievementPage` exists (hardcoded), not dynamic |
-| ☁️ Đồng bộ Firebase | 🟡 | Leaderboard only; no habit/cloud backup sync |
-| 🤖 AI Eye Health Score | ❌ | AI Chat disabled |
+| 🏆 Achievement/Badges | 🟡 | `_AchievementPage` ships; unlock logic still partly hardcoded |
+| ☁️ Đồng bộ Firebase | 🟡 | Leaderboard + cloud backup/restore (`cloud_backup_service.dart`); no cross-device habit sync |
+| 🤖 AI Eye Health Score | ✅ | Live NVIDIA NIM assistant + Home auto-analysis (ask-before-act) |
 | 🌳 Outdoor Detection (tự động) | ✅ | GPS-based in `DeviceDataService.startOutdoorTracking` |
-| 📱 Widget màn hình chính | ❌ | Not implemented |
-| 📤 Export PDF Report | 🟡 | Text export only (`downloadEyeHealthReport`) |
-| Xếp hạng/rank giống Duolingo (50%) | ✅ | `RankScreen`, `RankTiers` (7 tiers), Firestore leaderboard |
+| 📱 Widget màn hình chính | ✅ | `home_widget_service.dart` + `EyeWidgetProvider.kt` |
+| 📤 Export PDF Report | ✅ | Real A4 PDF (`settings_more_provider.dart:203-234`) + JSON export |
+| Xếp hạng/rank giống Duolingo | ✅ | `RankScreen`, `RankTiers` (7 tiers), Firestore leaderboard |
 | Biểu đồ cải thiện mắt | ✅ | `StatisticsScreen` weekly/monthly line charts |
-| Bài tập mắt có hướng dẫn | ❌ | `HabitData.reading` = "Eye Test Count" (coming soon) |
+| Bài tập mắt có hướng dẫn | ✅ | `eye_exercise_screen.dart` (guided exercises) |
 | Chế độ "Focus" chặn thông báo | ✅ | `FocusModeService` + `ReminderProvider.focusModeEnabled` |
-| Widget countdown lần nghỉ tiếp theo | ❌ | Home screen widget not implemented |
+| Widget countdown lần nghỉ tiếp theo | ✅ | Part of the home-screen widget |
 | So sánh xu hướng tuần/tháng | ✅ | `StatisticsScreen` tabs (Weekly/Monthly) |
-| Chế độ đọc ban đêm (sunset/sunrise GPS) | ❌ | Not implemented |
-| Nhắc uống nước kèm nghỉ mắt | ❌ | Not implemented |
+| Chế độ đọc ban đêm (sunset/sunrise GPS) | ✅ | `night_mode_advisor_service.dart` + `solar_service.dart` |
+| Nhắc uống nước kèm nghỉ mắt | ✅ | `ReminderProvider` + `eye_break_screen.dart` |
+| 👁️ Eye Health Timeline | ✅ | `eye_timeline_service.dart` + `eye_timeline_screen.dart` (merged 2026-10-23) |
 
 ---
 
 ## 📦 TECH DEBT & INFRASTRUCTURE
 
-- [ ] **Auto-update via GitHub Releases** (upgrader package)
+> ⚠️ [HISTORICAL — corrected against the code on 2026-10-23.]
+
+- [x] **Auto-update via GitHub Releases** — ✅ done (`update_service.dart`)
 - [ ] **Custom notification sound** (`eye_break_alert.mp3` in `res/raw/`)
 - [ ] **Guardian Email auto-send** on screen time overuse
-- [ ] **Remove dead code**: `UsageProvider`, `UsageService`, `UsagePieChart`, `AppUsage`, `storage_service.dart`, `eye_chat_service.dart`
+- [ ] **Remove dead code**: `usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart`
+  - ⚠️ Do **NOT** remove `usage_service.dart` (used by `setup_provider.dart`) or `eye_chat_service.dart` (used by `chat_screen.dart`)
+- [ ] **Implement analytics logging** — `analytics_service.dart` is a stub (2 TODOs)
 - [ ] **Fix stale strings**: `habitSubtitle('breaks')` says "Front camera gaze detection" but uses manual/auto-detect
 - [ ] **iOS build** — Resolve Mac/Apple Dev blocker
 - [ ] **Crash reporting** (Sentry/Crashlytics)
@@ -357,26 +461,26 @@ Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin
 ## 📝 GIT LOG (Recent)
 
 ```
-b2c826d feat: Implement Eye Break feature with Focus Mode and Notification enhancements
-8a30e67 fix: Update model string to include free version for EyeChatService
-42602ea Add push trigger for main branch to build APK workflow
-a3bfdb0 feat: Add focus mode strings and integrate rank teaser card in home screen
-ceb86a3 feat: Implement ranking system with focus mode and leaderboard
-5ae205e Alpha v1.2 Refactor MainShell and SettingsScreen; remove unused imports and simplify navigation
-93648af Enhance app features, improve workflows, and update configurations (#1)
-b81d890 Final release Alpha v1.1: feat: add usage permission guide for various device brands in settings
-e28710e feat: update AI model to google/gemma-4-31b-it:free; add release keystore
-e2a79e3 Cap nhat keystore va SHA-1 moi
-c637320 Cap nhat google-services.json voi SHA-1 keystore moi
-725fec2 feat: update google-services.json and chat handling; fix bugs and improve user experience
-7bebf79 Go keystore va key.properties khoi git, dung GitHub Secrets thay the
-37cb6f7 Gỡ keystore & key.properties khỏi git, dùng GitHub Secrets thay thế
-1d40eee Alpha v1.0 feat: update UI components to use dynamic theme colors for improved consistency
-2049fa9 feat: remove android_alarm_manager_plus dependency and refactor notification handling for break reminders
-f521a1e feat: update AndroidManifest and various components to support android_alarm_manager_plus; fix bugs and impro...
-6fbe0d6 feat: integrate android_alarm_manager_plus for repeating break reminders and enhance notification service
-b4db60d feat: update notification service to handle custom sound and improve error logging for alarm scheduling
-b6258ce feat: update OpenRouter API key and model in EyeChatService; add debug prints in chat screen
+ba547c0 feat: merge upstream Eye Timeline feature (event logging + timeline screen)
+3bdfe1a feat: merge upstream Eye Timeline feature (event logging + timeline screen)
+884e6f3 session: track a past OMP session
+18c4ce0 docs: track PLAN.md
+eb39a7c feat: Add Eye Timeline feature with event logging and display
+595623f fix: implement onUpdate in EyeWidgetProvider with view binding
+e29f196 fix: concrete EyeWidgetProvider subclass for home-screen widget
+db0ae85 security: add shareable gitleaks config with nvapi- rule
+7d42821 security!: share pre-push secret guard for nvapi- and common tokens
+ba4f4de fix: redact leaked NIM key from local_env.dart to placeholder
+71a5ee9 feat: home-screen widget with today score, streak and next break
+b5878b9 feat: weekly eye health report reminder every Monday
+2cfd84b feat: extend achievements with streak-starter and break milestones
+c90e0dc feat: guided eye exercise sessions with animated dot
+0dc92a4 feat: export weekly eye health report as real PDF
+eb754b5 feat: auto night reading mode from sunset/sunrise GPS location
+0ca34f1 merge: integrate upstream daily tracking, material icons, auto-break refactor (7 commits)
+643fefe Refactor AutoBreakProvider for improved eye break reminders and UI synchronization
+036505d feat: enhance eye-care tracking with daily check-in and streak reminders
+b2d2254 feat: replace emoji with Material Icons for consistency across the app
 ```
 
 ---
@@ -384,21 +488,24 @@ b6258ce feat: update OpenRouter API key and model in EyeChatService; add debug p
 ## 🎯 PRIORITY ORDER FOR NEXT SPRINT
 
 ### P0 (Critical)
-1. **Guardian Email auto-reminder** — Background check + mailto:/SMTP send
-2. **Auto-update (upgrader)** — Check GitHub Releases on startup
-3. **Custom notification sound** — Add `eye_break_alert.mp3`, enable `_useCustomSound`
+1. **Guardian Email auto-reminder** — Background check + real send via `GUARDIAN_EMAIL_ENDPOINT` *(in flight on `feat/mobile-p0`)*
+2. **Custom notification sound** — Add `eye_break_alert.mp3`, enable `_useCustomSound`
+3. **Ship legal pages + wire into Settings** — `feat/web-legal` → Privacy Policy / Terms URLs *(in flight)*
 
 ### P1 (Code Health)
-4. **Remove dead code** — `UsageProvider`, `UsageService`, `UsagePieChart`, `AppUsage`, `storage_service.dart`, `eye_chat_service.dart`
-5. **Fix stale strings** — `habitSubtitle('breaks')`, remove unused Eye Test strings
+4. **Remove dead code** — `usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart` (only — keep `usage_service.dart` + `eye_chat_service.dart`)
+5. **Implement analytics logging** — `analytics_service.dart` TODOs at `:57` / `:63`
+6. **Fix stale strings** — `habitSubtitle('breaks')`, remove unused Eye Test strings
 
 ### P2 (Features)
-6. **Achievement/Badges dynamic** — Replace hardcoded `_AchievementPage` with real unlock logic
-7. **Health Connect guide** — Add to Permissions bottom sheet
-8. **Persist Focus Mode state** — Avoid re-check banner
+7. **Snooze Duration** — the one notification setting still missing
+8. **Achievement/Badges dynamic** — Replace hardcoded `_AchievementPage` with real unlock logic
+9. **Health Connect guide** — Add to Permissions bottom sheet
+10. **Persist Focus Mode state** — Avoid re-check banner
+11. **Brightness Tips → actionable** — text exists; wire it to the brightness service
 
 ### P3 (Platform)
-9. **iOS build** — Mac/Apple Dev account
-10. **Crash reporting** — Sentry/Crashlytics
-11. **PDF Export** — Replace text report with PDF
-12. **Home screen widget** — Countdown + habit summary
+12. **iOS build** — Mac/Apple Dev account
+13. **Crash reporting** — Sentry/Crashlytics
+14. **Keystore rotation**
+15. **Toolchain bump** — Gradle 9.1+ / AGP 9.0.1+ / Kotlin 2.3.20+ before Flutter drops support
