@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/cloud_backup_service.dart';
 import '../services/device_data_service.dart';
+import '../services/eye_timeline_service.dart';
 import '../services/notification_service.dart';
 
 class HabitData {
@@ -237,6 +238,7 @@ class HabitProvider extends ChangeNotifier {
     // Cảnh báo dùng điện thoại trong bóng tối: gửi thông báo hệ thống khi
     // môi trường xung quanh tối liên tục quá lâu trong lúc app đang mở.
     service.startDarkRoomMonitoring(() async {
+      unawaited(EyeTimelineService.instance.log(TimelineEventType.darkRoom));
       await NotificationService.instance.showInstantNotification(
         title: '🌙 Bạn đang dùng điện thoại trong bóng tối',
         body: 'Ánh sáng yếu khiến mắt phải điều tiết nhiều hơn, dễ gây mỏi mắt. '
@@ -284,6 +286,7 @@ class HabitProvider extends ChangeNotifier {
     // Cập nhật biến hiển thị KHÔNG bị clamp — luôn = đúng tổng của
     // appUsageBreakdown, cùng 1 con số với thẻ "Sử dụng theo ứng dụng".
     totalScreenTimeHoursToday = phoneHours ?? 0;
+    if (appUsageBreakdown.isNotEmpty) _trackScreenSession(totalUsageSeconds);
 
     // 'reading' giờ là "Eye Test Count" — đếm số lần người dùng đã hoàn
     // thành bài Kiểm tra mắt (EyeTestScreen) trong 7 ngày gần nhất, lấy từ
@@ -595,8 +598,48 @@ class HabitProvider extends ChangeNotifier {
     final habit = habits.firstWhere((h) => h.id == 'breaks');
     habit.current = total.toDouble();
     habit.isLive = true;
+    unawaited(EyeTimelineService.instance.log(TimelineEventType.eyeBreak));
     await _updateHabitsCompletion();
     notifyListeners();
+  }
+
+  // ---------------- Phiên dùng màn hình (cho Dòng thời gian mắt) ----------------
+  // Suy ra từ mức tăng của tổng thời gian dùng máy giữa các lần làm mới: tăng
+  // đáng kể = đang dùng; im lặng >= 5 phút = phiên kết thúc. Cộng dồn theo
+  // MỨC TĂNG usage (không theo đồng hồ) nên vẫn đúng khi app bị đóng băng ở nền.
+  // Chỉ ghi các phiên >= 10 phút. Trạng thái nằm trong RAM — app bị tắt hẳn
+  // thì phiên đang dở không được ghi.
+  static const _sessionGap = Duration(minutes: 5);
+  static const _sessionMinMinutes = 10;
+  int? _lastUsageTotalSec;
+  int _sessionAccumSec = 0;
+  DateTime? _sessionLastActiveAt;
+
+  void _trackScreenSession(int totalSec) {
+    final now = DateTime.now();
+    final last = _lastUsageTotalSec;
+    _lastUsageTotalSec = totalSec;
+
+    if (_sessionLastActiveAt != null && now.difference(_sessionLastActiveAt!) >= _sessionGap) {
+      _closeScreenSession();
+    }
+    // Lần đọc đầu tiên, hoặc tổng giảm (sang ngày mới) -> chưa có mức tăng để tính.
+    if (last == null || totalSec < last) return;
+    final delta = totalSec - last;
+    if (delta < 10) return; // nhiễu làm tròn, không phải đang dùng máy.
+    _sessionAccumSec += delta;
+    _sessionLastActiveAt = now;
+  }
+
+  void _closeScreenSession() {
+    final minutes = (_sessionAccumSec / 60).round();
+    final endedAt = _sessionLastActiveAt;
+    _sessionAccumSec = 0;
+    _sessionLastActiveAt = null;
+    if (minutes >= _sessionMinMinutes) {
+      unawaited(EyeTimelineService.instance
+          .log(TimelineEventType.screenSession, value: minutes, at: endedAt));
+    }
   }
 
   void setStatsTabIndex(int index) {
@@ -655,7 +698,7 @@ class HabitProvider extends ChangeNotifier {
       jsonEncode({
         'appliedAt': DateTime.now().toIso8601String(),
         'targets': targets,
-        if (surveyAnswers != null) 'answers': surveyAnswers,
+        'answers': ?surveyAnswers,
       }),
     );
 

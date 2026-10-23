@@ -7,6 +7,8 @@ import 'package:light/light.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
+import 'eye_timeline_service.dart';
+
 /// Đọc ánh sáng môi trường (lux) + độ sáng màn hình hiện tại, rồi tính và áp
 /// dụng độ sáng ĐỀ XUẤT khớp với môi trường — hậu thuẫn cho tính năng "Gợi ý
 /// độ sáng" ở màn hình Cài đặt (trước đây chỉ là 1 dialog tip tĩnh, không
@@ -96,6 +98,12 @@ class BrightnessService {
   Future<bool> applySystemBrightness(double value) async {
     try {
       await ScreenBrightness.instance.setSystemScreenBrightness(value.clamp(0.0, 1.0));
+      // Ghi vào Dòng thời gian mắt. "Tự động điều chỉnh độ sáng" gọi hàm này
+      // liên tục (mỗi ~1.5 giây) nên PHẢI chặn spam: tối đa 1 sự kiện/20 phút.
+      unawaited(EyeTimelineService.instance.log(
+        TimelineEventType.brightnessAdjusted,
+        minGap: const Duration(minutes: 20),
+      ));
       return true;
     } on PlatformException {
       return false;

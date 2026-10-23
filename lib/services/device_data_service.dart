@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'eye_timeline_service.dart';
 import 'usage_service.dart';
 
 // Một dòng dữ liệu sử dụng của MỘT app trong ngày hôm nay, dùng cho biểu đồ
@@ -58,7 +59,6 @@ class DeviceDataService {
 
   StreamSubscription<AccelerometerEvent>? _accelSub;
   Timer? _outdoorSampleTimer;
-  DateTime? _lastOutdoorSample;
   DateTime? _lastReadingSample;
   double _recentAccelVariance = 0;
   final List<double> _accelWindow = [];
@@ -236,33 +236,59 @@ class DeviceDataService {
 
   Future<double> getOutdoorMinutesToday() async {
     final prefs = await SharedPreferences.getInstance();
+    // Worker nền ghi số phút ở 1 isolate KHÁC — SharedPreferences của isolate
+    // chính có cache trong RAM nên phải reload() mới thấy giá trị mới.
+    await prefs.reload();
     await _resetIfNewDay(prefs, _kOutdoorMinutesKey, _kOutdoorDateKey);
     return prefs.getDouble(_kOutdoorMinutesKey) ?? 0;
   }
 
+  static const _kOutdoorLastSampleKey = 'outdoor_last_sample_millis';
+
   Future<void> startOutdoorTracking() async {
     _outdoorSampleTimer?.cancel();
-    // Lấy mẫu mỗi 1 phút thay vì 2 phút trước đây — vừa phản hồi nhanh hơn
-    // với việc ra/vào nhà, vừa giảm rủi ro "trót ở ngoài trời 90 giây nhưng
-    // đúng lúc mẫu lấy vào giữa lúc GPS timeout" làm mất nguyên cả mẫu.
-    _outdoorSampleTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
-      final elapsedMinutes = _lastOutdoorSample == null
-          ? 1.0
-          : DateTime.now().difference(_lastOutdoorSample!).inSeconds / 60.0;
-      _lastOutdoorSample = DateTime.now();
+    // Lấy mẫu mỗi 1 phút khi app đang chạy (foreground). Khi app bị đóng/ở
+    // nền, việc lấy mẫu do Worker định kỳ ~15 phút đảm nhiệm — xem
+    // OutdoorBackgroundWorker (dark_room_background_service.dart).
+    _outdoorSampleTimer = Timer.periodic(const Duration(minutes: 1), (_) => sampleOutdoorOnce());
+  }
 
-      final isOutdoor = await _detectOutdoorSample();
-      if (isOutdoor == true) {
-        final prefs = await SharedPreferences.getInstance();
-        await _resetIfNewDay(prefs, _kOutdoorMinutesKey, _kOutdoorDateKey);
-        final current = prefs.getDouble(_kOutdoorMinutesKey) ?? 0;
-        await prefs.setDouble(_kOutdoorMinutesKey, current + elapsedMinutes);
-      }
-      // isOutdoor == false: trong nhà (thiếu GPS tốt, hoặc đủ GPS nhưng
-      // ánh sáng không giống ngoài trời), không cộng dồn.
-      // isOutdoor == null: không xác định được (mất quyền/dịch vụ vị trí bị
-      // tắt) -> bỏ qua mẫu này hoàn toàn thay vì đoán mò.
-    });
+  /// Lấy 1 mẫu "có đang ngoài trời không" và cộng thời gian tương ứng. Dùng
+  /// CHUNG cho Timer foreground (mỗi ~1 phút) và Worker nền (mỗi ~15 phút).
+  ///
+  /// Số phút được cộng = khoảng thời gian kể từ mẫu gần nhất của BẤT KỲ nguồn
+  /// nào (lưu ở `outdoor_last_sample_millis`) — nhờ vậy foreground và nền
+  /// không cộng chồng lên nhau. Kẹp trần (5 phút foreground / 20 phút nền) để
+  /// 1 khoảng im lặng dài (máy tắt, Doze) không bị tính hết là ngoài trời.
+  Future<void> sampleOutdoorOnce({bool fromBackground = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Cùng 1 file prefs được 2 isolate ghi -> luôn nạp lại trước khi đọc/ghi.
+    await prefs.reload();
+    await _resetIfNewDay(prefs, _kOutdoorMinutesKey, _kOutdoorDateKey);
+
+    if (fromBackground) {
+      // Android 10+: lấy vị trí khi app ở nền cần quyền "Luôn cho phép".
+      final permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.always) return;
+    }
+
+    final now = DateTime.now();
+    final lastMillis = prefs.getInt(_kOutdoorLastSampleKey);
+    var elapsedMinutes = lastMillis == null
+        ? 1.0
+        : now.difference(DateTime.fromMillisecondsSinceEpoch(lastMillis)).inSeconds / 60.0;
+    elapsedMinutes = elapsedMinutes.clamp(0.0, fromBackground ? 20.0 : 5.0);
+
+    final isOutdoor = await _detectOutdoorSample();
+
+    // Ghi lại mốc mẫu SAU khi đo xong (đo GPS mất tới ~15 giây).
+    await prefs.setInt(_kOutdoorLastSampleKey, DateTime.now().millisecondsSinceEpoch);
+
+    if (isOutdoor == true && elapsedMinutes > 0) {
+      final current = prefs.getDouble(_kOutdoorMinutesKey) ?? 0;
+      await prefs.setDouble(_kOutdoorMinutesKey, current + elapsedMinutes);
+    }
+    // isOutdoor == false: trong nhà / không bắt được GPS -> không cộng.
   }
 
   // CHỈ DÙNG GPS (theo yêu cầu): trước đây yêu cầu thêm ánh sáng (lux) nên
@@ -814,6 +840,8 @@ class DeviceDataService {
 
   Timer? _environmentSampleTimer;
   DateTime? _lastEnvSampleAt;
+  // Trạng thái sáng/tối của mẫu trước — chỉ ghi Dòng thời gian khi CHUYỂN trạng thái.
+  bool? _lastEnvGood;
 
   void startEnvironmentMonitoring() {
     _environmentSampleTimer?.cancel();
@@ -840,6 +868,16 @@ class DeviceDataService {
 
     final lux = await _readAmbientLuxOnce();
     if (lux == null) return; // không đọc được cảm biến -> bỏ mẫu, không phạt.
+
+    final isGood = lux >= _kGoodLuxThreshold;
+    if (_lastEnvGood != isGood) {
+      // minGap 30 phút để ánh sáng chập chờn không làm đầy timeline.
+      unawaited(EyeTimelineService.instance.log(
+        isGood ? TimelineEventType.brightEnvironment : TimelineEventType.dimEnvironment,
+        minGap: const Duration(minutes: 30),
+      ));
+    }
+    _lastEnvGood = isGood;
 
     final total = (prefs.getInt(_kEnvTotalSecondsKey) ?? 0) + weight;
     await prefs.setInt(_kEnvTotalSecondsKey, total);
