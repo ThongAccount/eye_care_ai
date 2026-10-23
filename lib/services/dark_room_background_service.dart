@@ -1,60 +1,71 @@
 // ============================================================================
-// LỊCH SỬ / TẠI SAO FILE NÀY GIỜ GẦN NHƯ RỖNG:
+// LỊCH SỬ + VAI TRÒ HIỆN TẠI CỦA FILE NÀY
 //
-// Tính năng "cảnh báo dùng điện thoại trong bóng tối chạy nền" TRƯỚC ĐÂY
-// được implement hoàn toàn ở đây bằng package `workmanager` (Flutter) gọi
-// vào 1 Dart callback chạy trong isolate nền riêng.
+// 1) "Cảnh báo dùng điện thoại trong bóng tối" chạy nền đã được chuyển sang
+//    NATIVE KOTLIN (DarkRoomWorker.kt) vì isolate nền của `workmanager` không
+//    có các MethodChannel tự đăng ký trong MainActivity.configureFlutterEngine()
+//    (gây MissingPluginException). File này vẫn HUỶ task `workmanager` cũ của
+//    tính năng đó còn sót lại từ các bản cài trước, tránh báo trùng 2 lần.
 //
-// BUG PHÁT HIỆN: Dart isolate nền đó gọi MethodChannel
-// "eye_care_ai/usage_events" (hàm "isScreenOn") để tránh cảnh báo nhầm khi
-// màn hình đang tắt — nhưng kênh đó CHỈ được đăng ký trong
-// MainActivity.configureFlutterEngine(), tức CHỈ tồn tại trên FlutterEngine
-// gắn với Activity đang mở. FlutterEngine "headless" mà `workmanager` tự
-// tạo để chạy nền hoàn toàn TÁCH BIỆT, không bao giờ đi qua
-// configureFlutterEngine() đó -> mọi lệnh gọi kênh từ isolate nền đều ném
-// MissingPluginException, bị nuốt im lặng (mặc định trả về true), khiến
-// bước kiểm tra màn hình mất tác dụng và code cứ cố đọc cảm biến ánh sáng cả
-// khi máy đang khoá màn hình -> Android không gửi sự kiện cảm biến khi màn
-// hình tắt -> lux=null vĩnh viễn dù task nền vẫn chạy đều (đã xác nhận qua
-// debug logging).
+// 2) MỚI: "Thời gian ngoài trời" chạy nền. Khác với bóng tối, tính năng này
+//    chỉ dùng các PLUGIN chuẩn (geolocator, shared_preferences) — plugin chuẩn
+//    được đăng ký tự động cho isolate nền của workmanager (không phụ thuộc
+//    MainActivity), nên viết thẳng bằng Dart được, không cần Kotlin riêng.
+//    Mỗi ~15 phút (mức tối thiểu Android cho phép với tác vụ định kỳ) Worker
+//    lấy 1 điểm GPS và cộng thời gian ngoài trời, KỂ CẢ khi app đã đóng —
+//    người dùng không phải mở app. Cần quyền vị trí "Luôn cho phép"
+//    (ACCESS_BACKGROUND_LOCATION), xin ở bước "Vị trí" của Setup Wizard.
 //
-// FIX: toàn bộ logic thật (đọc PowerManager, đọc cảm biến ánh sáng, gửi
-// thông báo) đã chuyển sang NATIVE KOTLIN — xem
-// android/app/src/main/kotlin/com/eyecare/eye_care_ai/DarkRoomWorker.kt,
-// được đăng ký lặp mỗi 15 phút trực tiếp bằng androidx.work.WorkManager
-// ngay trong MainActivity.onCreate() (không qua Dart/MethodChannel nào cả
-// -> không còn phụ thuộc FlutterEngine, đáng tin cậy tuyệt đối kể cả khi
-// app bị hệ điều hành dọn sạch khỏi bộ nhớ).
-//
-// File này CHỈ còn giữ 1 việc: dọn dẹp (huỷ) task `workmanager` CŨ đã đăng
-// ký trên máy người dùng TỪ CÁC BẢN CÀI TRƯỚC, để tránh chạy song song 2 cơ
-// chế cùng lúc (báo trùng 2 lần). Gọi register() (từ main.dart, giữ nguyên
-// tên hàm để không phải sửa main.dart) sẽ thực hiện việc dọn dẹp 1 lần này.
+// Gọi register() 1 lần lúc khởi động app (xem main.dart). An toàn gọi lại.
 // ============================================================================
+import 'dart:ui' show DartPluginRegistrant;
+
+import 'package:flutter/widgets.dart';
 import 'package:workmanager/workmanager.dart';
 
-const String _darkRoomUniqueTaskName = 'dark_room_periodic';
+import 'device_data_service.dart';
 
-// Dispatcher rỗng — chỉ tồn tại để thoả tham số bắt buộc của
-// Workmanager().initialize(). Không còn task nào dùng callback này (worker
-// thật đã chuyển hẳn sang native Kotlin, xem giải thích ở đầu file), nhưng
-// initialize() yêu cầu 1 @pragma('vm:entry-point') hợp lệ để không lỗi khi
-// Android thử warm-up isolate nền (dù giờ sẽ không có task nào gọi tới).
+const String _darkRoomUniqueTaskName = 'dark_room_periodic';
+const String _outdoorUniqueTaskName = 'outdoor_time_periodic';
+const String _outdoorTaskName = 'outdoor_time_sample';
+
+// PHẢI là hàm top-level + @pragma('vm:entry-point') để còn gọi được khi app
+// đã bị hệ điều hành tắt hẳn (chạy trong isolate nền riêng).
 @pragma('vm:entry-point')
-void _noopCallbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async => true);
+void backgroundCallbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    try {
+      // Isolate nền: cần khởi tạo binding + đăng ký plugin trước khi dùng
+      // geolocator/shared_preferences.
+      WidgetsFlutterBinding.ensureInitialized();
+      DartPluginRegistrant.ensureInitialized();
+
+      if (task == _outdoorTaskName) {
+        await DeviceDataService.instance.sampleOutdoorOnce(fromBackground: true);
+      }
+    } catch (_) {
+      // Lỗi 1 lần lấy mẫu (GPS timeout, thiếu quyền...) không được làm hỏng
+      // lịch chạy định kỳ — trả true để WorkManager vẫn chạy lần sau.
+    }
+    return true;
+  });
 }
 
-/// Gọi 1 lần lúc khởi động app (xem main.dart) — huỷ task `workmanager` cũ
-/// nếu còn sót lại từ bản cài trước khi có bản fix chuyển sang native
-/// Kotlin. An toàn để gọi nhiều lần / gọi cả khi task không tồn tại.
+/// Gọi 1 lần lúc khởi động app (xem main.dart).
 Future<void> registerDarkRoomBackgroundService() async {
   try {
-    await Workmanager().initialize(_noopCallbackDispatcher);
+    await Workmanager().initialize(backgroundCallbackDispatcher);
+    // Dọn task cũ của cảnh báo bóng tối (đã chuyển sang Kotlin).
     await Workmanager().cancelByUniqueName(_darkRoomUniqueTaskName);
+    // Đăng ký lấy mẫu ngoài trời định kỳ (đăng ký lại cùng tên là idempotent).
+    await Workmanager().registerPeriodicTask(
+      _outdoorUniqueTaskName,
+      _outdoorTaskName,
+      frequency: const Duration(minutes: 15),
+    );
   } catch (_) {
-    // Có thể workmanager chưa từng initialize trên máy này (cài mới hoàn
-    // toàn, chưa từng chạy bản cũ) -> không có gì để huỷ, bỏ qua an toàn.
+    // Thiết bị/ROM không hỗ trợ -> bỏ qua, app vẫn chạy bình thường (chỉ mất
+    // phần đo ngoài trời lúc app đóng; lúc app mở vẫn có Timer foreground).
   }
 }
 
