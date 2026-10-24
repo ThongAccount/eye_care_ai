@@ -219,7 +219,7 @@ class AppStrings {
       : 'Display-over-other-apps permission missing. Enable it in Settings.';
   String get helpSupport => vi ? 'Trợ giúp & Hỗ trợ' : 'Help & Support';
   String get signOut => vi ? 'Đăng xuất' : 'Sign Out';
-  String get version => vi ? 'EyeCare AI v1.0.0' : 'EyeCare AI v1.0.0';
+  String get version => vi ? 'EyeCare AI v1.4.0' : 'EyeCare AI v1.4.0';
   String get guardianEmailTitle => vi ? 'Email người bảo hộ' : 'Guardian email';
   String get guardianEmailHint => vi ? 'Nhận mail nhắc nhở nếu quá giờ dùng thiết bị' : 'Receive reminders if device usage exceeds limits';
   String get guardianEmailAdd => vi ? 'Thêm email' : 'Add email';

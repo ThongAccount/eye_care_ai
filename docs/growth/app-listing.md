@@ -1,12 +1,13 @@
 # EyeCare AI — Store Listing Pack (Google Play primary, App Store secondary)
 
-> Grounded in the code at `main` @ `6b90ce7` (2026-10-24). Every claim below maps to a
+> Grounded in the code at `main` @ `521cb2e` (2026-10-24), re-verified at the `1.4.0+alpha`
+> version bump. Every claim below maps to a
 > file in the repo. Anything that is **not** shipped is marked as a TODO, not written as a
 > feature. Health-adjacent rules applied throughout: no "treats / prevents / cures /
 > diagnoses", no Snellen-style 20/20 score, no medical-device framing.
 >
 > Facts used below and their source:
-> `android/app/build.gradle.kts` (package id, minSdk), `pubspec.yaml` (version 1.3.0+alpha),
+> `android/app/build.gradle.kts` (package id, minSdk), `pubspec.yaml` (version 1.4.0+alpha),
 > `android/app/src/main/AndroidManifest.xml` (permissions), `lib/models/app_strings.dart`
 > (user-facing copy, EN + VI), `lib/models/rank_tier.dart` (7 rank tiers),
 > `lib/services/*` (data flow), `lib/screens/*` (features), `lib/providers/*`.
@@ -21,13 +22,14 @@
 | App name (iOS) | `Eye Care Ai` | `ios/Runner/Info.plist:11` → **TODO**: rename to `EyeCare AI` before submission |
 | Package id | `com.eyecare.eye_care_ai` | `android/app/build.gradle.kts:63` (`applicationId`) |
 | Namespace | `com.eyecare.eye_care_ai` | `build.gradle.kts:51` |
-| Version | `1.3.0+alpha` | `pubspec.yaml` |
+| Version | `1.4.0+alpha` | `pubspec.yaml` (shown in-app as `EyeCare AI v1.4.0 (build N)`; `versionCode` = CI run number) |
 | Min Android | API 26 (Android 8.0) | `build.gradle.kts:68` |
 | Default language | English (Vietnamese supported) | `LanguageProvider`, `AppStrings` |
 | Support e-mail | `eyecareai.app@gmail.com` | `lib/widgets/help_support_section.dart:13` |
 | Developer name / entity | — | **TODO — user must provide** (Play requires a legal developer name; a personal developer account shows a legal name, not a brand) |
-| Contact URL / website | `https://github.com/ThongAccount/eye_care_ai` | repo (a GitHub Pages site is being built on `feat/web-legal`) |
-| Privacy policy URL | — | **TODO — will be** `https://<user>.github.io/eye_care_ai/legal/privacy.html` once `feat/web-legal` publishes; Play **rejects** a listing without a public URL |
+| Contact URL / website | `https://thongaccount.github.io/eye_care_ai/` | GitHub Pages (`gh-pages` branch) — live, HTTP 200 |
+| Privacy policy URL | `https://thongaccount.github.io/eye_care_ai/legal/privacy.html` | live, HTTP 200. Play **rejects** a listing without a public URL |
+| Terms of service URL | `https://thongaccount.github.io/eye_care_ai/legal/terms.html` | live, HTTP 200 |
 | Current distribution | Signed APK on GitHub Releases | `https://github.com/ThongAccount/eye_care_ai/releases` |
 | Licence | MIT | `README.md:101` |
 | IAP / ads | None | no ad SDK, no billing dependency in `pubspec.yaml` |
@@ -275,16 +277,22 @@ Use the Play full description with these edits:
 
 ## 3. Launch checklist (in order)
 
-1. Publish the privacy policy + terms pages (`feat/web-legal`) and put the **public URL** in
-   Play Console. Non-negotiable — Play rejects listings without it.
+1. ~~Publish the privacy policy + terms pages~~ — **done**, published from the `gh-pages`
+   branch and returning HTTP 200. Put these URLs in Play Console:
+   `https://thongaccount.github.io/eye_care_ai/legal/privacy.html` and
+   `.../legal/terms.html`. Non-negotiable — Play rejects listings without it.
 2. Decide the cloud-backup default (recommend: opt-in) and the AI-proxy question, then
    fill the Data safety form from §1.7 exactly.
 3. Create the Play Developer account (**TODO — personal account or organisation?** A personal
    account is fine for a solo founder; it caps the tester count to 20 for open testing and
    shows the developer's legal name on the listing).
-4. Upload the AAB built by Modal (`run_build.py`) at a versionCode above the current build
-   number; signed with a **real** upload key (the committed `ci-fallback-keystore.jks` is a
-   placeholder — keystore rotation is still on the tech-debt list).
+4. Upload an **Android App Bundle (`.aab`)** to Play — Play rejects APK uploads for new apps.
+   ⚠️ **The current pipeline builds APKs only** (`flutter build apk` in both `run_build.py` and
+   `.github/workflows/build-apk.yml`), so an AAB target has to be added to the build before
+   submission. `versionCode` must be higher than any previously uploaded build; here it is the
+   CI run number, so every new run is automatically higher. Sign with a **real** upload key (the
+   committed `ci-fallback-keystore.jks` is a placeholder — keystore rotation is still on the
+   tech-debt list).
 5. Add a release-signing key in Play Console → App integrity → App signing (mandatory for
    Play App Signing).
 6. Install the Play listing's screenshots (see `screenshots-outline.md`).
