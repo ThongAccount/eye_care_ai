@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EyeCare AI — Privacy Policy</title>
+<meta name="description" content="How EyeCare AI handles your data: what stays on your phone, what leaves it, and who processes it.">
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --ink: #14181f;
+    --ink-soft: #4a5160;
+    --ink-faint: #6d7484;
+    --paper: #fbfbfd;
+    --card: #ffffff;
+    --rule: #e3e6ee;
+    --accent: #23439b;
+    --accent-soft: #eef2fd;
+    --todo-bg: #fdf4dc;
+    --todo-ink: #7a5200;
+    --todo-edge: #dfae3a;
+    --ok-bg: #eaf6ee;
+    --ok-ink: #1d6134;
+    --radius: 10px;
+    --measure: 70ch;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 2px; }
+
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--accent);
+    color: #fff;
+    padding: 12px 18px;
+    z-index: 10;
+    border-radius: 0 0 var(--radius) 0;
+  }
+  .skip-link:focus { left: 0; }
+
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    background: var(--card);
+  }
+  .masthead-inner {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .brand {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .brand span { color: var(--ink-faint); font-weight: 400; }
+  .masthead nav { display: flex; gap: 18px; font-size: 0.92rem; }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 40px 24px 96px;
+  }
+
+  .doc-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.15;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  .lede {
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0 0 24px;
+  }
+  .meta {
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0 0 32px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .draft {
+    background: var(--todo-bg);
+    border: 1px solid var(--todo-edge);
+    border-left-width: 5px;
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 0 0 36px;
+    color: var(--todo-ink);
+    font-size: 0.95rem;
+  }
+  .draft h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-body);
+  }
+  .draft ul { margin: 10px 0 0; padding-left: 20px; }
+  .draft li { margin-bottom: 4px; }
+
+  .todo {
+    display: inline-block;
+    background: var(--todo-bg);
+    color: var(--todo-ink);
+    border: 1px solid var(--todo-edge);
+    border-radius: 4px;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .fact {
+    display: inline-block;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
+    border: 1px solid #b9dfc6;
+    border-radius: 4px;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  nav.toc {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    margin: 0 0 40px;
+  }
+  nav.toc h2 {
+    margin: 0 0 8px;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-faint);
+    font-family: var(--font-body);
+  }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 20px;
+    columns: 2;
+    column-gap: 32px;
+    font-size: 0.95rem;
+  }
+  nav.toc li { margin-bottom: 4px; break-inside: avoid; }
+
+  section { margin-bottom: 44px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 0 0 6px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+  section > h2 .num {
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 0.62em;
+    vertical-align: 0.35em;
+    margin-right: 10px;
+  }
+  section h3 {
+    font-size: 1.02rem;
+    margin: 26px 0 6px;
+  }
+  section p, section li { max-width: var(--measure); }
+  section ul, section ol { padding-left: 22px; }
+  section li { margin-bottom: 6px; }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--card);
+    margin: 18px 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 46rem;
+    font-size: 0.9rem;
+  }
+  caption {
+    text-align: left;
+    padding: 14px 16px 0;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    background: #f7f8fc;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code, p code, li code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: #f1f3f9;
+    border-radius: 4px;
+    padding: 1px 5px;
+    word-break: break-word;
+  }
+
+  .callout {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 0.95rem;
+  }
+  .callout p { margin: 0; max-width: var(--measure); }
+
+  .sources {
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    color: var(--ink-soft);
+    background: #f7f8fc;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    overflow-x: auto;
+  }
+  .sources ul { margin: 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+  .sources li { margin-bottom: 4px; break-inside: avoid; }
+
+  footer.doc-foot {
+    border-top: 1px solid var(--rule);
+    margin-top: 56px;
+    padding-top: 20px;
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+  }
+  footer.doc-foot a { margin-right: 18px; }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    .wrap { padding: 28px 18px 72px; }
+    nav.toc ol, .sources ul { columns: 1; }
+  }
+
+  @media print {
+    body { background: #fff; font-size: 11pt; }
+    .masthead, .draft, nav.toc { display: none; }
+    .wrap { max-width: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    section { break-inside: avoid-page; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../site/index.html">EyeCare AI <span>· Privacy Policy</span></a>
+    <nav aria-label="Legal pages">
+      <a href="../site/index.html">Home</a>
+      <a href="terms.html">Terms of Service</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai/releases">Downloads</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="doc-title">Privacy Policy</h1>
+  <p class="lede">
+    This policy describes what EyeCare AI collects, what stays on your phone, what is
+    uploaded when you sign in, and who processes it. Every factual claim below was taken
+    from the shipping app code (source files are listed in
+    <a href="#appendix-a">Appendix A</a>), not from a template.
+  </p>
+
+  <ul class="meta">
+    <li>Effective date: <span class="todo">TODO — set the date this policy is published</span></li>
+    <li>Last updated: <span class="todo">TODO — set the date of the last revision</span></li>
+    <li>Version: 0.1 (draft)</li>
+    <li>Applies to: EyeCare AI for Android (package <code>com.eyecare.eye_care_ai</code>)</li>
+  </ul>
+
+  <aside class="draft" aria-labelledby="draft-heading">
+    <h2 id="draft-heading">Draft — four inputs are still missing</h2>
+    <p>
+      This page is written to be publishable, but it cannot go live until you fill in the
+      four legal facts below. They are marked inline with a
+      <span class="todo">TODO</span> chip and collected in
+      <a href="#appendix-b">Appendix B</a>.
+    </p>
+    <ul>
+      <li>Legal entity / company name that publishes the app.</li>
+      <li>Governing jurisdiction (and, if you operate in Vietnam, the Vietnamese data-protection registration).</li>
+      <li>Official privacy contact address (the in-app support mailbox is <code>eyecareai.app@gmail.com</code>).</li>
+      <li>Effective date.</li>
+    </ul>
+  </aside>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#scope">Who we are and what this covers</a></li>
+      <li><a href="#summary">The short version</a></li>
+      <li><a href="#data-table">Every data type, side by side</a></li>
+      <li><a href="#on-device">Data that stays on your device</a></li>
+      <li><a href="#account">Account and leaderboard data</a></li>
+      <li><a href="#backup">Cloud backup and restore</a></li>
+      <li><a href="#ai">The AI assistant</a></li>
+      <li><a href="#permissions">Permissions and why we ask for them</a></li>
+      <li><a href="#analytics">Analytics: what happens today</a></li>
+      <li><a href="#sharing">How we share — and what we never do</a></li>
+      <li><a href="#retention">Retention</a></li>
+      <li><a href="#rights">Your rights and controls</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#children">Children</a></li>
+      <li><a href="#transfers">International transfers</a></li>
+      <li><a href="#changes">Changes to this policy</a></li>
+      <li><a href="#contact">Contact us</a></li>
+      <li><a href="#appendix-a">Appendix A — code sources</a></li>
+      <li><a href="#appendix-b">Appendix B — open questions for the publisher</a></li>
+    </ol>
+  </nav>
+
+  <main id="main">
+    <section id="scope">
+      <h2><span class="num">01</span>Who we are and what this covers</h2>
+      <p>
+        EyeCare AI ("the app") is published by <span class="todo">TODO — legal entity / company
+        name</span> (<span class="todo">TODO — registered address</span>), a
+        <span class="todo">TODO — jurisdiction</span> entity ("we", "us"). The app is a
+        <strong>wellness and habit-tracking tool for the eyes</strong>. It is distributed as an
+        Android application; the signed builds are published on the
+        <a href="https://github.com/ThongAccount/eye_care_ai/releases">project's GitHub Releases page</a>.
+      </p>
+      <p>
+        This policy covers the app running on your device. It does not cover the GitHub website,
+        Google Play, or any other service you may use to download the app, each of which has its
+        own privacy notice.
+      </p>
+      <p>
+        We have not built the app around behavioural advertising or third-party tracking. The app
+        contains no advertising SDK, no attribution SDK and no crash-reporting SDK — its published
+        dependency list is visible in the repository's <code>pubspec.yaml</code>.
+      </p>
+    </section>
+
+    <section id="summary">
+      <h2><span class="num">02</span>The short version</h2>
+      <ul>
+        <li><strong>Most of what the app measures stays on your phone.</strong> Screen-time totals, eye-break counts, sleep estimates, outdoor minutes, ambient-light readings, eye-test results and camera measurements are stored in the app's private storage.</li>
+        <li><strong>Nothing is uploaded unless you sign in.</strong> If you never create an account, no data is sent to our servers.</li>
+        <li><strong>If you sign in</strong>, two things happen: your streak is published to the shared leaderboard, and your settings and habit history can be backed up to your private cloud backup document so you can restore them on a new phone.</li>
+        <li><strong>The camera is opt-in and on-device.</strong> Frames are analysed by Google ML Kit on your phone to estimate viewing distance and whether your eyes are open. Images are never stored and never uploaded.</li>
+        <li><strong>The AI assistant is the one feature that sends content off-device.</strong> Your chat messages, plus a short summary of your current settings, are sent to NVIDIA's API to generate a reply. Everything else stays local.</li>
+        <li><strong>We do not sell your data</strong> and we do not share it for advertising.</li>
+      </ul>
+    </section>
+
+    <section id="data-table">
+      <h2><span class="num">03</span>Every data type, side by side</h2>
+      <p>
+        "Leaves the device" means "is transmitted to a server we or a third party control".
+        "Shared / sold" describes onward disclosure by us.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <caption>Data inventory for EyeCare AI (Android build reviewed 2026-10-23)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">What is collected</th>
+              <th scope="col">Leaves the device?</th>
+              <th scope="col">Shared / sold</th>
+              <th scope="col">Retention</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Screen time & per-app usage</th>
+              <td>Total screen-on time for the day, plus per-app package name, app name, time used and launch count (Android Usage access).</td>
+              <td>Only via Cloud Backup when you are signed in.</td>
+              <td>Not sold. Backed up to Google Cloud Firestore.</td>
+              <td>On device until overwritten by the next day. In the cloud backup until you delete it.</td>
+            </tr>
+            <tr>
+              <th scope="row">Eye breaks, streaks, badges</th>
+              <td>Count of completed eye breaks per day and in total, daily check-in flags, streak length, rank tier.</td>
+              <td>Yes — streak and tier are published to the leaderboard when signed in.</td>
+              <td>Display name and avatar are visible to other signed-in users. Not sold.</td>
+              <td>Leaderboard row persists while the account exists. <span class="todo">TODO — confirm intended retention</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Sleep estimate</th>
+              <td>An estimate in hours, inferred from the gap between your last phone use before sleep and your first use after waking (not a sleep measurement).</td>
+              <td>Only via Cloud Backup when signed in.</td>
+              <td>Not sold.</td>
+              <td>Same as screen time.</td>
+            </tr>
+            <tr>
+              <th scope="row">Outdoor time</th>
+              <td>Minutes considered "outdoors" per day, derived from whether a GPS fix could be obtained.</td>
+              <td>Only via Cloud Backup when signed in.</td>
+              <td>Not sold.</td>
+              <td>Same as screen time.</td>
+            </tr>
+            <tr>
+              <th scope="row">Approximate location</th>
+              <td>Latitude and longitude, captured only to decide whether you are outdoors and to compute local sunrise/sunset for night-read mode.</td>
+              <td><span class="fact">NO</span> — stored locally and never transmitted.</td>
+              <td>Not shared, not sold.</td>
+              <td>On device until you delete local data or uninstall.</td>
+            </tr>
+            <tr>
+              <th scope="row">Camera frames</th>
+              <td>Live front-camera frames analysed on-device to estimate eye-to-screen distance and eye-open probability.</td>
+              <td><span class="fact">NO</span> — processed in memory by ML Kit; frames are never written to storage and never uploaded.</td>
+              <td>Not shared, not sold.</td>
+              <td>Not retained at all.</td>
+            </tr>
+            <tr>
+              <th scope="row">Eye test results</th>
+              <td>Your answers and score from the in-app eye test, kept as a local history.</td>
+              <td><span class="fact">NO</span> — this history is not part of the cloud-backup whitelist.</td>
+              <td>Not shared, not sold.</td>
+              <td>On device until deleted. <span class="todo">TODO — confirm the intended history window</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Ambient light & proximity</th>
+              <td>Light level (lux) and whether the screen is covered, read by a background service to detect dark-room use.</td>
+              <td><span class="fact">NO</span> — only a local "currently in a dark session" flag is kept.</td>
+              <td>Not shared, not sold.</td>
+              <td>Local flag, cleared when the session ends.</td>
+            </tr>
+            <tr>
+              <th scope="row">Eye timeline events</th>
+              <td>Local events such as "moved to a bright environment", "completed an eye break", "screen session of N minutes".</td>
+              <td><span class="fact">NO</span> — stored locally, not part of the backup whitelist.</td>
+              <td>Not shared, not sold.</td>
+              <td>Rolling 7 days, then pruned automatically.</td>
+            </tr>
+            <tr>
+              <th scope="row">Account</th>
+              <td>Email address, password (held by the identity provider in hashed form), display name, profile photo URL, user ID, session token.</td>
+              <td>Yes — to Google Firebase Authentication, and Google Sign-In if you use it.</td>
+              <td>Not sold. Processed by Google as an authentication provider.</td>
+              <td>While your account exists; deleted when you delete the account.</td>
+            </tr>
+            <tr>
+              <th scope="row">Cloud backup</th>
+              <td>Your settings, habit targets, survey answers, daily scores and factor percentages, daily check-ins, outdoor and reading minutes, consent flags.</td>
+              <td>Yes — to Google Cloud Firestore, in a document keyed by your user ID.</td>
+              <td>Not sold. Hosted by Google.</td>
+              <td>Until you delete the account or the backup. <span class="todo">TODO — confirm whether any automatic expiry is desired</span></td>
+            </tr>
+            <tr>
+              <th scope="row">AI assistant conversations</th>
+              <td>Your chat messages, plus a short context block (your habit targets, vision profile, reminder style and auto-break state).</td>
+              <td>Yes — to NVIDIA's chat-completion API (<code>integrate.api.nvidia.com</code>).</td>
+              <td>Not sold by us. NVIDIA processes the request as a sub-processor. <span class="todo">TODO — confirm NVIDIA's retention / training terms for this endpoint</span></td>
+              <td>Held in memory for the current session by the app. <span class="todo">TODO — confirm NVIDIA-side retention</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Guardian email address</th>
+              <td>An email address you enter yourself, used to prepare a reminder for your chosen guardian.</td>
+              <td>Not by the app itself — the app opens your own mail client with the address pre-filled. <span class="todo">TODO — the mobile-P0 branch adds an optional server endpoint; this row must be rewritten once that ships</span></td>
+              <td>Whatever you choose in your mail app.</td>
+              <td>Stored locally in app preferences.</td>
+            </tr>
+            <tr>
+              <th scope="row">Diagnostics / analytics</th>
+              <td>Nothing. The analytics service is a stub: its event and screen-view methods contain no implementation.</td>
+              <td><span class="fact">NO</span></td>
+              <td>Nothing is shared, nothing is sold.</td>
+              <td>Not applicable — no events are produced.</td>
+            </tr>
+            <tr>
+              <th scope="row">App update checks</th>
+              <td>Nothing personal — the app requests release metadata for <code>ThongAccount/eye_care_ai</code> from the public GitHub API.</td>
+              <td>Only the request itself (which GitHub sees like any web request).</td>
+              <td>Not shared, not sold.</td>
+              <td>Not applicable.</td>
+            </tr>
+            <tr>
+              <th scope="row">Exports you create</th>
+              <td>A JSON file of your local data, or a PDF weekly report, both generated on your device and handed to the system share sheet.</td>
+              <td>Only if you choose a destination that uploads them (Drive, email, messaging).</td>
+              <td>Whatever you choose.</td>
+              <td>Written to the app's temporary directory; deleted by the operating system.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="on-device">
+      <h2><span class="num">04</span>Data that stays on your device</h2>
+      <p>
+        The app writes almost everything it learns to the app's private shared preferences on
+        your phone. That includes your screen-time totals, per-app usage breakdown, eye-break
+        counts, daily score snapshots, factor percentages, survey answers, habit targets, outdoor
+        and reading minutes, the eye timeline, eye-test history, and your reminder, theme, language
+        and accessibility settings.
+      </p>
+      <p>
+        You can erase all of it from <strong>Settings → Privacy & security → Delete local
+        data</strong>, and uninstalling the app removes it as well. <span class="todo">TODO —
+        confirm the exact menu labels in the current build before publishing</span>
+      </p>
+      <h3>Camera frames are not stored</h3>
+      <p>
+        The eye test can optionally use the front camera to check whether your eyes are open and to
+        estimate how far you are from the screen. Those frames are processed frame-by-frame in
+        memory by Google ML Kit's on-device face model. The app does not write frames to disk and
+        does not upload them; only the derived measurement (distance in centimetres, eye-open
+        probability) is shown on screen, and that measurement is not persisted either.
+      </p>
+      <h3>Location is used as a signal, not a map</h3>
+      <p>
+        When outdoor tracking is enabled, the app asks for a GPS fix and uses only the answer to
+        the question "could a GPS fix be obtained right now?" to accumulate outdoor minutes. For
+        night-read mode it also stores your approximate latitude and longitude locally so it can
+        compute local sunrise and sunset. Coordinates are never transmitted anywhere.
+      </p>
+    </section>
+
+    <section id="account">
+      <h2><span class="num">05</span>Account and leaderboard data</h2>
+      <p>
+        If you create an account, it is an email/password or Google account handled by Google
+        Firebase Authentication. The app receives your user ID, email address, display name and
+        profile photo URL. It never sees or stores your password in plain text — password
+        management and reset emails are handled by Google.
+      </p>
+      <p>
+        When your streak changes, the app writes one document to the Firestore collection
+        <code>leaderboard</code> containing your display name, avatar URL, streak length, rank tier
+        and a server timestamp. Other signed-in users can read the leaderboard, so treat the display
+        name you choose as public. Guest use is possible for the local features; without an account
+        nothing is published and nothing is backed up.
+      </p>
+      <p>
+        <span class="todo">TODO — confirm the Firestore security rules actually deployed to the
+        project, and whether leaderboard entries should be deletable by the user</span>
+      </p>
+    </section>
+
+    <section id="backup">
+      <h2><span class="num">06</span>Cloud backup and restore</h2>
+      <p>
+        Backup is optional and only runs for signed-in users. The app copies a fixed whitelist of
+        local preference keys into a single private Firestore document named after your user ID.
+        The whitelist deliberately excludes things that are not meaningful across a reinstall:
+        running timers, in-progress notification state, eye-test history, eye-timeline events and
+        camera-derived measurements.
+      </p>
+      <p>
+        The backup is uploaded in the background and restored automatically when you sign in on a
+        new device. If you delete your account inside the app, the backup document is deleted too.
+      </p>
+      <p>
+        <span class="todo">TODO — confirm the backup should be opt-in rather than automatic for all
+        signed-in users, and confirm the server-side retention period</span>
+      </p>
+    </section>
+
+    <section id="ai">
+      <h2><span class="num">07</span>The AI assistant</h2>
+      <p>
+        The assistant is optional and off until you open it and send a message. To produce a reply,
+        the app sends your message text and the conversation so far to NVIDIA's
+        <code>integrate.api.nvidia.com/v1/chat/completions</code> endpoint, together with a short
+        context block describing your current settings (habit targets, vision profile, reminder
+        style, and whether auto-reminders are on) so the assistant can give advice that fits your
+        setup.
+      </p>
+      <ul>
+        <li>Messages are held in memory for the current app session; the app does not write the conversation to device storage.</li>
+        <li>The assistant may propose an action inside the app (for example, lowering a target, logging an eye break, turning on Focus Mode). By default the app asks you to confirm before anything is applied, and you can turn that confirmation off in Settings.</li>
+        <li>The assistant is advisory. It does not diagnose eye conditions and it never changes clinical settings.</li>
+      </ul>
+      <p>
+        <span class="todo">TODO — confirm whether the embedded API credential should be replaced by
+        a relay endpoint owned by the publisher, and confirm NVIDIA's data-retention and model
+        training terms for this endpoint</span>
+      </p>
+    </section>
+
+    <section id="permissions">
+      <h2><span class="num">08</span>Permissions and why we ask for them</h2>
+      <p>
+        Every permission the app declares in its Android manifest, and what it is actually used
+        for. Each one is optional: the app degrades to "no data source" when a permission is
+        missing rather than faking numbers.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <caption>Declared Android permissions and their use</caption>
+          <thead>
+            <tr>
+              <th scope="col">Permission</th>
+              <th scope="col">Used for</th>
+              <th scope="col">Required?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><code>PACKAGE_USAGE_STATS</code></th><td>Reading the operating system's screen-on time and per-app usage so the habit score reflects real usage. Granted manually in Android settings.</td><td>Optional — the screen-time habit shows "no data source" without it.</td></tr>
+            <tr><th scope="row"><code>ACCESS_FINE_LOCATION</code> / <code>ACCESS_COARSE_LOCATION</code> / <code>ACCESS_BACKGROUND_LOCATION</code></th><td>Outdoor-time detection and local sunrise/sunset. Background access is only needed for the periodic outdoor sample while the app is closed.</td><td>Optional — outdoor time stays at zero without it.</td></tr>
+            <tr><th scope="row"><code>CAMERA</code></th><td>On-device eye-open and viewing-distance checks during the eye test.</td><td>Optional and opt-in — the app never requests it automatically.</td></tr>
+            <tr><th scope="row"><code>ACTIVITY_RECOGNITION</code></th><td>Motion data from the accelerometer, used to infer reading time and sleep.</td><td>Optional.</td></tr>
+            <tr><th scope="row"><code>POST_NOTIFICATIONS</code></th><td>Break reminders, dark-room warnings and the ongoing countdown.</td><td>Optional, though reminders are the core feature.</td></tr>
+            <tr><th scope="row"><code>SCHEDULE_EXACT_ALARM</code>, <code>RECEIVE_BOOT_COMPLETED</code>, <code>WAKE_LOCK</code>, <code>REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</code></th><td>Scheduling break alarms that survive a reboot and are not delayed by aggressive battery management.</td><td>Optional.</td></tr>
+            <tr><th scope="row"><code>USE_FULL_SCREEN_INTENT</code>, <code>VIBRATE</code></th><td>Alarming break reminders that behave like an alarm and can vibrate.</td><td>Optional.</td></tr>
+            <tr><th scope="row"><code>SYSTEM_ALERT_WINDOW</code></th><td>The optional app-lock overlay shown during a break.</td><td>Optional.</td></tr>
+            <tr><th scope="row"><code>ACCESS_NOTIFICATION_POLICY</code></th><td>Focus Mode — temporarily silencing other notifications so your eyes can rest.</td><td>Optional, enabled from system settings.</td></tr>
+            <tr><th scope="row"><code>FOREGROUND_SERVICE</code> + <code>FOREGROUND_SERVICE_SPECIAL_USE</code></th><td>The persistent, low-priority service that reads the ambient light sensor so dark-room warnings still work when the app is closed.</td><td>Optional.</td></tr>
+            <tr><th scope="row"><code>WRITE_SETTINGS</code></th><td>Adjusting system brightness to match the measured ambient light ("brightness suggestions").</td><td>Optional, granted from system settings.</td></tr>
+            <tr><th scope="row"><code>QUERY_ALL_PACKAGES</code></th><td>Resolving installed app names for the usage breakdown chart.</td><td>Optional.</td></tr>
+            <tr><th scope="row"><code>REQUEST_INSTALL_PACKAGES</code></th><td>Installing a newer build downloaded from the project's GitHub Releases (in-app update).</td><td>Optional; you confirm the install yourself.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        You can withdraw any permission at any time in Android's settings. Withdrawing a permission
+        stops the corresponding measurement; it never deletes data that was already collected.
+      </p>
+    </section>
+
+    <section id="analytics">
+      <h2><span class="num">09</span>Analytics: what happens today</h2>
+      <p>
+        The app contains an analytics service with a consent gate and a user-facing switch
+        (<strong>Settings → Privacy & security → Data collection</strong>). The service records
+        the consent decision and its timestamp locally, and the event and screen-view methods are
+        currently unimplemented stubs: <strong>no usage events are transmitted today</strong>, and
+        the app has no analytics or advertising SDK installed.
+      </p>
+      <p>
+        If a future release starts sending anonymous analytics, this section must be updated before
+        that release ships, and the switch must continue to gate every event.
+        <span class="todo">TODO — confirm that analytics stays off before the first Play release,
+        and that the Data safety form declares "no data collected" accordingly</span>
+      </p>
+    </section>
+
+    <section id="sharing">
+      <h2><span class="num">10</span>How we share — and what we never do</h2>
+      <p>
+        We do not sell your personal information. We do not share it with advertising networks, and
+        we do not use it for profiling. We do not run advertising in the app.
+      </p>
+      <p>We share data only with the service providers that make the features you asked for work:</p>
+      <ul>
+        <li><strong>Google (Firebase Authentication and Cloud Firestore)</strong> — account authentication, the leaderboard and your private cloud backup. <span class="todo">TODO — confirm the Firebase project region and whether Google Workspace / BAA-style terms apply</span></li>
+        <li><strong>Google Sign-In</strong> — only if you choose to link a Google account.</li>
+        <li><strong>NVIDIA</strong> — the AI assistant, as described in section 07, and only when you actually use it.</li>
+        <li><strong>GitHub</strong> — the public Releases API, used to check for app updates. No personal data is sent.</li>
+        <li><strong>Your own email client</strong> — the guardian reminder opens your mail app with the message pre-filled; the app never sends mail itself.</li>
+      </ul>
+      <p>
+        We may also disclose data if required by law, or as part of a corporate transaction, with
+        notice to you where the law allows.
+        <span class="todo">TODO — confirm whether this clause applies to the publisher's structure</span>
+      </p>
+    </section>
+
+    <section id="retention">
+      <h2><span class="num">11</span>Retention</h2>
+      <ul>
+        <li><strong>On-device data</strong> is kept until you delete it (Settings → Delete local data), delete your account, or uninstall the app. Daily counters roll over each day; the eye timeline prunes itself to the last 7 days.</li>
+        <li><strong>Cloud backup</strong> is kept until you delete your account or the backup document. <span class="todo">TODO — confirm the retention period you want to publish, and whether an automatic expiry should be added</span></li>
+        <li><strong>Leaderboard entries</strong> persist while your account exists. <span class="todo">TODO — confirm whether a user can remove their own entry</span></li>
+        <li><strong>AI conversations</strong> are not written to device storage by the app; NVIDIA-side retention follows their terms. <span class="todo">TODO — confirm NVIDIA-side retention</span></li>
+      </ul>
+    </section>
+
+    <section id="rights">
+      <h2><span class="num">12</span>Your rights and controls</h2>
+      <p>
+        Depending on where you live, you may have the right to access, correct, export, delete or
+        restrict the processing of your personal data, and to object to certain processing. The app
+        gives you direct control of most of these without contacting us:
+      </p>
+      <ul>
+        <li><strong>Export</strong> — <strong>Settings → Export my data</strong> produces a JSON file of everything the app holds locally and hands it to the system share sheet.</li>
+        <li><strong>Correct</strong> — edit targets, profile name and preferences directly in the app; changes are reflected in the next backup.</li>
+        <li><strong>Delete local data</strong> — clears the app's local storage in one action.</li>
+        <li><strong>Delete account</strong> — deletes the Firebase account and the cloud backup document, and clears local data.</li>
+        <li><strong>Withdraw permissions</strong> — revoke camera, location or usage access in Android settings to stop a measurement.</li>
+        <li><strong>Turn off data collection</strong> — the Data collection switch in Settings.</li>
+      </ul>
+      <p>
+        To exercise any right that the app does not cover, contact us at
+        <span class="todo">TODO — official privacy contact address</span>. The in-app support
+        mailbox currently used by the Help & Support section is
+        <code>eyecareai.app@gmail.com</code>.
+      </p>
+    </section>
+
+    <section id="security">
+      <h2><span class="num">13</span>Security</h2>
+      <p>
+        Data that leaves your device is sent over HTTPS/TLS to Google, NVIDIA or GitHub. Local data
+        is stored in the app's private application storage, which Android isolates from other apps.
+        Account passwords are handled by Google Firebase Authentication and are never stored by the
+        app in plain text.
+      </p>
+      <p>
+        <span class="todo">TODO — confirm the publisher's operational security commitments before
+        publishing (access control to Firebase, whether Firestore rules are audited, whether a
+        breach-notification process exists)</span>
+      </p>
+    </section>
+
+    <section id="children">
+      <h2><span class="num">14</span>Children</h2>
+      <p>
+        The app is a general-audience wellness tool and is not directed at children under 13 (or
+        the minimum age in your jurisdiction). We do not knowingly collect personal data from
+        children. If you believe a child has provided personal data, contact us and we will delete
+        it. <span class="todo">TODO — confirm the intended minimum age and the Play Families policy
+        classification</span>
+      </p>
+    </section>
+
+    <section id="transfers">
+      <h2><span class="num">15</span>International transfers</h2>
+      <p>
+        We use providers whose infrastructure is outside Vietnam and, where relevant, outside your
+        own country, including Google (Firebase) and NVIDIA. The data that may be transferred is
+        limited to what is described in sections 05 to 07. <span class="todo">TODO — confirm the
+        providers' regions and whether standard contractual clauses or an equivalent safeguard
+        applies, and whether a Vietnamese data-protection registration is required</span>
+      </p>
+    </section>
+
+    <section id="changes">
+      <h2><span class="num">16</span>Changes to this policy</h2>
+      <p>
+        We may update this policy as the app changes — for example, when a feature starts sending
+        data it previously kept local. The effective date at the top of this page always reflects
+        the current version, and the app will show a notice when a material change is published.
+      </p>
+    </section>
+
+    <section id="contact">
+      <h2><span class="num">17</span>Contact us</h2>
+      <p>
+        <strong>TODO — legal entity name</strong><br>
+        <strong>TODO — postal address</strong><br>
+        Privacy contact: <strong>TODO — official privacy email address</strong>
+        (support mailbox in the app: <code>eyecareai.app@gmail.com</code>)
+      </p>
+    </section>
+
+    <section id="appendix-a">
+      <h2><span class="num">A</span>Appendix A — code sources</h2>
+      <p>
+        Every statement in this policy was checked against these files in the repository on
+        2026-10-23, so the page can be re-verified after any change to the app.
+      </p>
+      <div class="sources">
+        <ul>
+          <li><code>lib/services/analytics_service.dart</code> — consent gate, stubbed logging.</li>
+          <li><code>lib/services/auth_service.dart</code> — email/password and Google sign-in, account deletion.</li>
+          <li><code>lib/services/leaderboard_service.dart</code> — leaderboard document fields and guest behaviour.</li>
+          <li><code>lib/services/cloud_backup_service.dart</code> — backup whitelist, restore rules, deletion.</li>
+          <li><code>lib/services/device_data_service.dart</code> — usage access, GPS outdoor sampling, daily snapshots, eye-break counters.</li>
+          <li><code>lib/services/distance_service.dart</code> — on-device ML Kit camera analysis.</li>
+          <li><code>lib/services/dark_room_background_service.dart</code> — periodic outdoor worker.</li>
+          <li><code>lib/services/eye_chat_service.dart</code>, <code>lib/services/ai_action_handler.dart</code> — AI endpoint, model, context and actions.</li>
+          <li><code>lib/services/eye_timeline_service.dart</code> — timeline retention window.</li>
+          <li><code>lib/services/update_service.dart</code> — GitHub Releases check.</li>
+          <li><code>lib/providers/settings_more_provider.dart</code> — JSON export, PDF report, delete local data, delete account.</li>
+          <li><code>lib/providers/theme_provider.dart</code>, <code>lib/services/solar_service.dart</code> — locally stored coordinates, sunrise/sunset.</li>
+          <li><code>lib/providers/chat_provider.dart</code> — in-memory conversation only.</li>
+          <li><code>android/app/src/main/AndroidManifest.xml</code> — declared permissions.</li>
+          <li><code>android/app/src/main/kotlin/com/eyecare/eye_care_ai/DarkRoomForegroundService.kt</code> — ambient light handling.</li>
+          <li><code>pubspec.yaml</code> — dependency list (no ads or analytics SDK).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="appendix-b">
+      <h2><span class="num">B</span>Appendix B — open questions for the publisher</h2>
+      <ol>
+        <li>What is the legal entity or company name behind EyeCare AI, and its registered address?</li>
+        <li>Which jurisdiction governs this app, and is a Vietnamese data-protection registration required?</li>
+        <li>What is the official privacy contact address, and should it differ from the support mailbox <code>eyecareai.app@gmail.com</code>?</li>
+        <li>What effective date should be printed?</li>
+        <li>Should the leaderboard entry be deletable by the user, and what is its intended retention?</li>
+        <li>Should cloud backup be opt-in rather than automatic for signed-in users?</li>
+        <li>What server-side retention should be published for the backup document?</li>
+        <li>Confirm NVIDIA's retention and model-training terms for <code>integrate.api.nvidia.com</code>, and whether the embedded API credential should be replaced with a publisher-owned relay.</li>
+        <li>Once the guardian-email endpoint lands (mobile P0 branch), confirm the final data flow so section 03 and section 10 can be rewritten accurately.</li>
+        <li>Confirm the intended minimum age and the Google Play Families policy classification.</li>
+        <li>Should a Vietnamese translation of this policy be published, and which version prevails if they differ?</li>
+        <li>Confirm the exact in-app menu labels used in section 04 and section 12 (Delete local data / Export my data / Data collection).</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="doc-foot">
+    <p>
+      <a href="../site/index.html">Home</a>
+      <a href="terms.html">Terms of Service</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai/releases">Downloads</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai">Source code</a>
+    </p>
+    <p>EyeCare AI — draft privacy policy, version 0.1.</p>
+  </footer>
+</div>
+</body>
+</html>
