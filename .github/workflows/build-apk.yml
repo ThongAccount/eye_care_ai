@@ -20,6 +20,24 @@ jobs:
           # range between the previous release and this build.
           fetch-depth: 0
 
+      # Chặn release NGAY khi cây source còn chứa key thật (vd key NVIDIA NIM
+      # bị paste nhầm vào lib/config/local_env.dart, hoặc key bị commit vào
+      # docs/). Hook pre-push chỉ chạy trên máy lập trình viên và chỉ quét
+      # dòng MỚI thêm — CI quét TOÀN BỘ cây source, nên key có sẵn trong
+      # lịch sử cũng bị chặn trước khi đóng gói APK.
+      - name: Scan source tree for secrets
+        run: |
+          PATTERNS='nvapi-[A-Za-z0-9_.-]{20,}|sk-ant-[A-Za-z0-9-]{20,}|sk-[A-Za-z0-9]{20,}|(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[bpas]-[A-Za-z0-9-]{10,}|BEGIN [A-Z ]*PRIVATE KEY'
+          HITS=$(grep -rEIl --exclude-dir=.git --exclude-dir=build \
+            --exclude-dir=.dart_tool --exclude-dir=.gradle \
+            "$PATTERNS" . 2>/dev/null | head -5 || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::Secret-like content found in the source tree (build aborted):"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "Source tree is clean of secret-like content."
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:

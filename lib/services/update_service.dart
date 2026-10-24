@@ -312,9 +312,12 @@ class UpdateService {
   }
 
   /// Tải file APK về thư mục cache RIÊNG của app (KHÔNG phải thư mục Download
-  /// công khai) — bắt buộc phải vậy để FileProvider (xem AndroidManifest.xml +
-  /// res/xml/file_paths.xml) có quyền cấp lại quyền đọc file này cho trình
-  /// cài đặt gói của hệ thống qua content:// URI.
+  /// công khai) — bắt buộc phải vậy để trình cài đặt gói của hệ thống đọc
+  /// được file này qua content:// URI do FileProvider của open_filex (thư viện
+  /// tự khai báo provider trong AndroidManifest của nó) cấp quyền.
+  ///
+  /// LƯU Ý: app KHÔNG tự khai báo FileProvider (không có res/xml/file_paths.xml
+  /// trong repo) — mọi thao tác mở/cài file đều đi qua OpenFilex.
   Future<File> downloadApk(
     UpdateInfo update, {
     void Function(int received, int total)? onProgress,
