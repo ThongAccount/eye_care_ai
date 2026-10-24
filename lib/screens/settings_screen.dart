@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/app_icon.dart';
 import '../utils/permission_helper.dart';
@@ -16,6 +15,7 @@ import '../providers/profile_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/update_provider.dart';
+import '../services/guardian_reminder_service.dart';
 import '../services/notification_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
@@ -124,6 +124,17 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: strings.breakRemindersSubtitle,
                 value: settings.notifyBreaks,
                 onChanged: (v) => settings.setNotification('breaks', v),
+              ),
+              // Âm thanh riêng cho thông báo hết-giờ-nghỉ-mắt. Bật/tắt được
+              // ngay: service tự đặt lại báo thức lặp đang chạy để âm thanh
+              // mới có hiệu lực (báo thức lặp là native thuần nên kênh/âm
+              // thanh bị ghim cố định lúc đặt lịch).
+              _ToggleTile(
+                icon: '🔔',
+                title: strings.customNotificationSound,
+                subtitle: strings.customNotificationSoundSubtitle,
+                value: settings.customNotificationSound,
+                onChanged: (v) => settings.setCustomNotificationSound(v),
               ),
               _ToggleTile(
                 icon: '👁️',
@@ -395,7 +406,11 @@ class SettingsScreen extends StatelessWidget {
                     _ListTileOption(
                       icon: '🛡️',
                       title: strings.guardianEmailTitle,
-                      subtitle: strings.guardianEmailHint,
+                      // Đã có email -> nhắc người dùng biết app sẽ TỰ ĐỘNG
+                      // nhắc người bảo hộ khi vượt giờ (kiểm tra nền).
+                      subtitle: settings.guardianEmail.isNotEmpty
+                          ? strings.guardianEmailAuto
+                          : strings.guardianEmailHint,
                       valueLabel: settings.guardianEmail.isNotEmpty ? settings.guardianEmail : strings.guardianEmailAdd,
                       valueOnNewLine: true,
                       onTap: () => _showGuardianEmailDialog(context, settings, strings),
@@ -1035,6 +1050,9 @@ Future<void> _showViewingDistanceDialog(BuildContext context, SettingsProvider s
 Future<void> _showGuardianEmailDialog(BuildContext context, SettingsProvider settings, AppStrings strings) async {
   final controller = TextEditingController(text: settings.guardianEmail);
   final formKey = GlobalKey<FormState>();
+  // Worker nền đã phát hiện vượt giờ nhưng KHÔNG gửi được (chưa cấu hình
+  // endpoint) -> báo người dùng biết để họ gửi mail bằng tay.
+  final pendingDate = await GuardianReminderService.instance.pendingReminderDate();
 
   final result = await showDialog<bool>(
     context: context,
@@ -1063,16 +1081,43 @@ Future<void> _showGuardianEmailDialog(BuildContext context, SettingsProvider set
                 },
               ),
               const SizedBox(height: 12),
+              if (pendingDate != null) ...[
+                Text(
+                  strings.guardianEmailPending,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+              ],
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     final email = controller.text.trim();
                     if (email.isEmpty) return;
-                    final uri = Uri.parse(
-                      'mailto:$email?cc=eyecareai.app@gmail.com&subject=${Uri.encodeComponent(strings.vi ? 'EyeCare AI - Nhắc nhở sử dụng thiết bị' : 'EyeCare AI - Device usage reminder')}&body=${Uri.encodeComponent(strings.vi ? 'Xin chào,\n\nHệ thống EyeCare AI đã phát hiện người dùng đã dùng thiết bị quá giờ khuyến nghị. Vui lòng kiểm tra và nhắc nhở họ nghỉ ngơi.\n\nTrân trọng,\nEyeCare AI' : 'Hello,\n\nEyeCare AI detected that the user exceeded the recommended screen time. Please check in and remind them to take a break.\n\nRegards,\nEyeCare AI')}',
+                    // Đường gửi THẬT: nếu bản build có cấu hình endpoint HTTPS
+                    // (--dart-define=GUARDIAN_EMAIL_ENDPOINT=...) thì POST thẳng
+                    // tới endpoint; nếu không có thì lùi về mở app mail
+                    // (mailto:) như trước. Xem GuardianReminderService.
+                    final sent = await GuardianReminderService.instance
+                        .sendReminderOrFallback(
+                          guardianEmail: email,
+                          subject: strings.vi
+                              ? 'EyeCare AI - Nhắc nhở sử dụng thiết bị'
+                              : 'EyeCare AI - Device usage reminder',
+                          body: strings.vi
+                              ? 'Xin chào,\n\nHệ thống EyeCare AI đã phát hiện người dùng đã dùng thiết bị quá giờ khuyến nghị. Vui lòng kiểm tra và nhắc nhở họ nghỉ ngơi.\n\nTrân trọng,\nEyeCare AI'
+                              : 'Hello,\n\nEyeCare AI detected that the user exceeded the recommended screen time. Please check in and remind them to take a break.\n\nRegards,\nEyeCare AI',
+                        );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          sent
+                              ? strings.guardianEmailSent
+                              : strings.guardianEmailSendFailed,
+                        ),
+                      ),
                     );
-                    launchUrl(uri, mode: LaunchMode.externalApplication);
                   },
                   icon: const Icon(Icons.send_outlined),
                   label: Text(strings.guardianEmailSendTest),

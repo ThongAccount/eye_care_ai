@@ -1,6 +1,5 @@
 package com.eyecare.eye_care_ai
 
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -32,7 +31,7 @@ class DailySnapshotWorker(appContext: Context, params: WorkerParameters) :
             // tránh đá văng số liệu mới hơn/chính xác hơn bằng số cũ hơn.
             if (prefs.contains("flutter.daily_snapshot_$today")) return Result.success()
 
-            val screenHours = readTodayScreenHours()
+            val screenHours = ScreenTimeReader.readTodayScreenHours(applicationContext)
             val sleepHours = readManualOrZeroSleepHours(today)
             val outdoorMinutes = readOutdoorMinutesToday(today)
             val breaksCount = readEyeBreaksToday(today)
@@ -50,40 +49,6 @@ class DailySnapshotWorker(appContext: Context, params: WorkerParameters) :
         } catch (e: Exception) {
             Result.retry()
         }
-    }
-
-    private fun readTodayScreenHours(): Double {
-        val usm = applicationContext.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        val end = System.currentTimeMillis()
-
-        val events = usm.queryEvents(start, end)
-        val foregroundStart = HashMap<String, Long>()
-        var totalMs = 0L
-        val e = android.app.usage.UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(e)
-            when (e.eventType) {
-                android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND ->
-                    foregroundStart[e.packageName] = e.timeStamp
-                android.app.usage.UsageEvents.Event.MOVE_TO_BACKGROUND -> {
-                    val fgAt = foregroundStart.remove(e.packageName)
-                    if (fgAt != null) totalMs += (e.timeStamp - fgAt)
-                }
-            }
-        }
-        // App còn đang foreground tại thời điểm chạy worker (hiếm, vì worker
-        // chạy 23:55) -> cộng nốt phần còn dang dở.
-        foregroundStart.values.forEach { totalMs += (end - it) }
-
-        val elapsed = end - start
-        val clamped = if (totalMs > elapsed) elapsed else totalMs
-        return clamped / 3_600_000.0
     }
 
     // Ước lượng giấc ngủ THẬT (dựa vào UsageEvents đêm hôm trước) phức tạp

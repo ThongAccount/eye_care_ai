@@ -83,6 +83,10 @@ class AppStrings {
   String get notifications => vi ? 'Thông báo' : 'Notifications';
   String get breakReminders => vi ? 'Nhắc nhở nghỉ ngơi' : 'Break Reminders';
   String get breakRemindersSubtitle => vi ? 'Nhận thông báo cho nghỉ ngơi 20-20-20' : 'Get notified for 20-20-20 breaks';
+  String get customNotificationSound => vi ? 'Âm thanh nhắc riêng' : 'Custom alert sound';
+  String get customNotificationSoundSubtitle => vi
+      ? 'Dùng âm thanh báo nghỉ mắt riêng của EyeCare AI thay cho âm thanh mặc định'
+      : 'Use the built-in EyeCare AI break alert instead of the system sound';
   String get eyeTestReminders => vi ? 'Nhắc nhở kiểm tra mắt' : 'Eye Test Reminders';
   String get eyeTestRemindersSubtitle => vi ? 'Nhắc kiểm tra thị lực hàng tuần' : 'Weekly vision screening alerts';
   String get habitTracking => vi ? 'Theo dõi thói quen' : 'Habit Tracking';
@@ -221,6 +225,17 @@ class AppStrings {
   String get guardianEmailAdd => vi ? 'Thêm email' : 'Add email';
   String get guardianEmailSendTest => vi ? 'Gửi mail nhắc thử' : 'Send test reminder';
   String get guardianEmailSaved => vi ? 'Đã lưu email người bảo hộ.' : 'Guardian email saved.';
+  String get guardianEmailSent =>
+      vi ? 'Đã gửi nhắc nhở cho người bảo hộ.' : 'Guardian reminder sent.';
+  String get guardianEmailSendFailed => vi
+      ? 'Chưa gửi được tự động — đã mở app mail để bạn tự gửi.'
+      : 'Could not send automatically — opened your mail app instead.';
+  String get guardianEmailPending => vi
+      ? 'Đã vượt giờ — chạm để nhắc người bảo hộ.'
+      : 'Limit exceeded — tap to notify the guardian.';
+  String get guardianEmailAuto => vi
+      ? 'Tự động nhắc khi vượt giờ (kiểm tra nền mỗi 30 phút)'
+      : 'Notifies automatically when the limit is exceeded (checked in the background every 30 min)';
   String get roadmapTitle => vi ? 'Lộ trình tính năng sắp tới' : 'Upcoming feature roadmap';
   List<String> get roadmapFeatures => vi
       ? [
@@ -680,7 +695,9 @@ class AppStrings {
       case 'outdoor':
         return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':
-        return vi ? 'Nhận diện ánh nhìn qua camera trước' : 'Front camera gaze detection';
+        // Camera distance/gaze scoring đã bị gỡ bỏ (26/09) — số lần nghỉ
+        // được đếm bằng nhắc thủ công + tự động.
+        return vi ? 'Đếm nghỉ ngơi thủ công và tự động' : 'Manually and auto-counted breaks';
       default:
         return '';
     }
