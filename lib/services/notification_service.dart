@@ -423,7 +423,7 @@ class NotificationService {
   // qua 3 chế độ lên lịch, từ đáng tin cậy nhất -> kém nhất. Trả về true nếu
   // hệ thống xác nhận đã đăng ký báo thức.
   Future<bool> _scheduleAlarmWithSound({
-    required DateTime scheduledDate,
+    required tz.TZDateTime scheduledDate,
     required String title,
     required String body,
     required bool useCustomSound,

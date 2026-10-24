@@ -104,13 +104,14 @@ class GuardianReminderWorker(appContext: Context, params: WorkerParameters) :
     ): Boolean {
         var connection: HttpURLConnection? = null
         return try {
-            connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 15000
                 readTimeout = 15000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
             }
+            connection = conn
 
             val payload = JSONObject()
                 .put("to", guardianEmail)
@@ -118,11 +119,11 @@ class GuardianReminderWorker(appContext: Context, params: WorkerParameters) :
                 .put("targetHours", targetHours)
                 .put("date", today)
                 .put("source", "eyecare-ai-android")
-            connection.outputStream.use {
+            conn.outputStream.use {
                 it.write(payload.toString().toByteArray(Charsets.UTF_8))
             }
 
-            val code = connection.responseCode
+            val code = conn.responseCode
             code in 200..299
         } catch (e: Exception) {
             false
