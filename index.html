@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EyeCare AI — break reminders and an eye-health score for Android</title>
+<meta name="description" content="EyeCare AI keeps the 20-20-20 rule for you: break reminders that survive reboots, an honest eye-health score, an on-device eye test, weekly PDF reports, streaks and a bilingual English / Tiếng Việt experience.">
+<meta property="og:title" content="EyeCare AI — your eyes get a break, every twenty minutes">
+<meta property="og:description" content="Break reminders, an eye-health score and an on-device eye test for Android. Free, no ads, English and Tiếng Việt.">
+<meta property="og:type" content="website">
+<link rel="icon" href="../favicon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="shell">
+    <a class="brand" href="index.html">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <circle cx="16" cy="16" r="13" fill="none" stroke="#74cfc0" stroke-width="2"/>
+        <circle cx="16" cy="16" r="5" fill="none" stroke="#e9b25c" stroke-width="2"/>
+        <circle cx="16" cy="16" r="1.8" fill="#e9eff1"/>
+      </svg>
+      <span>EyeCare AI</span>
+      <span class="brand-sub" data-lang="en">Android · EN / VI</span>
+      <span class="brand-sub" data-lang="vi" lang="vi" hidden>Android · VI / EN</span>
+    </a>
+
+    <nav aria-label="Primary">
+      <a href="#features" data-lang="en">Features</a>
+      <a href="#features" data-lang="vi" lang="vi" hidden>Tính năng</a>
+      <a href="#privacy" class="optional" data-lang="en">Privacy</a>
+      <a href="#privacy" class="optional" data-lang="vi" lang="vi" hidden>Quyền riêng tư</a>
+      <a href="#download" data-lang="en">Download</a>
+      <a href="#download" data-lang="vi" lang="vi" hidden>Tải về</a>
+      <span class="lang-switch" role="group" aria-label="Language / Ngôn ngữ">
+        <button type="button" data-lang-btn="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-btn="vi" aria-pressed="false">VI</button>
+      </span>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ============================ HERO ============================ -->
+  <section class="hero shell">
+    <div>
+      <p class="eyebrow" data-lang="en">Android 8.0+ · English & Tiếng Việt · Free</p>
+      <p class="eyebrow" data-lang="vi" lang="vi" hidden>Android 8.0+ · Tiếng Anh & Tiếng Việt · Miễn phí</p>
+
+      <h1>
+        <span data-lang="en">Your eyes get a break. <span class="accent">Every twenty minutes.</span></span>
+        <span data-lang="vi" lang="vi" hidden>Mắt bạn được nghỉ. <span class="accent">Cứ mỗi hai mươi phút.</span></span>
+      </h1>
+
+      <p class="lede" data-lang="en">
+        EyeCare AI turns the 20-20-20 rule into something you don't have to remember: a break
+        reminder that survives reboots, an eye-health score built from your own device signals,
+        and a weekly report you can actually read.
+      </p>
+      <p class="lede" data-lang="vi" lang="vi" hidden>
+        EyeCare AI biến quy tắc 20-20-20 thành thứ bạn không cần phải nhớ: lời nhắc nghỉ mắt
+        vẫn còn hiệu lực sau khi máy khởi động lại, điểm sức khỏe mắt dựng từ dữ liệu chính
+        chiếc điện thoại của bạn, và báo cáo tuần dễ đọc.
+      </p>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="https://github.com/ThongAccount/eye_care_ai/releases">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>
+          </svg>
+          <span data-lang="en">Download the APK</span>
+          <span data-lang="vi" lang="vi" hidden>Tải APK</span>
+        </a>
+        <a class="btn btn-ghost" href="../legal/privacy.html">
+          <span data-lang="en">Read the privacy policy</span>
+          <span data-lang="vi" lang="vi" hidden>Đọc chính sách quyền riêng tư</span>
+        </a>
+      </div>
+
+      <p class="install-note" data-lang="en">
+        Signed builds are published on GitHub Releases. Android will ask you once to allow
+        installs from this source. You need Android 8.0 or newer.
+      </p>
+      <p class="install-note" data-lang="vi" lang="vi" hidden>
+        Bản build có chữ ký được phát hành trên GitHub Releases. Android sẽ hỏi bạn một lần để
+        cho phép cài đặt từ nguồn này. Yêu cầu Android 8.0 trở lên.
+      </p>
+    </div>
+
+    <div class="dial" role="img"
+         data-aria-en="The 20-20-20 rule: every 20 minutes, look 20 seconds at something about 20 feet away."
+         data-aria-vi="Quy tắc 20-20-20: cứ mỗi 20 phút, hãy nhìn 20 giây vào một thứ cách bạn khoảng 20 feet.">
+      <svg viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+        <circle class="dial-ring-outer" cx="200" cy="200" r="186"/>
+        <circle class="dial-ring-track" cx="200" cy="200" r="142"/>
+        <circle class="dial-ring-fill" cx="200" cy="200" r="142" stroke-dasharray="642 892"/>
+        <circle class="dial-orbit" cx="200" cy="200" r="112"/>
+        <circle class="dial-glow" cx="200" cy="200" r="62"/>
+        <circle class="dial-core" cx="200" cy="200" r="56"/>
+      </svg>
+      <div class="dial-label">
+        <span class="big">20</span>
+        <span class="small" data-lang="en">minutes</span>
+        <span class="small" data-lang="vi" lang="vi" hidden>phút</span>
+        <span class="rule" data-lang="en">20 · 20 · 20</span>
+        <span class="rule" data-lang="vi" lang="vi" hidden>20 · 20 · 20</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ THE RULE ============================ -->
+  <section class="section shell" aria-labelledby="rule-heading">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow" data-lang="en">The rule</p>
+        <p class="eyebrow" data-lang="vi" lang="vi" hidden>Quy tắc</p>
+        <h2 id="rule-heading" data-lang="en">Twenty minutes, twenty seconds, twenty feet.</h2>
+        <h2 id="rule-heading-vi" data-lang="vi" lang="vi" hidden>Hai mươi phút, hai mươi giây, hai mươi feet.</h2>
+      </div>
+      <p data-lang="en">
+        The 20-20-20 rule is the whole idea: every 20 minutes of screen work, look 20 seconds at
+        something about 20 feet away. EyeCare AI keeps the timing for you — and keeps the reminder
+        alive even when the system cleans the app out of memory.
+      </p>
+      <p data-lang="vi" lang="vi" hidden>
+        Quy tắc 20-20-20 là toàn bộ ý tưởng: cứ mỗi 20 phút làm việc với màn hình, hãy nhìn 20
+        giây vào một thứ cách bạn khoảng 20 feet. EyeCare AI giữ nhịp giờ thay bạn — và giữ lời
+        nhắc sống ngay cả khi hệ thống dọn ứng dụng khỏi bộ nhớ.
+      </p>
+    </div>
+
+    <div class="rule-grid">
+      <article class="rule-card">
+        <p class="num">01</p>
+        <h3 data-lang="en">Twenty minutes</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Hai mươi phút</h3>
+        <p data-lang="en">
+          Keep working. The app reads the operating system's screen time and arms the next break
+          alarm for you.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Cứ tiếp tục làm việc. Ứng dụng đọc thời gian màn hình từ hệ điều hành và tự hẹn lần
+          nghỉ mắt tiếp theo.
+        </p>
+      </article>
+
+      <article class="rule-card">
+        <p class="num">02</p>
+        <h3 data-lang="en">Twenty seconds</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Hai mươi giây</h3>
+        <p data-lang="en">
+          Look away. A persistent countdown stays on your screen until the break is over, with an
+          alarm and vibration so it cannot be missed.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Hãy nhìn đi chỗ khác. Một bộ đếm ngược ghim trên màn hình chạy đến khi hết giờ nghỉ,
+          kèm chuông và rung để không thể bỏ lỡ.
+        </p>
+      </article>
+
+      <article class="rule-card">
+        <p class="num">03</p>
+        <h3 data-lang="en">Twenty feet</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Hai mươi feet</h3>
+        <p data-lang="en">
+          Around six metres — roughly an arm's length beyond your screen. The reminder tells you
+          what to do while it counts.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Khoảng sáu mét — đại khái một cánh tay vượt ra ngoài màn hình. Lời nhắc nói cho bạn biết
+          cần làm gì trong lúc đếm.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============================ FEATURES ============================ -->
+  <section class="section shell" id="features" aria-labelledby="features-heading">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow" data-lang="en">What ships</p>
+        <p class="eyebrow" data-lang="vi" lang="vi" hidden>Có sẵn trong app</p>
+        <h2 id="features-heading" data-lang="en">Everything it measures, it measures honestly.</h2>
+        <h2 id="features-heading-vi" data-lang="vi" lang="vi" hidden>Điều nó đo đều được đo trung thực.</h2>
+      </div>
+      <p data-lang="en">
+        No fabricated charts and no sample data: when a permission is missing, the app says "no
+        data source" instead of inventing a number. Eleven more things ship as well — guided eye
+        exercises, badges, JSON export, in-app updates with a changelog, dark mode, night-read
+        mode, and 30-day targets built from a habits survey.
+      </p>
+      <p data-lang="vi" lang="vi" hidden>
+        Không biểu đồ bịa, không số liệu mẫu: khi thiếu quyền, ứng dụng ghi rõ “chưa có nguồn dữ
+        liệu” thay vì bịa một con số. Mười một tính năng nữa cũng có mặt — bài tập thư giãn mắt có
+        hướng dẫn, huy hiệu, xuất JSON, cập nhật trong app kèm changelog, chế độ tối, chế độ đọc
+        ban đêm, và mục tiêu 30 ngày sinh ra từ khảo sát thói quen.
+      </p>
+    </div>
+
+    <div class="feature-grid">
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M12 3a6 6 0 0 0-6 6v3.2c0 .9-.4 1.8-1.1 2.4h14.2c-.7-.6-1.1-1.5-1.1-2.4V9a6 6 0 0 0-6-6z"/><path d="M10 18.5a2 2 0 0 0 4 0"/>
+        </svg>
+        <h3 data-lang="en">Break reminders that survive reboots</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Nhắc nghỉ mắt sống dai sau khi khởi động lại</h3>
+        <p data-lang="en">
+          A repeating alarm with a persistent countdown notification, vibration and a full-screen
+          alert — re-armed after every restart, so a reminder never vanishes because the system
+          tidied up.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Báo thức lặp lại kèm thông báo đếm ngược ghim, rung và cảnh báo toàn màn hình — được hẹn
+          lại sau mỗi lần khởi động, nên lời nhắc không bao giờ biến mất vì hệ thống dọn dẹp.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4.2-5.6"/><circle cx="12" cy="18" r="1.4"/>
+        </svg>
+        <h3 data-lang="en">An Eye Health Score with reasons</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Điểm sức khỏe mắt có lý do</h3>
+        <p data-lang="en">
+          Screen time, breaks, environment, sleep and outdoor time roll into one number, with the
+          daily factor breakdown beside it.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Thời gian màn hình, lần nghỉ, môi trường, giấc ngủ và thời gian ngoài trời gộp thành một
+          con số, kèm chi tiết từng yếu tố trong ngày.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>
+        </svg>
+        <h3 data-lang="en">Dark-room awareness</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Cảnh báo dùng máy trong bóng tối</h3>
+        <p data-lang="en">
+          A native foreground service reads the ambient light sensor and warns you when you use
+          your phone in a genuinely dark room.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Một dịch vụ nền gốc đọc cảm biến ánh sáng và cảnh báo khi bạn dùng máy trong phòng thực
+          sự tối.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>
+        </svg>
+        <h3 data-lang="en">Camera checks that stay on the phone</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Kiểm tra bằng camera, không rời máy</h3>
+        <p data-lang="en">
+          ML Kit estimates eye-to-screen distance and whether each eye is open. Frames are analysed
+          on the device and never stored or uploaded.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          ML Kit ước lượng khoảng cách mắt–màn hình và trạng thái mở mắt từng bên. Khung hình được
+          phân tích ngay trên máy, không lưu, không tải lên.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>
+        </svg>
+        <h3 data-lang="en">Outdoor time and sleep, estimated</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Ngoài trời và giấc ngủ, ước lượng</h3>
+        <p data-lang="en">
+          GPS presence counts daylight minutes; the gap between your last night-time use and your
+          first morning use estimates sleep. Both are estimates, and the app says so.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Tín hiệu GPS đếm số phút dưới ánh sáng ban ngày; khoảng cách giữa lần dùng cuối trước khi
+          ngủ và lần đầu buổi sáng ước lượng giấc ngủ. Cả hai đều là ước lượng, và ứng dụng nói rõ
+          điều đó.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M3 12h4l3-7 4 14 3-7h4"/>
+        </svg>
+        <h3 data-lang="en">Guided eye exercises</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Bài tập thư giãn mắt</h3>
+        <p data-lang="en">
+          Short animated routines that walk you through releasing your eyes, with a timer that keeps
+          the pace.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Các bài tập ngắn có hướng dẫn động hoạt hình dẫn dắt bạn thả lỏng mắt, kèm bộ đếm giữ
+          nhịp.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5v1.5A3 3 0 0 0 8 10.4M16 6h3v1.5a3 3 0 0 1-3 2.9"/><path d="M12 13v6M9 20h6"/>
+        </svg>
+        <h3 data-lang="en">Streaks, tiers and a leaderboard</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Chuỗi ngày, hạng bậc và bảng xếp hạng</h3>
+        <p data-lang="en">
+          Bronze to Master tiers by streak length, milestone badges, and an optional shared
+          leaderboard for signed-in users.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Hạng từ Bronze đến Master theo độ dài chuỗi ngày, huy hiệu cột mốc, và bảng xếp hạng chia
+          sẻ tùy chọn cho người đã đăng nhập.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h7M10 17h5"/>
+        </svg>
+        <h3 data-lang="en">A weekly report worth keeping</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Báo cáo tuần đáng giữ lại</h3>
+        <p data-lang="en">
+          A seven-day summary you can export as a real PDF, plus a JSON export of everything the
+          app stores.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Bản tóm tắt bảy ngày xuất được thành PDF thật, cùng bản xuất JSON toàn bộ dữ liệu ứng
+          dụng lưu.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>
+        </svg>
+        <h3 data-lang="en">A home-screen widget</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Widget trên màn hình chính</h3>
+        <p data-lang="en">
+          Today's score, your streak and the countdown to the next break, without opening the app.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Điểm hôm nay, chuỗi ngày của bạn và đồng hồ đếm ngược tới lần nghỉ tiếp theo, không cần mở
+          app.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M12 3a6 6 0 0 0-6 6v3.2c0 .9-.4 1.8-1.1 2.4h12.2"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"/><path d="M3.5 3.5l17 17"/>
+        </svg>
+        <h3 data-lang="en">Focus Mode</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Chế độ Tập trung</h3>
+        <p data-lang="en">
+          Silence other notifications while you work, so your eyes are not pulled back to the screen
+          every minute.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Chặn thông báo ứng dụng khác khi bạn làm việc, để mắt không bị kéo lại màn hình mỗi phút.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/>
+        </svg>
+        <h3 data-lang="en">A guardian nudge</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Nhắc từ người bảo hộ</h3>
+        <p data-lang="en">
+          Ask a family member to remind you when you pass your own screen-time target.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Nhờ người thân nhắc bạn khi bạn vượt quá mục tiêu thời gian màn hình do chính bạn đặt.
+        </p>
+      </article>
+
+      <article class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M12 3l1.9 5.6L19.5 10l-5.6 1.4L12 17l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M18 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>
+        </svg>
+        <h3 data-lang="en">An AI assistant that asks first</h3>
+        <h3 data-lang="vi" lang="vi" hidden>Trợ lý AI hỏi trước khi làm</h3>
+        <p data-lang="en">
+          Ask eye-care questions and get suggestions for your settings — but every change is
+          proposed first and applied only after you agree.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Hỏi các câu về sức khỏe mắt và nhận gợi ý cho cài đặt của bạn — nhưng mọi thay đổi đều
+          được đề xuất trước và chỉ áp dụng khi bạn đồng ý.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============================ PRIVACY BAND ============================ -->
+  <section class="band" id="privacy" aria-labelledby="privacy-heading">
+    <div class="shell band-grid">
+      <div>
+        <p class="eyebrow" data-lang="en">Privacy, plainly</p>
+        <p class="eyebrow" data-lang="vi" lang="vi" hidden>Quyền riêng tư, nói thẳng</p>
+        <h2 id="privacy-heading" data-lang="en">Most of it never leaves your phone.</h2>
+        <h2 id="privacy-heading-vi" data-lang="vi" lang="vi" hidden>Phần lớn dữ liệu không rời khỏi máy bạn.</h2>
+        <p data-lang="en">
+          Camera frames, light readings, GPS coordinates and your eye-test history are processed on
+          the device and stay there. Sign in only if you want the leaderboard and cloud backup.
+          There is no analytics SDK in the app at all — the analytics service is a switch with no
+          events behind it.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Khung hình camera, dữ liệu ánh sáng, tọa độ GPS và lịch sử kiểm tra mắt của bạn được xử lý
+          ngay trên máy và nằm lại đó. Chỉ đăng nhập khi bạn muốn dùng bảng xếp hạng và sao lưu đám
+          mây. Ứng dụng không cài bất kỳ SDK phân tích nào — dịch vụ analytics chỉ là một công tắc mà
+          chưa có sự kiện nào chạy qua.
+        </p>
+        <p>
+          <a href="../legal/privacy.html" data-lang="en">The privacy policy names every data type, where it goes and how long it is kept →</a>
+          <a href="../legal/privacy.html" data-lang="vi" lang="vi" hidden>Chính sách quyền riêng tư nêu rõ từng loại dữ liệu, đi đâu và giữ bao lâu →</a>
+        </p>
+      </div>
+
+      <ul class="stay-list">
+        <li data-lang="en">Camera frames</li>
+        <li data-lang="vi" lang="vi" hidden>Khung hình camera</li>
+        <li data-lang="en">Ambient light readings</li>
+        <li data-lang="vi" lang="vi" hidden>Dữ liệu ánh sáng môi trường</li>
+        <li data-lang="en">GPS coordinates</li>
+        <li data-lang="vi" lang="vi" hidden>Tọa độ GPS</li>
+        <li data-lang="en">Eye-test history</li>
+        <li data-lang="vi" lang="vi" hidden>Lịch sử kiểm tra mắt</li>
+        <li data-lang="en">Daily scores and habits</li>
+        <li data-lang="vi" lang="vi" hidden>Điểm số và thói quen hằng ngày</li>
+        <li data-lang="en">Reminder schedules and settings</li>
+        <li data-lang="vi" lang="vi" hidden>Lịch nhắc và cài đặt</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================ DOWNLOAD ============================ -->
+  <section class="section shell" id="download" aria-labelledby="download-heading">
+    <div class="download">
+      <div>
+        <p class="eyebrow" data-lang="en">Get it</p>
+        <p class="eyebrow" data-lang="vi" lang="vi" hidden>Tải về</p>
+        <h2 id="download-heading" data-lang="en">Get EyeCare AI.</h2>
+        <h2 id="download-heading-vi" data-lang="vi" lang="vi" hidden>Tải EyeCare AI.</h2>
+        <p data-lang="en">
+          Signed builds live on the project's GitHub Releases page. Install the APK, open it once,
+          and the setup wizard walks you through the permissions you actually need — each one
+          optional, and the app still works without most of them.
+        </p>
+        <p data-lang="vi" lang="vi" hidden>
+          Bản build có chữ ký nằm trên trang GitHub Releases của dự án. Cài APK, mở lần đầu, và trình
+          hướng dẫn sẽ đưa bạn qua đúng những quyền bạn thật sự cần — mỗi quyền đều tùy chọn, và
+          ứng dụng vẫn chạy được khi thiếu phần lớn trong số đó.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="https://github.com/ThongAccount/eye_care_ai/releases">
+            <span data-lang="en">Open GitHub Releases</span>
+            <span data-lang="vi" lang="vi" hidden>Mở GitHub Releases</span>
+          </a>
+          <a class="btn btn-ghost" href="../legal/terms.html">
+            <span data-lang="en">Terms of Service</span>
+            <span data-lang="vi" lang="vi" hidden>Điều khoản sử dụng</span>
+          </a>
+        </div>
+      </div>
+
+      <ul class="facts">
+        <li><strong data-lang="en">Version</strong><strong data-lang="vi" lang="vi" hidden>Phiên bản</strong><span>1.3.0+alpha</span></li>
+        <li><strong data-lang="en">Platform</strong><strong data-lang="vi" lang="vi" hidden>Nền tảng</strong><span>Android 8.0+ (API 26)</span></li>
+        <li><strong data-lang="en">Languages</strong><strong data-lang="vi" lang="vi" hidden>Ngôn ngữ</strong><span>English · Tiếng Việt</span></li>
+        <li><strong data-lang="en">Price</strong><strong data-lang="vi" lang="vi" hidden>Giá</strong><span data-lang="en">Free · no ads · no in-app purchases</span><span data-lang="vi" lang="vi" hidden>Miễn phí · không quảng cáo · không mua trong app</span></li>
+        <li><strong data-lang="en">Source</strong><strong data-lang="vi" lang="vi" hidden>Mã nguồn</strong><span>github.com/ThongAccount/eye_care_ai</span></li>
+        <li><strong data-lang="en">Package</strong><strong data-lang="vi" lang="vi" hidden>Gói</strong><span>com.eyecare.eye_care_ai</span></li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="shell">
+    <nav aria-label="Footer">
+      <a href="../legal/privacy.html" data-lang="en">Privacy Policy</a>
+      <a href="../legal/privacy.html" data-lang="vi" lang="vi" hidden>Chính sách quyền riêng tư</a>
+      <a href="../legal/terms.html" data-lang="en">Terms of Service</a>
+      <a href="../legal/terms.html" data-lang="vi" lang="vi" hidden>Điều khoản sử dụng</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai/releases" data-lang="en">Downloads</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai/releases" data-lang="vi" lang="vi" hidden>Tải về</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai" data-lang="en">Source code</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai" data-lang="vi" lang="vi" hidden>Mã nguồn</a>
+    </nav>
+    <p class="legal-note" data-lang="en">
+      EyeCare AI is a wellness tool. It does not diagnose, treat or prevent eye disease.
+      Support: eyecareai.app@gmail.com
+    </p>
+    <p class="legal-note" data-lang="vi" lang="vi" hidden>
+      EyeCare AI là công cụ chăm sóc sức khỏe. Ứng dụng không chẩn đoán, không điều trị và không ngăn
+      ngừa bệnh về mắt. Hỗ trợ: eyecareai.app@gmail.com
+    </p>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+
+    function apply(lang) {
+      var blocks = document.querySelectorAll('[data-lang]');
+      for (var i = 0; i < blocks.length; i++) {
+        blocks[i].hidden = blocks[i].getAttribute('data-lang') !== lang;
+      }
+      var buttons = document.querySelectorAll('[data-lang-btn]');
+      for (var j = 0; j < buttons.length; j++) {
+        buttons[j].setAttribute('aria-pressed', buttons[j].getAttribute('data-lang-btn') === lang ? 'true' : 'false');
+      }
+      var labelled = document.querySelectorAll('[data-aria-en]');
+      for (var m = 0; m < labelled.length; m++) {
+        labelled[m].setAttribute('aria-label', labelled[m].getAttribute(lang === 'vi' ? 'data-aria-vi' : 'data-aria-en'));
+      }
+      root.setAttribute('lang', lang);
+    }
+
+    var buttons = document.querySelectorAll('[data-lang-btn]');
+    for (var k = 0; k < buttons.length; k++) {
+      buttons[k].addEventListener('click', function (event) {
+        apply(event.currentTarget.getAttribute('data-lang-btn'));
+      });
+    }
+
+    var preferred = (navigator.language || 'en').toLowerCase().indexOf('vi') === 0 ? 'vi' : 'en';
+    apply(preferred);
+  })();
+</script>
+</body>
+</html>
