@@ -116,3 +116,41 @@ jobs:
             ${{ github.event.head_commit.message }}
           prerelease: true
           files: release/*.apk
+
+      # ------------------------------------------------------------------
+      # Android App Bundle (.aab) — what Google Play actually accepts.
+      # Play REJECTS APK uploads for new apps, so the bundle is built IN
+      # ADDITION to the APK (never instead of it — the APK stays the alpha
+      # distribution channel via GitHub Releases and the in-app updater).
+      #
+      # Deliberately built AFTER the release is published: if the bundle
+      # step breaks, the job goes red and the AAB is missing, but the APK
+      # release is already out — alpha testers are never blocked by it.
+      # ------------------------------------------------------------------
+      - name: Build release App Bundle
+        run: flutter build appbundle --release --build-number=${{ github.run_number }} --dart-define=NIM_API_KEY=${{ secrets.NIM_API_KEY }} --dart-define=COMMIT_HASH=${{ github.sha }}
+
+      - name: Rename App Bundle
+        run: |
+          SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          mkdir -p release
+          cp build/app/outputs/bundle/release/app-release.aab \
+            "release/eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.aab"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aab-${{ github.run_number }}
+          path: release/*.aab
+
+      - name: Attach App Bundle to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "v${{ steps.version.outputs.version }} (build ${{ github.run_number }})"
+          body: |
+            **Commit:** ${{ github.sha }}
+            
+            ${{ github.event.head_commit.message }}
+          prerelease: true
+          files: release/*.aab
