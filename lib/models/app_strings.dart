@@ -83,6 +83,10 @@ class AppStrings {
   String get notifications => vi ? 'Thông báo' : 'Notifications';
   String get breakReminders => vi ? 'Nhắc nhở nghỉ ngơi' : 'Break Reminders';
   String get breakRemindersSubtitle => vi ? 'Nhận thông báo cho nghỉ ngơi 20-20-20' : 'Get notified for 20-20-20 breaks';
+  String get customNotificationSound => vi ? 'Âm thanh nhắc riêng' : 'Custom alert sound';
+  String get customNotificationSoundSubtitle => vi
+      ? 'Dùng âm thanh báo nghỉ mắt riêng của EyeCare AI thay cho âm thanh mặc định'
+      : 'Use the built-in EyeCare AI break alert instead of the system sound';
   String get eyeTestReminders => vi ? 'Nhắc nhở kiểm tra mắt' : 'Eye Test Reminders';
   String get eyeTestRemindersSubtitle => vi ? 'Nhắc kiểm tra thị lực hàng tuần' : 'Weekly vision screening alerts';
   String get habitTracking => vi ? 'Theo dõi thói quen' : 'Habit Tracking';
@@ -215,12 +219,23 @@ class AppStrings {
       : 'Display-over-other-apps permission missing. Enable it in Settings.';
   String get helpSupport => vi ? 'Trợ giúp & Hỗ trợ' : 'Help & Support';
   String get signOut => vi ? 'Đăng xuất' : 'Sign Out';
-  String get version => vi ? 'EyeCare AI v1.0.0' : 'EyeCare AI v1.0.0';
+  String get version => vi ? 'EyeCare AI v1.4.0' : 'EyeCare AI v1.4.0';
   String get guardianEmailTitle => vi ? 'Email người bảo hộ' : 'Guardian email';
   String get guardianEmailHint => vi ? 'Nhận mail nhắc nhở nếu quá giờ dùng thiết bị' : 'Receive reminders if device usage exceeds limits';
   String get guardianEmailAdd => vi ? 'Thêm email' : 'Add email';
   String get guardianEmailSendTest => vi ? 'Gửi mail nhắc thử' : 'Send test reminder';
   String get guardianEmailSaved => vi ? 'Đã lưu email người bảo hộ.' : 'Guardian email saved.';
+  String get guardianEmailSent =>
+      vi ? 'Đã gửi nhắc nhở cho người bảo hộ.' : 'Guardian reminder sent.';
+  String get guardianEmailSendFailed => vi
+      ? 'Chưa gửi được tự động — đã mở app mail để bạn tự gửi.'
+      : 'Could not send automatically — opened your mail app instead.';
+  String get guardianEmailPending => vi
+      ? 'Đã vượt giờ — chạm để nhắc người bảo hộ.'
+      : 'Limit exceeded — tap to notify the guardian.';
+  String get guardianEmailAuto => vi
+      ? 'Tự động nhắc khi vượt giờ (kiểm tra nền mỗi 30 phút)'
+      : 'Notifies automatically when the limit is exceeded (checked in the background every 30 min)';
   String get roadmapTitle => vi ? 'Lộ trình tính năng sắp tới' : 'Upcoming feature roadmap';
   List<String> get roadmapFeatures => vi
       ? [
@@ -680,7 +695,9 @@ class AppStrings {
       case 'outdoor':
         return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':
-        return vi ? 'Nhận diện ánh nhìn qua camera trước' : 'Front camera gaze detection';
+        // Camera distance/gaze scoring đã bị gỡ bỏ (26/09) — số lần nghỉ
+        // được đếm bằng nhắc thủ công + tự động.
+        return vi ? 'Đếm nghỉ ngơi thủ công và tự động' : 'Manually and auto-counted breaks';
       default:
         return '';
     }
@@ -1051,7 +1068,7 @@ class AppStrings {
   String get docDataProtectionPolicy => vi ? 'Chính sách bảo vệ dữ liệu' : 'Data Protection Policy';
   String get docOpenSourceLicenses => vi ? 'Giấy phép mã nguồn mở' : 'Open Source Licenses';
   String get termsVersion => vi ? 'Phiên bản điều khoản 1.0' : 'Terms Version 1.0';
-  String get termsLastUpdated => vi ? 'Cập nhật lần cuối: Tháng 7, 2026' : 'Last Updated: July 2026';
+  String get termsLastUpdated => vi ? 'Cập nhật lần cuối: Tháng 10, 2026' : 'Last Updated: October 2026';
 
   // Help & Support section
   String get faqTitle => vi ? 'Câu hỏi thường gặp' : 'Frequently Asked Questions';
@@ -1108,4 +1125,21 @@ class AppStrings {
       vi ? 'Không tải được nhật ký cập nhật. Vui lòng thử lại.' : 'Failed to load the changelog. Please try again.';
   String get changelogRetry => vi ? 'Thử lại' : 'Retry';
   String get changelogNoNotes => vi ? 'Không có ghi chú cho bản này.' : 'No notes for this release.';
+
+  // ---------------- Rate App (Đánh giá ứng dụng) ----------------
+  // Mục "Đánh giá EyeCare AI" nằm ngay dưới mục "Nhật ký cập nhật" trong
+  // phần Cài đặt > Khác (xem settings_screen.dart) — dùng chung service
+  // RateAppService (lib/services/rate_app_service.dart) để mở listing của
+  // store, hoặc hộp thoại fallback (GitHub Releases + e-mail góp ý).
+  String get rateAppTitle => vi ? 'Đánh giá EyeCare AI' : 'Rate EyeCare AI';
+  String get rateAppSubtitle =>
+      vi ? 'Góp ý giúp ứng dụng tốt hơn' : 'Your review helps other people find it';
+  String get rateAppThanksTitle =>
+      vi ? 'Cảm ơn bạn!' : 'Thanks for using EyeCare AI!';
+  String get rateAppFallbackBody => vi
+      ? 'EyeCare AI chưa có trên kho ứng dụng. Bạn có thể tải bản mới nhất trên GitHub Releases, hoặc gửi góp ý cho chúng tôi.'
+      : 'EyeCare AI is not in an app store yet. You can get the latest build from GitHub Releases, or send us your feedback directly.';
+  String get rateAppFeedback => vi ? 'Gửi góp ý' : 'Send feedback';
+  String get rateAppDownload => vi ? 'Tải bản mới nhất' : 'Get the latest build';
+  String get rateAppLater => vi ? 'Để sau' : 'Maybe later';
 }

@@ -15,6 +15,70 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history + tags: the release notes are generated from the commit
+          # range between the previous release and this build.
+          fetch-depth: 0
+
+      # Chặn release NGAY khi cây source còn chứa key thật (vd key NVIDIA NIM
+      # bị paste nhầm vào lib/config/local_env.dart, hoặc key bị commit vào
+      # docs/). Hook pre-push chỉ chạy trên máy lập trình viên và chỉ quét
+      # dòng MỚI thêm — CI quét TOÀN BỘ cây source, nên key có sẵn trong
+      # lịch sử cũng bị chặn trước khi đóng gói APK.
+      - name: Scan source tree for secrets
+        run: |
+          PATTERNS='nvapi-[A-Za-z0-9_.-]{20,}|sk-ant-[A-Za-z0-9-]{20,}|sk-[A-Za-z0-9]{20,}|(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[bpas]-[A-Za-z0-9-]{10,}|BEGIN [A-Z ]*PRIVATE KEY'
+          HITS=$(grep -rEIl --exclude-dir=.git --exclude-dir=build \
+            --exclude-dir=.dart_tool --exclude-dir=.gradle \
+            "$PATTERNS" . 2>/dev/null | head -5 || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::Secret-like content found in the source tree (build aborted):"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "Source tree is clean of secret-like content."
+
+      # ------------------------------------------------------------------
+      # Upstream-identity guard.
+      #
+      # The app checks GitHub Releases for updates, using the repo name
+      # hard-coded in lib/services/update_service.dart. If that points at a
+      # DIFFERENT repo, the updater reads someone else's releases.
+      #
+      # This is not hypothetical: merges from upstream
+      # (Supertime1236/eye_care_ai) have twice carried upstream's own repo
+      # name into this fork - once in update_service.dart, once in the
+      # README links. Upstream publishes under the SAME build-N tag scheme,
+      # so a user on build-94 would be told build-106 is an update and
+      # offered a foreign APK. The merge looked clean, so only a guard
+      # catches it.
+      #
+      # Runs BEFORE the release is published: if this fails, no release and
+      # no APK are produced.
+      # ------------------------------------------------------------------
+      - name: Verify the updater targets this repository
+        run: |
+          SERVICE=lib/services/update_service.dart
+          EXPECTED_OWNER="${GITHUB_REPOSITORY%%/*}"
+          EXPECTED_REPO="${GITHUB_REPOSITORY#*/}"
+
+          OWNER=$(grep -oE "githubOwner = '[^']+'" "$SERVICE" | head -1 | sed "s/.*'\([^']*\)'.*/\1/")
+          REPO=$(grep -oE "githubRepo = '[^']+'" "$SERVICE" | head -1 | sed "s/.*'\([^']*\)'.*/\1/")
+
+          if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
+            echo "::error::Could not read githubOwner/githubRepo from $SERVICE"
+            exit 1
+          fi
+          if [ "$OWNER" != "$EXPECTED_OWNER" ] || [ "$REPO" != "$EXPECTED_REPO" ]; then
+            echo "::error::Updater targets $OWNER/$REPO but this build is ${GITHUB_REPOSITORY}."
+            echo "::error::Users would be offered another repository's APK as an update."
+            exit 1
+          fi
+          if ! grep -q "https://github.com/$OWNER/$REPO/releases" README.md; then
+            echo "::error::README.md does not link to $OWNER/$REPO releases."
+            exit 1
+          fi
+          echo "Updater targets $OWNER/$REPO - matches ${GITHUB_REPOSITORY}."
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -53,6 +117,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # Trước đây workflow KHÔNG chạy test — các file test/ trong repo chỉ
+      # tồn tại trên giấy. Chạy analyze (lỗi thì chặn, cảnh báo thì không)
+      # và test TRƯỚC khi build để một bản release không bao giờ đóng gói code
+      # hỏng.
+      - name: Analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
       - name: Clean stale cache
         run: |
           flutter clean
@@ -79,21 +153,97 @@ jobs:
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d '\r')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # ------------------------------------------------------------------
+      # Release notes.
+      #
+      # The body of a GitHub release IS what the user reads: the in-app
+      # "Update Available" modal and the changelog screen both render it in a
+      # plain Text widget (no markdown). So:
+      #   - notes must be PLAIN TEXT (markdown "**" used to show up literally);
+      #   - notes must list EVERY commit of this release (subject + description),
+      #     not just the last commit - a release containing the version bump and
+      #     the App Bundle pipeline used to announce itself as one bare subject.
+      #
+      # The previous release is resolved from the GitHub releases API, not from
+      # `git tag`: the tag namespace "build-<N>" is also used by the repo's
+      # older upstream history, so tags alone are not authoritative.
+      # ------------------------------------------------------------------
+      - name: Build release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          PREV_TAG=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/releases?per_page=100" \
+            | jq -r --argjson n "$RUN_NUMBER" '
+                [ .[] | .tag_name | select(test("^build-[0-9]+$"))
+                  | sub("^build-";"") | tonumber | select(. < $n) ] | max // empty')
+          if [ -n "$PREV_TAG" ] && git rev-parse -q --verify "refs/tags/build-$PREV_TAG" >/dev/null 2>&1; then
+            RANGE="build-$PREV_TAG..HEAD"
+          else
+            RANGE="-20"
+          fi
+          echo "Previous release: build-${PREV_TAG:-none} | range: $RANGE"
+          {
+            echo "notes<<NOTES_EOF"
+            python3 - "$RANGE" <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          rng = sys.argv[1]
+          raw = subprocess.run(
+              ["git", "log", "--no-merges", rng, "--pretty=format:%s%x00%b%x00"],
+              capture_output=True,
+              text=True,
+          ).stdout
+
+          parts = raw.split("\x00")
+          items = []
+          for i in range(0, len(parts) - 1, 2):
+              subject = parts[i].strip()
+              body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+              if not subject:
+                  continue
+              # Drop the Conventional Commit prefix - "feat(ui): add x" -> "add x".
+              subject = re.sub(r"^[a-z]+(\([a-z]+\))?!?: ", "", subject)
+              subject = subject[:1].upper() + subject[1:]
+              lines = ["- " + subject]
+              # Every body line is indented under its subject, and blank lines
+              # inside a body are kept so paragraphs stay readable.
+              for line in body.splitlines():
+                  lines.append(("  " + line).rstrip() if line.strip() else "")
+              items.append("\n".join(lines))
+
+          print("\n\n".join(items))
+          PY
+            echo ""
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build release APK
         run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=NIM_API_KEY=${{ secrets.NIM_API_KEY }} --dart-define=COMMIT_HASH=${{ github.sha }}
 
       - name: Rename APK
+        id: apk
         run: |
           SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          # XOÁ sạch thư mục release trước khi copy: thư mục này từng bị
+          # commit nhầm vào git (2 APK build 57/58), khiến glob release/*.apk
+          # bên dưới đính kèm APK CŨ vào mọi release -> app tải nhầm bản cũ.
+          rm -rf release
           mkdir -p release
-          cp build/app/outputs/flutter-apk/app-release.apk \
-            "release/eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.apk"
+          APK_NAME="eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "release/${APK_NAME}"
+          echo "path=release/${APK_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.run_number }}
-          path: release/*.apk
+          path: ${{ steps.apk.outputs.path }}
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -101,8 +251,49 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: "v${{ steps.version.outputs.version }} (build ${{ github.run_number }})"
           body: |
-            **Commit:** ${{ github.sha }}
-            
-            ${{ github.event.head_commit.message }}
+            ${{ steps.notes.outputs.notes }}
+
+            Build ${{ github.run_number }} - commit ${{ github.sha }}
           prerelease: true
-          files: release/*.apk
+          files: ${{ steps.apk.outputs.path }}
+
+      # ------------------------------------------------------------------
+      # Android App Bundle (.aab) — what Google Play actually accepts.
+      # Play REJECTS APK uploads for new apps, so the bundle is built IN
+      # ADDITION to the APK (never instead of it — the APK stays the alpha
+      # distribution channel via GitHub Releases and the in-app updater).
+      #
+      # Deliberately built AFTER the release is published: if the bundle
+      # step breaks, the job goes red and the AAB is missing, but the APK
+      # release is already out — alpha testers are never blocked by it.
+      # ------------------------------------------------------------------
+      - name: Build release App Bundle
+        run: flutter build appbundle --release --build-number=${{ github.run_number }} --dart-define=NIM_API_KEY=${{ secrets.NIM_API_KEY }} --dart-define=COMMIT_HASH=${{ github.sha }}
+
+      - name: Rename App Bundle
+        id: aab
+        run: |
+          SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          rm -rf release
+          mkdir -p release
+          AAB_NAME="eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.aab"
+          cp build/app/outputs/bundle/release/app-release.aab "release/${AAB_NAME}"
+          echo "path=release/${AAB_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aab-${{ github.run_number }}
+          path: ${{ steps.aab.outputs.path }}
+
+      - name: Attach App Bundle to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "v${{ steps.version.outputs.version }} (build ${{ github.run_number }})"
+          body: |
+            ${{ steps.notes.outputs.notes }}
+
+            Build ${{ github.run_number }} - commit ${{ github.sha }}
+          prerelease: true
+          files: ${{ steps.aab.outputs.path }}

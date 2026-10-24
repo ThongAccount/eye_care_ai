@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'release_asset_picker.dart';
+
 /// Kiểm tra bản cập nhật mới bằng cách hỏi thẳng GitHub Releases của repo
 /// (KHÔNG qua Google Play — vì app không lên Play Store, chỉ phát hành APK
 /// trực tiếp qua GitHub Actions, xem .github/workflows/build-apk.yml).
@@ -73,9 +75,41 @@ class UpdateCheckResult {
   final String? errorDetail;
 }
 
+/// Một bản phát hành đã được chuẩn hoá từ JSON của GitHub Releases API.
+@immutable
+class ReleaseRef {
+  const ReleaseRef({
+    required this.buildNumber,
+    required this.versionName,
+    required this.notes,
+    required this.downloadUrl,
+  });
+
+  final int buildNumber;
+  final String versionName;
+  final String notes;
+  final String downloadUrl;
+}
+
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
+
+  /// Chuẩn hoá ghi chú release trước khi hiển thị.
+  ///
+  /// Ghi chú release được render bằng widget Text thuần (không phải
+  /// markdown) trong modal "Có bản cập nhật" và màn "Nhật ký cập nhật", nên
+  /// các body cũ viết theo kiểu markdown ("**Commit:** ...") sẽ hiện ra với
+  /// dấu * nguyên văn cho người dùng. Bỏ header legacy và dấu ** để phần
+  /// ghi chú luôn hiển thị gọn gàng, đồng thời giữ nguyên các dòng bullet.
+  static String sanitizeNotes(String body) {
+    final lines = body
+        .split('\n')
+        .where((l) => !l.trimLeft().startsWith('**Commit:**'))
+        .map((l) => l.replaceAll('**', '').trimRight())
+        .toList();
+    return lines.join('\n').trim();
+  }
 
   // Chủ repo GitHub đang publish APK qua workflow build-apk.yml. Nếu nút
   // "Kiểm tra cập nhật" LUÔN báo lỗi/luôn "đang dùng bản mới nhất" dù rõ
@@ -88,10 +122,65 @@ class UpdateService {
   static const String githubRepo = 'eye_care_ai';
 
   static const String _latestReleaseUrl =
-      'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=1';
+      'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=20';
 
   static String _releasesUrl(int limit) =>
       'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=$limit';
+
+  /// Chuyển JSON của GitHub Releases API thành danh sách [ReleaseRef].
+  ///
+  /// - Bỏ qua release có tag không đúng định dạng `build-<số>` (release tạo
+  ///   thủ công) — cùng quy tắc với logic so sánh trước đây.
+  /// - Sắp theo build mới nhất trước.
+  /// - Ghi chú đã qua [sanitizeNotes].
+  /// - File APK được chọn theo SỐ BUILD của release (xem
+  ///   [pickReleaseApkUrl]) — không lấy asset `.apk` đầu tiên, vì thứ tự
+  ///   assets của GitHub có thể đưa APK cũ lên trước.
+  ///
+  /// Tách thành hàm thuần (không gọi mạng) để unit test được.
+  static List<ReleaseRef> parseReleases(dynamic raw) {
+    final items = raw is List
+        ? raw
+        : (raw == null ? const <dynamic>[] : <dynamic>[raw]);
+    final parsed = <ReleaseRef>[];
+    for (final item in items) {
+      if (item is! Map) continue;
+      final tag = (item['tag_name'] ?? '').toString();
+      final match = RegExp(r'build-(\d+)').firstMatch(tag);
+      if (match == null) continue;
+      final buildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
+      if (buildNumber <= 0) continue;
+
+      // Chọn APK THEO SỐ BUILD của release, không lấy asset .apk đầu tiên —
+      // lý do và lịch sử lỗi xem release_asset_picker.dart.
+      final downloadUrl = pickReleaseApkUrl(
+        (item['assets'] as List?) ?? const [],
+        buildNumber,
+      );
+
+      parsed.add(ReleaseRef(
+        buildNumber: buildNumber,
+        versionName: (item['name'] ?? tag).toString(),
+        notes: sanitizeNotes((item['body'] ?? '').toString()),
+        downloadUrl: downloadUrl,
+      ));
+    }
+    parsed.sort((a, b) => b.buildNumber.compareTo(a.buildNumber));
+    return parsed;
+  }
+
+  /// Gộp ghi chú của MỌI bản phát hành mới hơn bản đang chạy.
+  ///
+  /// Người dùng thường bỏ qua nhiều bản (build 84 -> build 90), nên chỉ hiện
+  /// ghi chú của bản mới nhất sẽ giấu mọi thay đổi ở giữa. Gom lại theo thứ tự
+  /// mới -> cũ, mỗi bản một tiêu đề, để modal "Có bản cập nhật" cho người dùng
+  /// biết đã có gì mới kể từ bản họ đang dùng.
+  static String aggregateNotes(List<ReleaseRef> newerReleases) {
+    return newerReleases
+        .where((r) => r.notes.trim().isNotEmpty)
+        .map((r) => '${r.versionName}\n${r.notes.trim()}')
+        .join('\n\n');
+  }
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
@@ -124,48 +213,38 @@ class UpdateService {
         return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'empty_response');
       }
 
-      final data = raw is List ? (raw.firstOrNull as Map<String, dynamic>?) : raw as Map<String, dynamic>?;
-      if (data == null) {
-        // raw is List rỗng -> repo CHƯA CÓ release nào (khác với lỗi mạng).
+      final releases = UpdateService.parseReleases(raw);
+      if (releases.isEmpty) {
+        debugPrint('[UpdateService] Không có release nào khớp định dạng "build-<số>" '
+            '(repo có thể chưa có release, hoặc release được tạo thủ công ngoài workflow).');
         return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_releases_found');
       }
 
-      final tag = (data['tag_name'] ?? '').toString(); // "build-42"
-      final match = RegExp(r'build-(\d+)').firstMatch(tag);
-      if (match == null) {
-        debugPrint('[UpdateService] Release mới nhất có tag "$tag" không khớp định dạng "build-<số>" '
-            '— có thể release này được tạo thủ công thay vì qua workflow build-apk.yml.');
-        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'tag_format_mismatch:$tag');
-      }
-      final latestBuildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
-      if (latestBuildNumber <= 0) {
-        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'invalid_build_number');
-      }
-
-      final assets = (data['assets'] as List?) ?? [];
-      final apkAsset = assets.cast<Map<String, dynamic>>().firstWhere(
-            (a) => (a['name'] ?? '').toString().toLowerCase().endsWith('.apk'),
-            orElse: () => {},
-          );
-      final downloadUrl = (apkAsset['browser_download_url'] ?? '').toString();
-      if (downloadUrl.isEmpty) {
-        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_apk_asset');
-      }
+      final latest = releases.first;
 
       final packageInfo = await PackageInfo.fromPlatform();
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      if (latestBuildNumber <= currentBuildNumber) {
+      // Mọi bản phát hành mới hơn bản đang chạy — người dùng có thể bỏ qua
+      // nhiều bản, và họ nên thấy đủ mọi thay đổi kể từ bản của họ.
+      final newer =
+          releases.where((r) => r.buildNumber > currentBuildNumber).toList();
+
+      if (newer.isEmpty) {
         return UpdateCheckResult(UpdateCheckStatus.upToDate, null);
+      }
+
+      if (latest.downloadUrl.isEmpty) {
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_apk_asset');
       }
 
       return UpdateCheckResult(
         UpdateCheckStatus.updateAvailable,
         UpdateInfo(
-          buildNumber: latestBuildNumber,
-          versionName: (data['name'] ?? tag).toString(),
-          downloadUrl: downloadUrl,
-          releaseNotes: (data['body'] ?? '').toString(),
+          buildNumber: latest.buildNumber,
+          versionName: latest.versionName,
+          downloadUrl: latest.downloadUrl,
+          releaseNotes: UpdateService.aggregateNotes(newer),
         ),
       );
     } on DioException catch (e) {
@@ -203,7 +282,7 @@ class UpdateService {
         if (item is! Map<String, dynamic>) continue;
         final tag = (item['tag_name'] ?? '').toString();
         final match = RegExp(r'build-(\d+)').firstMatch(tag);
-        // Bỏ qua release không đúng định dạng "build-<số>" (release tạo thủ
+        // Bỏ qua release không đúng định dạng `build-<số>` (release tạo thủ
         // công) — chỉ liệt kê những bản thật sự do workflow build-apk.yml
         // phát hành, khớp với logic ở checkForUpdateVerbose.
         if (match == null) continue;
@@ -213,7 +292,9 @@ class UpdateService {
         entries.add(ChangelogEntry(
           buildNumber: buildNumber,
           versionName: (item['name'] ?? tag).toString(),
-          notes: (item['body'] ?? '').toString(),
+          notes: UpdateService.sanitizeNotes(
+            (item['body'] ?? '').toString(),
+          ),
           publishedAt: DateTime.tryParse((item['published_at'] ?? '').toString()),
         ));
       }
@@ -231,9 +312,12 @@ class UpdateService {
   }
 
   /// Tải file APK về thư mục cache RIÊNG của app (KHÔNG phải thư mục Download
-  /// công khai) — bắt buộc phải vậy để FileProvider (xem AndroidManifest.xml +
-  /// res/xml/file_paths.xml) có quyền cấp lại quyền đọc file này cho trình
-  /// cài đặt gói của hệ thống qua content:// URI.
+  /// công khai) — bắt buộc phải vậy để trình cài đặt gói của hệ thống đọc
+  /// được file này qua content:// URI do FileProvider của open_filex (thư viện
+  /// tự khai báo provider trong AndroidManifest của nó) cấp quyền.
+  ///
+  /// LƯU Ý: app KHÔNG tự khai báo FileProvider (không có res/xml/file_paths.xml
+  /// trong repo) — mọi thao tác mở/cài file đều đi qua OpenFilex.
   Future<File> downloadApk(
     UpdateInfo update, {
     void Function(int received, int total)? onProgress,

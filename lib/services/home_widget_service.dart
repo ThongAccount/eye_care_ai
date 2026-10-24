@@ -13,7 +13,7 @@ import 'notification_service.dart';
 // commit). Tap vào widget mở app (PendingIntent mặc định của package).
 class HomeWidgetService {
   static const _androidProvider =
-      'es.antonborri.home_widget.HomeWidgetProvider';
+      'com.eyecare.eye_care_ai.EyeWidgetProvider';
 
   static String _twoDigits(int n) => n.toString().padLeft(2, '0');
 

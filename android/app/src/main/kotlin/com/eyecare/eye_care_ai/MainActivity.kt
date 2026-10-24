@@ -41,6 +41,7 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         registerNativeDarkRoomWorker()
         registerNativeDailySnapshotWorker()
+        registerNativeGuardianReminderWorker()
         requestBatteryOptimizationExemptionOnce()
         startDarkRoomForegroundServiceIfNeeded()
     }
@@ -131,6 +132,24 @@ class MainActivity : FlutterActivity() {
             .build()
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             "daily_snapshot_periodic",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    // Đăng ký GuardianReminderWorker: kiểm tra NỀN mỗi 30 phút xem thời
+    // gian dùng điện thoại hôm nay đã vượt mục tiêu chưa — nếu vượt thì nhắc
+    // người bảo hộ (POST tới endpoint HTTPS cấu hình lúc build, hoặc ghi
+    // trạng thái "đang chờ" để app nhắc khi người dùng mở app).
+    // HOÀN TOÀN NATIVE — xem GuardianReminderWorker.kt để hiểu vì sao không
+    // làm được qua Dart/workmanager. ExistingPeriodicWorkPolicy.KEEP: gọi lại
+    // mỗi lần mở app là vô hại, không reset lịch đã đăng ký.
+    private fun registerNativeGuardianReminderWorker() {
+        val request = PeriodicWorkRequestBuilder<GuardianReminderWorker>(30, TimeUnit.MINUTES)
+            .setConstraints(Constraints.Builder().setRequiresBatteryNotLow(false).build())
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            GuardianReminderWorker.UNIQUE_WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )

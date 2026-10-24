@@ -165,8 +165,9 @@ class _EyeBreakScreenState extends State<EyeBreakScreen>
   }
 
   Future<void> _startFromButton(ReminderProvider reminder) async {
-    await _ensureOnlyOneReminderActive(keepAuto: false);
+    // Lấy provider TRƯỚC khi await để không dùng BuildContext qua khoảng async.
     final habitProvider = context.read<HabitProvider>();
+    await _ensureOnlyOneReminderActive(keepAuto: false);
     final target = habitProvider.habits
         .firstWhere((h) => h.id == 'breaks')
         .target;

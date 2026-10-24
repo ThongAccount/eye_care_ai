@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EyeCare AI — Terms of Service</title>
+<meta name="description" content="The terms that apply when you use EyeCare AI, including the limits of what the app's scores and advice can tell you.">
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --ink: #14181f;
+    --ink-soft: #4a5160;
+    --ink-faint: #6d7484;
+    --paper: #fbfbfd;
+    --card: #ffffff;
+    --rule: #e3e6ee;
+    --accent: #23439b;
+    --accent-soft: #eef2fd;
+    --todo-bg: #fdf4dc;
+    --todo-ink: #7a5200;
+    --todo-edge: #dfae3a;
+    --ok-bg: #eaf6ee;
+    --ok-ink: #1d6134;
+    --radius: 10px;
+    --measure: 70ch;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 2px; }
+
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--accent);
+    color: #fff;
+    padding: 12px 18px;
+    z-index: 10;
+    border-radius: 0 0 var(--radius) 0;
+  }
+  .skip-link:focus { left: 0; }
+
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    background: var(--card);
+  }
+  .masthead-inner {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .brand {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .brand span { color: var(--ink-faint); font-weight: 400; }
+  .masthead nav { display: flex; gap: 18px; font-size: 0.92rem; }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 40px 24px 96px;
+  }
+
+  .doc-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.15;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+  .lede {
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0 0 24px;
+  }
+  .meta {
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0 0 32px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .draft {
+    background: var(--todo-bg);
+    border: 1px solid var(--todo-edge);
+    border-left-width: 5px;
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 0 0 36px;
+    color: var(--todo-ink);
+    font-size: 0.95rem;
+  }
+  .draft h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-body);
+  }
+  .draft ul { margin: 10px 0 0; padding-left: 20px; }
+  .draft li { margin-bottom: 4px; }
+
+  .todo {
+    display: inline-block;
+    background: var(--todo-bg);
+    color: var(--todo-ink);
+    border: 1px solid var(--todo-edge);
+    border-radius: 4px;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .fact {
+    display: inline-block;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
+    border: 1px solid #b9dfc6;
+    border-radius: 4px;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .callout {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 0.95rem;
+  }
+  .callout p { margin: 0; max-width: var(--measure); }
+  .callout p + p { margin-top: 10px; }
+
+  nav.toc {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    margin: 0 0 40px;
+  }
+  nav.toc h2 {
+    margin: 0 0 8px;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-faint);
+    font-family: var(--font-body);
+  }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 20px;
+    columns: 2;
+    column-gap: 32px;
+    font-size: 0.95rem;
+  }
+  nav.toc li { margin-bottom: 4px; break-inside: avoid; }
+
+  section { margin-bottom: 44px; }
+  section > h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 0 0 6px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+  section > h2 .num {
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 0.62em;
+    vertical-align: 0.35em;
+    margin-right: 10px;
+  }
+  section h3 {
+    font-size: 1.02rem;
+    margin: 26px 0 6px;
+  }
+  section p, section li { max-width: var(--measure); }
+  section ul, section ol { padding-left: 22px; }
+  section li { margin-bottom: 6px; }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--card);
+    margin: 18px 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 44rem;
+    font-size: 0.9rem;
+  }
+  caption {
+    text-align: left;
+    padding: 14px 16px 0;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    background: #f7f8fc;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code, p code, li code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: #f1f3f9;
+    border-radius: 4px;
+    padding: 1px 5px;
+    word-break: break-word;
+  }
+
+  .sources {
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+    color: var(--ink-soft);
+    background: #f7f8fc;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    overflow-x: auto;
+  }
+  .sources ul { margin: 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+  .sources li { margin-bottom: 4px; break-inside: avoid; }
+
+  footer.doc-foot {
+    border-top: 1px solid var(--rule);
+    margin-top: 56px;
+    padding-top: 20px;
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+  }
+  footer.doc-foot a { margin-right: 18px; }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    .wrap { padding: 28px 18px 72px; }
+    nav.toc ol, .sources ul { columns: 1; }
+  }
+
+  @media print {
+    body { background: #fff; font-size: 11pt; }
+    .masthead, .draft, nav.toc { display: none; }
+    .wrap { max-width: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    section { break-inside: avoid-page; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../site/index.html">EyeCare AI <span>· Terms of Service</span></a>
+    <nav aria-label="Legal pages">
+      <a href="../site/index.html">Home</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai/releases">Downloads</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="doc-title">Terms of Service</h1>
+  <p class="lede">
+    These terms govern your use of EyeCare AI, an eye-habit and wellness companion for Android.
+    They are written to match what the app actually does; anything that depends on a decision only
+    the publisher can make is marked <span class="todo">TODO</span> rather than guessed.
+  </p>
+
+  <ul class="meta">
+    <li>Effective date: <span class="todo">TODO — set the date these terms are published</span></li>
+    <li>Last updated: <span class="todo">TODO — set the date of the last revision</span></li>
+    <li>Version: 0.1 (draft)</li>
+    <li>Applies to: EyeCare AI for Android (package <code>com.eyecare.eye_care_ai</code>)</li>
+  </ul>
+
+  <aside class="draft" aria-labelledby="draft-heading">
+    <h2 id="draft-heading">Draft — inputs still missing</h2>
+    <p>
+      Before this can be published, you need to confirm the legal entity, the governing
+      jurisdiction, the contact address, the effective date, and whether the free-app promise
+      below is accurate for your release plan. The full list is in
+      <a href="#appendix-b">Appendix B</a>.
+    </p>
+    <ul>
+      <li>Legal entity / company name and registered address.</li>
+      <li>Governing jurisdiction and dispute forum.</li>
+      <li>Official contact address (in-app support mailbox: <code>eyecareai.app@gmail.com</code>).</li>
+      <li>Effective date, and confirmation that the app stays free with no in-app purchases.</li>
+    </ul>
+  </aside>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#agreement">Agreement to these terms</a></li>
+      <li><a href="#not-medical">The app is not medical advice</a></li>
+      <li><a href="#scores">What the scores and estimates mean</a></li>
+      <li><a href="#ai">The AI assistant</a></li>
+      <li><a href="#licence">Your licence to use the app</a></li>
+      <li><a href="#conduct">Acceptable use</a></li>
+      <li><a href="#your-data">Your data and your account</a></li>
+      <li><a href="#third-parties">Third-party services</a></li>
+      <li><a href="#availability">Availability and changes</a></li>
+      <li><a href="#warranty">Disclaimer of warranties</a></li>
+      <li><a href="#liability">Limitation of liability</a></li>
+      <li><a href="#termination">Termination</a></li>
+      <li><a href="#changes">Changes to these terms</a></li>
+      <li><a href="#law">Governing law</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li><a href="#appendix-a">Appendix A — code sources</a></li>
+      <li><a href="#appendix-b">Appendix B — open questions for the publisher</a></li>
+    </ol>
+  </nav>
+
+  <main id="main">
+    <section id="agreement">
+      <h2><span class="num">01</span>Agreement to these terms</h2>
+      <p>
+        These Terms of Service ("Terms") form a binding agreement between you and
+        <span class="todo">TODO — legal entity / company name</span> ("we", "us") concerning your
+        use of EyeCare AI ("the app"), the Android application published at
+        <a href="https://github.com/ThongAccount/eye_care_ai/releases">github.com/ThongAccount/eye_care_ai/releases</a>.
+      </p>
+      <p>
+        By installing, opening or using the app you accept these Terms. If you do not accept them,
+        do not use the app. If you use the app on behalf of somebody else (for example, a family
+        member), you confirm you are allowed to do so and that you accept these Terms on their
+        behalf.
+      </p>
+      <p>
+        The app is provided free of charge and contains no in-app purchases and no advertising.
+        <span class="todo">TODO — confirm this remains true for the published release, and decide
+        whether a donation or paid tier is planned</span>
+      </p>
+    </section>
+
+    <section id="not-medical">
+      <h2><span class="num">02</span>The app is not medical advice</h2>
+      <div class="callout">
+        <p>
+          <strong>EyeCare AI is a wellness and habit-tracking tool. It does not diagnose, treat,
+          cure, prevent or manage any eye disease or other medical condition, and nothing in the
+          app — including its Eye Health Score, its eye test, its reminders and its AI assistant —
+          is medical advice, a diagnosis, or a substitute for a licensed eye-care professional.</strong>
+        </p>
+        <p>
+          If you have eye pain, sudden vision changes, flashes, floaters, double vision, a
+          persistent headache, or any other acute symptom, stop using the app and see an
+          optometrist or ophthalmologist promptly.
+        </p>
+      </div>
+      <p>
+        The app is aimed at people who spend long hours on screens and want to build healthier
+        habits around breaks, lighting, sleep and outdoor time. It is not a medical device, it has
+        not been clinically validated, and it is not intended to replace professional assessment.
+        <span class="todo">TODO — confirm whether the publisher wants to state the regulatory status
+        of the app explicitly (for example, "not a medical device") in the Play listing as well
+        as here</span>
+      </p>
+    </section>
+
+    <section id="scores">
+      <h2><span class="num">03</span>What the scores and estimates mean</h2>
+      <p>
+        The Eye Health Score is a <strong>wellness estimate</strong> computed from your own device
+        signals against the targets you set. It is not a clinical measurement and it is not
+        calibrated against any medical standard. In particular:
+      </p>
+      <ul>
+        <li><strong>Screen time</strong> is read from the Android operating system's own usage statistics, which can include time attributed to other apps and can be inaccurate on some devices.</li>
+        <li><strong>Sleep</strong> is estimated from the gap between your last phone use before the night and your first use after waking. It is not a sleep measurement, it misses naps, and it counts time when you were awake but away from the phone.</li>
+        <li><strong>Outdoor time</strong> is counted only when the device can obtain a GPS fix, so indoor time near a window may be over-counted and genuine outdoor time in poor signal may be under-counted.</li>
+        <li><strong>Environment / dark-room</strong> comes from the ambient light sensor on your device, which is often less sensitive than a dedicated lux meter.</li>
+        <li><strong>Viewing distance and eye openness</strong> are estimated on-device from camera frames using statistical models and population averages. The app itself documents an expected error of roughly ±15–20%.</li>
+        <li><strong>The eye test</strong> is a short self-screening exercise based on your responses. It cannot detect refractive error, retinal disease, glaucoma, cataract or colour-vision deficiency.</li>
+      </ul>
+      <p>
+        A score that rises or falls tells you about your recent habits relative to your own targets.
+        It says nothing about the condition of your eyes.
+      </p>
+    </section>
+
+    <section id="ai">
+      <h2><span class="num">04</span>The AI assistant</h2>
+      <p>
+        The assistant uses a third-party language model hosted by NVIDIA to produce replies. Its
+        output is generated text, not professional advice, and it can be wrong, incomplete, or
+        unsuitable for your situation. The assistant is instructed to refuse to diagnose and to
+        suggest seeing an eye-care professional when symptoms are serious or persistent, but you
+        should treat any output as unverified information.
+      </p>
+      <p>
+        The assistant can propose actions inside the app — for example, lowering a habit target,
+        logging an eye break or switching Focus Mode on. Those actions are shown to you for
+        confirmation before they run, and you can change that behaviour in Settings. You remain
+        responsible for any change you accept.
+      </p>
+      <p>
+        When you use the assistant, your messages and a summary of your current settings are
+        transmitted to NVIDIA. See the <a href="privacy.html">Privacy Policy</a> for the details.
+      </p>
+    </section>
+
+    <section id="licence">
+      <h2><span class="num">05</span>Your licence to use the app</h2>
+      <p>
+        We grant you a personal, non-exclusive, non-transferable, revocable licence to install and
+        use the app on devices you own or control, for your own personal or internal use, in line
+        with these Terms.
+      </p>
+      <p>
+        The app is licensed, not sold. You may not resell, redistribute, sublicense, modify,
+        decompile, reverse-engineer or create derivative works from the app or its source code,
+        except where that restriction is prohibited by law. The project's source code is published
+        on GitHub; <span class="todo">TODO — add a LICENSE file to the repository and state here
+        which licence governs the source code, and how third-party contributions are handled</span>.
+      </p>
+      <p>
+        We may include open-source components; their own licences continue to apply.
+      </p>
+    </section>
+
+    <section id="conduct">
+      <h2><span class="num">06</span>Acceptable use</h2>
+      <p>You agree not to:</p>
+      <ul>
+        <li>use the app to break the law, or to harass, harm or defraud anyone;</li>
+        <li>submit false information to the leaderboard, or misrepresent your streak, profile or results;</li>
+        <li>attempt to gain unauthorised access to any account, server, document or device, or to probe, scan or test the vulnerability of any service except with our written permission;</li>
+        <li>use automated means to scrape the leaderboard or any service at a rate that degrades them;</li>
+        <li>upload or distribute malicious code, or interfere with the app's operation;</li>
+        <li>use the app in a way that infringes the rights of others, including by uploading content you do not have the right to use.</li>
+      </ul>
+      <p>
+        <span class="todo">TODO — decide whether the publisher wants an explicit clause covering
+        commercial use of the leaderboard and any moderation approach for abusive display names</span>
+      </p>
+    </section>
+
+    <section id="your-data">
+      <h2><span class="num">07</span>Your data and your account</h2>
+      <p>
+        You keep ownership of the data you generate: your settings, your statistics, your eye-test
+        history, your exports and your reports. You grant us only the limited permission needed to
+        operate the features you switch on — for example, publishing your streak and display name to
+        the shared leaderboard when you are signed in, and storing a private backup document so you
+        can restore your settings on a new device.
+      </p>
+      <p>
+        You are responsible for keeping your account credentials secure and for activity that
+        happens under your account. If you use the guardian reminder feature, you are responsible
+        for entering an address you are permitted to contact.
+      </p>
+      <p>
+        The privacy policy describes in detail what is collected, what leaves your device and how
+        long it is kept.
+      </p>
+    </section>
+
+    <section id="third-parties">
+      <h2><span class="num">08</span>Third-party services</h2>
+      <p>The app relies on services operated by others:</p>
+      <ul>
+        <li><strong>Google</strong> — Firebase Authentication for accounts, Cloud Firestore for the leaderboard and your cloud backup, ML Kit for on-device camera analysis, and optionally Google Sign-In.</li>
+        <li><strong>NVIDIA</strong> — the language model behind the AI assistant.</li>
+        <li><strong>GitHub</strong> — hosting for the source code and the release builds, including the in-app update check.</li>
+        <li><strong>Android</strong> — the operating system's usage statistics, permission model, notifications and alarms.</li>
+      </ul>
+      <p>
+        Those services are governed by their own terms and privacy notices, and their availability
+        is outside our control. Installs are distributed as APK files through GitHub Releases rather
+        than through Google Play; your device may ask you to allow installation from this source the
+        first time, and you are responsible for that choice.
+      </p>
+    </section>
+
+    <section id="availability">
+      <h2><span class="num">09</span>Availability and changes</h2>
+      <p>
+        The app is provided on an "as available" basis. We may change, suspend or discontinue any
+        feature — including the leaderboard, cloud backup, the AI assistant or the ambient-light
+        monitoring — at any time, and we may require you to update to a newer build for the app to
+        keep working against our services. Features that depend on the operating system (usage
+        statistics, background location, exact alarms, dark-room detection) can be limited by the
+        device manufacturer, the OS version or the device's battery settings.
+      </p>
+      <p>
+        <span class="todo">TODO — confirm whether the publisher wants to commit to a support or
+        response window for issues reported to the support mailbox</span>
+      </p>
+    </section>
+
+    <section id="warranty">
+      <h2><span class="num">10</span>Disclaimer of warranties</h2>
+      <p>
+        Except where the law says otherwise, the app is provided "as is" and "as available",
+        without warranties of any kind, whether express or implied, including implied warranties
+        of merchantability, fitness for a particular purpose, non-infringement and accuracy. We do
+        not warrant that the app will be uninterrupted, error-free, or that any measurement,
+        estimate, score, reminder or generated response will be accurate, complete or suitable for
+        your purpose.
+      </p>
+      <p>
+        The app is not a medical device and has not been clinically validated; see section 02.
+      </p>
+    </section>
+
+    <section id="liability">
+      <h2><span class="num">11</span>Limitation of liability</h2>
+      <p>
+        To the maximum extent permitted by law, we are not liable for indirect, incidental, special,
+        consequential or exemplary damages, or for loss of profits, data, goodwill or opportunity,
+        arising out of your use of the app or your inability to use it. This includes any decision
+        you make, or fail to make, on the basis of the app's scores, reminders, eye test or AI
+        responses.
+      </p>
+      <p>
+        To the maximum extent permitted by law, our total liability to you for all claims arising
+        out of or relating to the app is limited to the greater of the amount you paid for the app
+        (which is currently zero, as the app is free) or the minimum permitted by law.
+      </p>
+      <p>
+        Nothing in these Terms excludes or limits liability that cannot lawfully be excluded or
+        limited, including liability for death or personal injury caused by negligence, or for
+        fraud. <span class="todo">TODO — confirm whether the publisher wants a specific liability
+        cap figure instead of the "amount paid" formulation, and whether consumer-protection rules
+        in the target market override any part of this section</span>
+      </p>
+    </section>
+
+    <section id="termination">
+      <h2><span class="num">12</span>Termination</h2>
+      <p>
+        You may stop using the app at any time; uninstalling it removes the local data, and you can
+        delete your account from within the app, which also deletes your cloud backup and your
+        leaderboard entry. We may suspend or terminate your access if you breach these Terms or if
+        we are required to do so by law.
+      </p>
+      <p>
+        Sections that by their nature should survive termination — including the disclaimers, the
+        limitation of liability, the governing-law clause and the privacy policy — do survive it.
+      </p>
+    </section>
+
+    <section id="changes">
+      <h2><span class="num">13</span>Changes to these terms</h2>
+      <p>
+        We may revise these Terms as the app changes. The effective date at the top of this page
+        always reflects the current version. Continuing to use the app after a change means you
+        accept the revised Terms. <span class="todo">TODO — decide whether a material change must
+        be announced in-app before it takes effect</span>
+      </p>
+    </section>
+
+    <section id="law">
+      <h2><span class="num">14</span>Governing law</h2>
+      <p>
+        These Terms are governed by the laws of <span class="todo">TODO — jurisdiction</span>,
+        without regard to conflict-of-law rules. Any dispute that cannot be settled amicably
+        will be subject to the exclusive jurisdiction of the courts of
+        <span class="todo">TODO — courts / venue</span>.
+        <span class="todo">TODO — confirm whether the publisher prefers arbitration or mediation,
+        and whether a consumer-friendly venue clause is required in the target market</span>
+      </p>
+    </section>
+
+    <section id="contact">
+      <h2><span class="num">15</span>Contact</h2>
+      <p>
+        <strong>TODO — legal entity name</strong><br>
+        <strong>TODO — postal address</strong><br>
+        Support and feedback: <code>eyecareai.app@gmail.com</code>
+        (the in-app Help & Support section opens your mail app with this address pre-filled)
+      </p>
+    </section>
+
+    <section id="appendix-a">
+      <h2><span class="num">A</span>Appendix A — code sources</h2>
+      <p>
+        The factual statements in these terms were checked against the shipping app code on
+        2026-10-23.
+      </p>
+      <div class="sources">
+        <ul>
+          <li><code>lib/services/distance_service.dart</code> — on-device estimation and its stated ±15–20% accuracy.</li>
+          <li><code>lib/services/device_data_service.dart</code> — usage access, sleep estimation, outdoor sampling.</li>
+          <li><code>lib/services/usage_service.dart</code>, <code>UsageStatsHandler.kt</code> — sleep estimate derivation.</li>
+          <li><code>lib/services/eye_chat_service.dart</code> — assistant scope, "no diagnosis" instruction, NVIDIA endpoint.</li>
+          <li><code>lib/services/ai_action_handler.dart</code>, <code>lib/providers/settings_provider.dart</code> — proposed actions and the ask-before-acting default.</li>
+          <li><code>lib/providers/settings_more_provider.dart</code> — data export, PDF report, delete local data, delete account.</li>
+          <li><code>lib/services/leaderboard_service.dart</code> — leaderboard fields and guest behaviour.</li>
+          <li><code>lib/services/update_service.dart</code> — GitHub Releases update flow.</li>
+          <li><code>lib/widgets/help_support_section.dart</code>, <code>lib/widgets/feedback_form.dart</code> — support mailbox.</li>
+          <li><code>android/app/src/main/AndroidManifest.xml</code> — permissions and components.</li>
+          <li><code>pubspec.yaml</code> — no billing, advertising or analytics dependencies.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="appendix-b">
+      <h2><span class="num">B</span>Appendix B — open questions for the publisher</h2>
+      <ol>
+        <li>What is the legal entity or company name behind EyeCare AI, and its registered address?</li>
+        <li>Which jurisdiction's law governs, and which courts have jurisdiction?</li>
+        <li>What is the official contact address for legal notices, and should it differ from the support mailbox <code>eyecareai.app@gmail.com</code>?</li>
+        <li>What effective date should be printed on both legal pages?</li>
+        <li>Does the app remain free with no in-app purchases and no advertising for the published release?</li>
+        <li>Should the publisher add a LICENSE file for the source code, and which licence should apply?</li>
+        <li>Do you want a specific liability cap rather than the "amount paid" formulation?</li>
+        <li>Do you want to state the app's non-medical-device regulatory status explicitly in the Play listing as well as in these terms?</li>
+        <li>Should material changes to these terms be announced in-app before they take effect?</li>
+        <li>Is there a support or response window you want to commit to for the support mailbox?</li>
+        <li>The guardian-reminder endpoint shipped with the mobile-P0 release (2026-10-23), so section 07 now describes what is sent where. Still open: the endpoint host and its operator, and whether the forwarded notice carries any identifier beyond the address and the day's screen-time hours.</li>
+        <li>Should a Vietnamese translation of these terms be published, and which version prevails if they differ?</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="doc-foot">
+    <p>
+      <a href="../site/index.html">Home</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai/releases">Downloads</a>
+      <a href="https://github.com/ThongAccount/eye_care_ai">Source code</a>
+    </p>
+    <p>EyeCare AI — draft terms of service, version 0.1.</p>
+  </footer>
+</div>
+</body>
+</html>

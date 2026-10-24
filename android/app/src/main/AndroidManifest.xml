@@ -63,6 +63,15 @@
          không đủ trên nhiều máy Android quản lý pin gắt). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Cần mạng cho: (1) worker nền POST nhắc người bảo hộ tới endpoint
+         HTTPS cấu hình lúc build (xem GuardianReminderWorker.kt), (2) kiểm tra
+         bản cập nhật trong app (update_service.dart). Trước đây quyền này
+         CHỈ có trong manifest của bản debug -> bản release không gọi được
+         mạng. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="EyeCare AI"
         android:name="${applicationName}"
@@ -113,11 +122,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="eye_care_dark_room_lux_monitoring" />
         </service>
-        <!-- Widget man hinh chinh EyeCare AI (package home_widget): khong can
-             code Kotlin rieng, class provider cua package duoc dung truc tiep. -->
+        <!-- Widget man hinh chinh EyeCare AI (package home_widget):
+             receiver PHAI la class cu the (xem EyeWidgetProvider.kt) —
+             dang ky thang class cua package se crash InstantiationException. -->
         <receiver
             android:exported="false"
-            android:name="es.antonborri.home_widget.HomeWidgetProvider">
+            android:name=".EyeWidgetProvider">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

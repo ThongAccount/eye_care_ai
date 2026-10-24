@@ -33,6 +33,7 @@ import 'screens/setup_wizard_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/dark_room_background_service.dart';
 import 'services/device_data_service.dart';
+import 'services/guardian_reminder_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 
@@ -104,6 +105,16 @@ Future<void> main() async {
   // WorkManager) — lỗi ở đây (ví dụ thiết bị không hỗ trợ) không được làm
   // chậm/kẹt màn hình khởi động app.
   unawaited(DarkRoomBackgroundService.register());
+
+  // Chép endpoint gửi mail người bảo hộ (biến --dart-define
+  // GUARDIAN_EMAIL_ENDPOINT) vào SharedPreferences để worker NATIVE
+  // (GuardianReminderWorker.kt) đọc được — biến compile-time của Dart không
+  // tồn tại trong code Kotlin. Không chặn khởi động app nếu bước này lỗi.
+  try {
+    await GuardianReminderService.instance.syncEndpointToPrefs();
+  } catch (_) {
+    // Không có endpoint thì worker sẽ bỏ qua bước gửi (đường lùi mailto).
+  }
 
   // Trường hợp app đã bị TẮT HẲN (không chỉ thu nhỏ) và người dùng mở lại
   // bằng cách nhấn vào thông báo "Đến giờ nghỉ mắt": onDidReceiveNotification

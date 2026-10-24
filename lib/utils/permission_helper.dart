@@ -66,9 +66,33 @@ class PermissionHelper {
     return status.isGranted;
   }
 
-  // Yêu cầu quyền Location
+  // Yêu cầu quyền Location.
+  //
+  // THÊM MỚI: sau khi được cấp quyền "Khi đang dùng app", xin tiếp quyền
+  // "Luôn cho phép" (ACCESS_BACKGROUND_LOCATION) để Worker nền đo được thời
+  // gian ngoài trời ngay cả khi app đã đóng — người dùng không phải mở app.
+  // Android 11+ không cho xin quyền nền bằng popup thường: hệ thống sẽ đưa
+  // người dùng sang màn Cài đặt để chọn "Luôn cho phép". Kết quả trả về vẫn là
+  // quyền vị trí CƠ BẢN (đủ cho tính năng khi app đang mở); quyền nền chỉ là
+  // phần nâng cấp, từ chối cũng không làm hỏng gì.
   static Future<bool> requestLocationPermission() async {
     final status = await Permission.location.request();
+    if (!status.isGranted) return false;
+    if (Platform.isAndroid) {
+      try {
+        await Permission.locationAlways.request();
+      } catch (_) {
+        // Một số ROM/phiên bản không hỗ trợ hộp thoại này -> bỏ qua.
+      }
+    }
+    return true;
+  }
+
+  // Quyền vị trí NỀN ("Luôn cho phép") đã được cấp chưa — dùng để hiện gợi ý
+  // nếu người dùng mới chỉ cấp "Khi đang dùng app".
+  static Future<bool> checkBackgroundLocationPermission() async {
+    if (!Platform.isAndroid) return true;
+    final status = await Permission.locationAlways.status;
     return status.isGranted;
   }
 

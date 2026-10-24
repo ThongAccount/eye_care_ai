@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/notification_service.dart';
+
 class SettingsProvider extends ChangeNotifier {
   static const _kMetricKey = 'pref_use_metric';
   static const _k24HourKey = 'pref_24_hour';
@@ -27,6 +29,7 @@ class SettingsProvider extends ChangeNotifier {
   String _reminderStyle = 'gentle';
   String _viewingDistanceMode = 'auto';
   String _guardianEmail = '';
+  bool _customNotificationSound = true;
 
   bool get useMetric => _useMetric;
   bool get is24Hour => _is24Hour;
@@ -38,6 +41,10 @@ class SettingsProvider extends ChangeNotifier {
   String get reminderStyle => _reminderStyle;
   String get viewingDistanceMode => _viewingDistanceMode;
   String get guardianEmail => _guardianEmail;
+
+  /// Dùng âm thanh báo nghỉ mắt riêng của EyeCare AI thay cho âm thanh mặc
+  /// định của hệ thống. Khoá lưu trữ do [NotificationService] sở hữu.
+  bool get customNotificationSound => _customNotificationSound;
 
   Future<void> reload() => _loadSavedPreferences();
 
@@ -53,6 +60,9 @@ class SettingsProvider extends ChangeNotifier {
     _reminderStyle = prefs.getString(_kReminderStyleKey) ?? _reminderStyle;
     _viewingDistanceMode = prefs.getString(_kViewingDistanceModeKey) ?? _viewingDistanceMode;
     _guardianEmail = prefs.getString(_kGuardianEmailKey) ?? _guardianEmail;
+    _customNotificationSound =
+        prefs.getBool(NotificationService.customSoundPrefKey) ??
+            _customNotificationSound;
     notifyListeners();
   }
 
@@ -116,6 +126,15 @@ class SettingsProvider extends ChangeNotifier {
     _guardianEmail = value.trim();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kGuardianEmailKey, _guardianEmail);
+    notifyListeners();
+  }
+
+  /// Bật/tắt âm thanh báo nghỉ mắt riêng. Việc lưu trữ (và việc đặt lại
+  /// báo thức lặp đang chạy) do [NotificationService] đảm nhiệm — provider
+  /// chỉ cập nhật trạng thái để UI vẽ lại.
+  Future<void> setCustomNotificationSound(bool value) async {
+    _customNotificationSound = value;
+    await NotificationService.instance.setCustomSoundEnabled(value);
     notifyListeners();
   }
 
