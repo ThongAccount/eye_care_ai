@@ -73,6 +73,22 @@ class UpdateCheckResult {
   final String? errorDetail;
 }
 
+/// Một bản phát hành đã được chuẩn hoá từ JSON của GitHub Releases API.
+@immutable
+class ReleaseRef {
+  const ReleaseRef({
+    required this.buildNumber,
+    required this.versionName,
+    required this.notes,
+    required this.downloadUrl,
+  });
+
+  final int buildNumber;
+  final String versionName;
+  final String notes;
+  final String downloadUrl;
+}
+
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
@@ -109,25 +125,9 @@ class UpdateService {
   static String _releasesUrl(int limit) =>
       'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=$limit';
 
-  /// Một bản phát hành đã được chuẩn hoá từ JSON của GitHub Releases API.
-  @immutable
-  class ReleaseRef {
-    const ReleaseRef({
-      required this.buildNumber,
-      required this.versionName,
-      required this.notes,
-      required this.downloadUrl,
-    });
-
-    final int buildNumber;
-    final String versionName;
-    final String notes;
-    final String downloadUrl;
-  }
-
   /// Chuyển JSON của GitHub Releases API thành danh sách [ReleaseRef].
   ///
-  /// - Bỏ qua release có tag không đúng định dạng "build-<số>" (release tạo
+  /// - Bỏ qua release có tag không đúng định dạng `build-<số>` (release tạo
   ///   thủ công) — cùng quy tắc với logic so sánh trước đây.
   /// - Sắp theo build mới nhất trước.
   /// - Ghi chú đã qua [sanitizeNotes].
@@ -280,7 +280,7 @@ class UpdateService {
         if (item is! Map<String, dynamic>) continue;
         final tag = (item['tag_name'] ?? '').toString();
         final match = RegExp(r'build-(\d+)').firstMatch(tag);
-        // Bỏ qua release không đúng định dạng "build-<số>" (release tạo thủ
+        // Bỏ qua release không đúng định dạng `build-<số>` (release tạo thủ
         // công) — chỉ liệt kê những bản thật sự do workflow build-apk.yml
         // phát hành, khớp với logic ở checkForUpdateVerbose.
         if (match == null) continue;
