@@ -53,6 +53,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # Trước đây workflow KHÔNG chạy test — các file test/ trong repo chỉ
+      # tồn tại trên giấy. Chạy analyze (lỗi thì chặn, cảnh báo thì không)
+      # và test TRƯỚC khi build để một bản release không bao giờ đóng gói code
+      # hỏng.
+      - name: Analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
       - name: Clean stale cache
         run: |
           flutter clean
