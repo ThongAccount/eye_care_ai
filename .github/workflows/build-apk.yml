@@ -127,11 +127,37 @@ jobs:
           echo "Previous release: build-${PREV_TAG:-none} | range: $RANGE"
           {
             echo "notes<<NOTES_EOF"
-            git log --no-merges $RANGE --pretty=format:'- %s%n  %b' \
-              | sed -E -e 's/^(- )[a-z]+(\([a-z]+\))?!?: /\1/' \
-                       -e 's/^(- )([a-z])/\1\U\2/' \
-                       -e 's/[[:space:]]+$//' \
-              | grep -v '^[[:space:]]*$' || true
+            python3 - "$RANGE" <<'PY'
+import re
+import subprocess
+import sys
+
+rng = sys.argv[1]
+raw = subprocess.run(
+    ["git", "log", "--no-merges", rng, "--pretty=format:%s%x00%b%x00"],
+    capture_output=True,
+    text=True,
+).stdout
+
+parts = raw.split("\x00")
+items = []
+for i in range(0, len(parts) - 1, 2):
+    subject = parts[i].strip()
+    body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+    if not subject:
+        continue
+    # Drop the Conventional Commit prefix - "feat(ui): add x" -> "add x".
+    subject = re.sub(r"^[a-z]+(\([a-z]+\))?!?: ", "", subject)
+    subject = subject[:1].upper() + subject[1:]
+    lines = ["- " + subject]
+    # Every body line is indented under its subject, and blank lines inside a
+    # body are kept so paragraphs stay readable.
+    for line in body.splitlines():
+        lines.append(("  " + line).rstrip() if line.strip() else "")
+    items.append("\n".join(lines))
+
+print("\n\n".join(items))
+PY
             echo ""
             echo "NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
