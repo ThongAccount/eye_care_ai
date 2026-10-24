@@ -1125,4 +1125,21 @@ class AppStrings {
       vi ? 'Không tải được nhật ký cập nhật. Vui lòng thử lại.' : 'Failed to load the changelog. Please try again.';
   String get changelogRetry => vi ? 'Thử lại' : 'Retry';
   String get changelogNoNotes => vi ? 'Không có ghi chú cho bản này.' : 'No notes for this release.';
+
+  // ---------------- Rate App (Đánh giá ứng dụng) ----------------
+  // Mục "Đánh giá EyeCare AI" nằm ngay dưới mục "Nhật ký cập nhật" trong
+  // phần Cài đặt > Khác (xem settings_screen.dart) — dùng chung service
+  // RateAppService (lib/services/rate_app_service.dart) để mở listing của
+  // store, hoặc hộp thoại fallback (GitHub Releases + e-mail góp ý).
+  String get rateAppTitle => vi ? 'Đánh giá EyeCare AI' : 'Rate EyeCare AI';
+  String get rateAppSubtitle =>
+      vi ? 'Góp ý giúp ứng dụng tốt hơn' : 'Your review helps other people find it';
+  String get rateAppThanksTitle =>
+      vi ? 'Cảm ơn bạn!' : 'Thanks for using EyeCare AI!';
+  String get rateAppFallbackBody => vi
+      ? 'EyeCare AI chưa có trên kho ứng dụng. Bạn có thể tải bản mới nhất trên GitHub Releases, hoặc gửi góp ý cho chúng tôi.'
+      : 'EyeCare AI is not in an app store yet. You can get the latest build from GitHub Releases, or send us your feedback directly.';
+  String get rateAppFeedback => vi ? 'Gửi góp ý' : 'Send feedback';
+  String get rateAppDownload => vi ? 'Tải bản mới nhất' : 'Get the latest build';
+  String get rateAppLater => vi ? 'Để sau' : 'Maybe later';
 }

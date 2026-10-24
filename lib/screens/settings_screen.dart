@@ -17,6 +17,7 @@ import '../providers/theme_provider.dart';
 import '../providers/update_provider.dart';
 import '../services/guardian_reminder_service.dart';
 import '../services/notification_service.dart';
+import '../services/rate_app_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/shared_widgets.dart';
@@ -462,6 +463,12 @@ class SettingsScreen extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const ChangelogScreen()),
                       ),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    _MenuItem(
+                      icon: '⭐',
+                      title: strings.rateAppTitle,
+                      onTap: () => RateAppService.instance.openRateFlow(context, strings),
                     ),
                     const Divider(height: 1, indent: 56),
                     _MenuItem(
