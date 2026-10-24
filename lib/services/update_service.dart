@@ -104,10 +104,81 @@ class UpdateService {
   static const String githubRepo = 'eye_care_ai';
 
   static const String _latestReleaseUrl =
-      'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=1';
+      'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=20';
 
   static String _releasesUrl(int limit) =>
       'https://api.github.com/repos/$githubOwner/$githubRepo/releases?per_page=$limit';
+
+  /// Một bản phát hành đã được chuẩn hoá từ JSON của GitHub Releases API.
+  @immutable
+  class ReleaseRef {
+    const ReleaseRef({
+      required this.buildNumber,
+      required this.versionName,
+      required this.notes,
+      required this.downloadUrl,
+    });
+
+    final int buildNumber;
+    final String versionName;
+    final String notes;
+    final String downloadUrl;
+  }
+
+  /// Chuyển JSON của GitHub Releases API thành danh sách [ReleaseRef].
+  ///
+  /// - Bỏ qua release có tag không đúng định dạng "build-<số>" (release tạo
+  ///   thủ công) — cùng quy tắc với logic so sánh trước đây.
+  /// - Sắp theo build mới nhất trước.
+  /// - Ghi chú đã qua [sanitizeNotes].
+  ///
+  /// Tách thành hàm thuần (không gọi mạng) để unit test được.
+  static List<ReleaseRef> parseReleases(dynamic raw) {
+    final items = raw is List
+        ? raw
+        : (raw == null ? const <dynamic>[] : <dynamic>[raw]);
+    final parsed = <ReleaseRef>[];
+    for (final item in items) {
+      if (item is! Map) continue;
+      final tag = (item['tag_name'] ?? '').toString();
+      final match = RegExp(r'build-(\d+)').firstMatch(tag);
+      if (match == null) continue;
+      final buildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
+      if (buildNumber <= 0) continue;
+
+      var downloadUrl = '';
+      final assets = (item['assets'] as List?) ?? const [];
+      for (final asset in assets) {
+        if (asset is Map &&
+            (asset['name'] ?? '').toString().toLowerCase().endsWith('.apk')) {
+          downloadUrl = (asset['browser_download_url'] ?? '').toString();
+          break;
+        }
+      }
+
+      parsed.add(ReleaseRef(
+        buildNumber: buildNumber,
+        versionName: (item['name'] ?? tag).toString(),
+        notes: sanitizeNotes((item['body'] ?? '').toString()),
+        downloadUrl: downloadUrl,
+      ));
+    }
+    parsed.sort((a, b) => b.buildNumber.compareTo(a.buildNumber));
+    return parsed;
+  }
+
+  /// Gộp ghi chú của MỌI bản phát hành mới hơn bản đang chạy.
+  ///
+  /// Người dùng thường bỏ qua nhiều bản (build 84 -> build 90), nên chỉ hiện
+  /// ghi chú của bản mới nhất sẽ giấu mọi thay đổi ở giữa. Gom lại theo thứ tự
+  /// mới -> cũ, mỗi bản một tiêu đề, để modal "Có bản cập nhật" cho người dùng
+  /// biết đã có gì mới kể từ bản họ đang dùng.
+  static String aggregateNotes(List<ReleaseRef> newerReleases) {
+    return newerReleases
+        .where((r) => r.notes.trim().isNotEmpty)
+        .map((r) => '${r.versionName}\n${r.notes.trim()}')
+        .join('\n\n');
+  }
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
@@ -140,50 +211,38 @@ class UpdateService {
         return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'empty_response');
       }
 
-      final data = raw is List ? (raw.firstOrNull as Map<String, dynamic>?) : raw as Map<String, dynamic>?;
-      if (data == null) {
-        // raw is List rỗng -> repo CHƯA CÓ release nào (khác với lỗi mạng).
+      final releases = UpdateService.parseReleases(raw);
+      if (releases.isEmpty) {
+        debugPrint('[UpdateService] Không có release nào khớp định dạng "build-<số>" '
+            '(repo có thể chưa có release, hoặc release được tạo thủ công ngoài workflow).');
         return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_releases_found');
       }
 
-      final tag = (data['tag_name'] ?? '').toString(); // "build-42"
-      final match = RegExp(r'build-(\d+)').firstMatch(tag);
-      if (match == null) {
-        debugPrint('[UpdateService] Release mới nhất có tag "$tag" không khớp định dạng "build-<số>" '
-            '— có thể release này được tạo thủ công thay vì qua workflow build-apk.yml.');
-        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'tag_format_mismatch:$tag');
-      }
-      final latestBuildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
-      if (latestBuildNumber <= 0) {
-        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'invalid_build_number');
-      }
-
-      final assets = (data['assets'] as List?) ?? [];
-      final apkAsset = assets.cast<Map<String, dynamic>>().firstWhere(
-            (a) => (a['name'] ?? '').toString().toLowerCase().endsWith('.apk'),
-            orElse: () => {},
-          );
-      final downloadUrl = (apkAsset['browser_download_url'] ?? '').toString();
-      if (downloadUrl.isEmpty) {
-        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_apk_asset');
-      }
+      final latest = releases.first;
 
       final packageInfo = await PackageInfo.fromPlatform();
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      if (latestBuildNumber <= currentBuildNumber) {
+      // Mọi bản phát hành mới hơn bản đang chạy — người dùng có thể bỏ qua
+      // nhiều bản, và họ nên thấy đủ mọi thay đổi kể từ bản của họ.
+      final newer =
+          releases.where((r) => r.buildNumber > currentBuildNumber).toList();
+
+      if (newer.isEmpty) {
         return UpdateCheckResult(UpdateCheckStatus.upToDate, null);
+      }
+
+      if (latest.downloadUrl.isEmpty) {
+        return UpdateCheckResult(UpdateCheckStatus.failed, null, errorDetail: 'no_apk_asset');
       }
 
       return UpdateCheckResult(
         UpdateCheckStatus.updateAvailable,
         UpdateInfo(
-          buildNumber: latestBuildNumber,
-          versionName: (data['name'] ?? tag).toString(),
-          downloadUrl: downloadUrl,
-          releaseNotes: UpdateService.sanitizeNotes(
-            (data['body'] ?? '').toString(),
-          ),
+          buildNumber: latest.buildNumber,
+          versionName: latest.versionName,
+          downloadUrl: latest.downloadUrl,
+          releaseNotes: UpdateService.aggregateNotes(newer),
         ),
       );
     } on DioException catch (e) {
