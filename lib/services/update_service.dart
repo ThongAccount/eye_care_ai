@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'release_asset_picker.dart';
+
 /// Kiểm tra bản cập nhật mới bằng cách hỏi thẳng GitHub Releases của repo
 /// (KHÔNG qua Google Play — vì app không lên Play Store, chỉ phát hành APK
 /// trực tiếp qua GitHub Actions, xem .github/workflows/build-apk.yml).
@@ -131,6 +133,9 @@ class UpdateService {
   ///   thủ công) — cùng quy tắc với logic so sánh trước đây.
   /// - Sắp theo build mới nhất trước.
   /// - Ghi chú đã qua [sanitizeNotes].
+  /// - File APK được chọn theo SỐ BUILD của release (xem
+  ///   [pickReleaseApkUrl]) — không lấy asset `.apk` đầu tiên, vì thứ tự
+  ///   assets của GitHub có thể đưa APK cũ lên trước.
   ///
   /// Tách thành hàm thuần (không gọi mạng) để unit test được.
   static List<ReleaseRef> parseReleases(dynamic raw) {
@@ -146,15 +151,12 @@ class UpdateService {
       final buildNumber = int.tryParse(match.group(1) ?? '') ?? 0;
       if (buildNumber <= 0) continue;
 
-      var downloadUrl = '';
-      final assets = (item['assets'] as List?) ?? const [];
-      for (final asset in assets) {
-        if (asset is Map &&
-            (asset['name'] ?? '').toString().toLowerCase().endsWith('.apk')) {
-          downloadUrl = (asset['browser_download_url'] ?? '').toString();
-          break;
-        }
-      }
+      // Chọn APK THEO SỐ BUILD của release, không lấy asset .apk đầu tiên —
+      // lý do và lịch sử lỗi xem release_asset_picker.dart.
+      final downloadUrl = pickReleaseApkUrl(
+        (item['assets'] as List?) ?? const [],
+        buildNumber,
+      );
 
       parsed.add(ReleaseRef(
         buildNumber: buildNumber,

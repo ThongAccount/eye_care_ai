@@ -167,17 +167,23 @@ jobs:
         run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=NIM_API_KEY=${{ secrets.NIM_API_KEY }} --dart-define=COMMIT_HASH=${{ github.sha }}
 
       - name: Rename APK
+        id: apk
         run: |
           SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          # XOÁ sạch thư mục release trước khi copy: thư mục này từng bị
+          # commit nhầm vào git (2 APK build 57/58), khiến glob release/*.apk
+          # bên dưới đính kèm APK CŨ vào mọi release -> app tải nhầm bản cũ.
+          rm -rf release
           mkdir -p release
-          cp build/app/outputs/flutter-apk/app-release.apk \
-            "release/eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.apk"
+          APK_NAME="eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "release/${APK_NAME}"
+          echo "path=release/${APK_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.run_number }}
-          path: release/*.apk
+          path: ${{ steps.apk.outputs.path }}
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -189,7 +195,7 @@ jobs:
 
             Build ${{ github.run_number }} - commit ${{ github.sha }}
           prerelease: true
-          files: release/*.apk
+          files: ${{ steps.apk.outputs.path }}
 
       # ------------------------------------------------------------------
       # Android App Bundle (.aab) — what Google Play actually accepts.
@@ -205,17 +211,20 @@ jobs:
         run: flutter build appbundle --release --build-number=${{ github.run_number }} --dart-define=NIM_API_KEY=${{ secrets.NIM_API_KEY }} --dart-define=COMMIT_HASH=${{ github.sha }}
 
       - name: Rename App Bundle
+        id: aab
         run: |
           SHORT_SHA=$(git rev-parse --short=8 HEAD)
+          rm -rf release
           mkdir -p release
-          cp build/app/outputs/bundle/release/app-release.aab \
-            "release/eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.aab"
+          AAB_NAME="eye_care_ai-${{ steps.version.outputs.version }}-${SHORT_SHA}-build${{ github.run_number }}.aab"
+          cp build/app/outputs/bundle/release/app-release.aab "release/${AAB_NAME}"
+          echo "path=release/${AAB_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: aab-${{ github.run_number }}
-          path: release/*.aab
+          path: ${{ steps.aab.outputs.path }}
 
       - name: Attach App Bundle to the GitHub Release
         uses: softprops/action-gh-release@v2
@@ -227,4 +236,4 @@ jobs:
 
             Build ${{ github.run_number }} - commit ${{ github.sha }}
           prerelease: true
-          files: release/*.aab
+          files: ${{ steps.aab.outputs.path }}
