@@ -286,13 +286,18 @@ Use the Play full description with these edits:
 3. Create the Play Developer account (**TODO — personal account or organisation?** A personal
    account is fine for a solo founder; it caps the tester count to 20 for open testing and
    shows the developer's legal name on the listing).
-4. Upload an **Android App Bundle (`.aab`)** to Play — Play rejects APK uploads for new apps.
-   ⚠️ **The current pipeline builds APKs only** (`flutter build apk` in both `run_build.py` and
-   `.github/workflows/build-apk.yml`), so an AAB target has to be added to the build before
-   submission. `versionCode` must be higher than any previously uploaded build; here it is the
-   CI run number, so every new run is automatically higher. Sign with a **real** upload key (the
-   committed `ci-fallback-keystore.jks` is a placeholder — keystore rotation is still on the
-   tech-debt list).
+4. Upload the **Android App Bundle (`.aab`)** to Play — Play rejects APK uploads for new apps.
+   The pipeline now builds the bundle **alongside** the APK (the APK stays the alpha
+   distribution channel via GitHub Releases):
+   - CI attaches `eye_care_ai-<version>-<sha>-build<N>.aab` to the same GitHub Release as the
+     APK (`build-<N>`).
+   - Modal can produce one directly:
+     `python3 -m modal run run_build.py --build-number N --commit-hash $(git rev-parse HEAD) --branch <branch> --build-aab`.
+   `versionCode` = the build number, so it always increases. The bundle is signed with the
+   release keystore from the four `KEYSTORE_*` GitHub secrets (alias `EYECARE_`); the committed
+   `ci-fallback-keystore.jks` is only a fallback for when those secrets are absent — rotate it
+   and use a dedicated **upload key** before the first Play upload (keystore rotation is still
+   on the tech-debt list).
 5. Add a release-signing key in Play Console → App integrity → App signing (mandatory for
    Play App Signing).
 6. Install the Play listing's screenshots (see `screenshots-outline.md`).
