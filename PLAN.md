@@ -19,6 +19,16 @@
 > section is ground truth for what is actually in the app today.
 > Legend: ✅ shipped · 🟡 partial/stub · ❌ genuinely absent.
 
+### 🔖 Release status — 2026-10-24
+
+| Item | State |
+|---|---|
+| Version | Bumped `1.3.0+alpha` → **`1.4.0+alpha`** (minor, not patch: 46 commits of new features landed after the 1.3.0 cut on 2026-09-08). In-app it reads `EyeCare AI v1.4.0 (build N)`; `versionCode` = CI run number. Verified end-to-end on build 85 — APK manifest `versionName=1.4.0`, `versionCode=85`. |
+| Play artifact | **Android App Bundle (`.aab`) now built alongside the APK** — Play rejects APK uploads for new apps. CI attaches `eye_care_ai-<version>-<sha>-build<N>.aab` to the same GitHub Release; Modal produces one with `--build-aab` (build 111 verified: signed with the release key, `versionName=1.4.0`, `versionCode=111`, INTERNET permission present). |
+| CI gates | `flutter analyze` + `flutter test` now run **before** the release build — a failing test can no longer ship. |
+| Legal | Privacy/Terms published and returning HTTP 200. Still 45 `TODO` chips waiting on the user: entity name, jurisdiction, contact e-mail, effective date. |
+| Versioning rule | The in-app updater compares **build numbers** (GitHub release tag `build-<N>` vs the installed `versionCode`), not the version name — so a version-string bump never affects the update flow. |
+
 ### 📦 Shipped features (verified in code)
 
 | Area | Feature | Evidence |
