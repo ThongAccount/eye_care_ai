@@ -66,6 +66,12 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
      <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
      <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Cần mạng cho: (1) worker nền POST nhắc người bảo hộ tới endpoint
+         HTTPS cấu hình lúc build (xem GuardianReminderWorker.kt), (2) kiểm tra
+         bản cập nhật trong app (update_service.dart). Trước đây quyền này
+         CHỈ có trong manifest của bản debug -> bản release không gọi được
+         mạng. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="EyeCare AI"
         android:name="${applicationName}"

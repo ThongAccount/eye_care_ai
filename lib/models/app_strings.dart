@@ -225,6 +225,17 @@ class AppStrings {
   String get guardianEmailAdd => vi ? 'Thêm email' : 'Add email';
   String get guardianEmailSendTest => vi ? 'Gửi mail nhắc thử' : 'Send test reminder';
   String get guardianEmailSaved => vi ? 'Đã lưu email người bảo hộ.' : 'Guardian email saved.';
+  String get guardianEmailSent =>
+      vi ? 'Đã gửi nhắc nhở cho người bảo hộ.' : 'Guardian reminder sent.';
+  String get guardianEmailSendFailed => vi
+      ? 'Chưa gửi được tự động — đã mở app mail để bạn tự gửi.'
+      : 'Could not send automatically — opened your mail app instead.';
+  String get guardianEmailPending => vi
+      ? 'Đã vượt giờ — chạm để nhắc người bảo hộ.'
+      : 'Limit exceeded — tap to notify the guardian.';
+  String get guardianEmailAuto => vi
+      ? 'Tự động nhắc khi vượt giờ (kiểm tra nền mỗi 30 phút)'
+      : 'Notifies automatically when the limit is exceeded (checked in the background every 30 min)';
   String get roadmapTitle => vi ? 'Lộ trình tính năng sắp tới' : 'Upcoming feature roadmap';
   List<String> get roadmapFeatures => vi
       ? [
