@@ -28,6 +28,7 @@
 | CI gates | `flutter analyze` + `flutter test` now run **before** the release build — a failing test can no longer ship. |
 | Legal | Privacy/Terms published and returning HTTP 200. Still 45 `TODO` chips waiting on the user: entity name, jurisdiction, contact e-mail, effective date. |
 | Versioning rule | The in-app updater compares **build numbers** (GitHub release tag `build-<N>` vs the installed `versionCode`), not the version name — so a version-string bump never affects the update flow. |
+| Release notes | The CI generates the GitHub release body from **every** commit between the previous release and this build — subject + description, plain text, Conventional Commit prefix stripped. That body is exactly what the in-app "Update Available" modal and the changelog screen render, so **every commit must carry a description body**. Legacy bodies are cleaned by `UpdateService.sanitizeNotes()`. |
 
 ### 📦 Shipped features (verified in code)
 
