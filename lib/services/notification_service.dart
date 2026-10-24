@@ -30,11 +30,13 @@ void _onBackgroundNotificationResponse(NotificationResponse response) {}
 //    do hệ điều hành tự bắn đúng giờ dù app đã bị đóng/thu nhỏ — đây là cách
 //    đảm bảo người dùng vẫn được nhắc kể cả khi không mở app.
 //
-// ÂM THANH RIÊNG: nếu bạn thêm 1 file âm thanh vào
-// android/app/src/main/res/raw/eye_break_alert.mp3 (hoặc .wav/.ogg — KHÔNG có
-// khoảng trắng/ký tự hoa trong tên file, chỉ chữ thường/số/gạch dưới), app sẽ
-// tự dùng file đó làm âm thanh thông báo thay vì âm mặc định của hệ thống.
-// Nếu chưa có file này, code vẫn chạy bình thường với âm thanh mặc định.
+// ÂM THANH RIÊNG: app đóng gói sẵn file
+// android/app/src/main/res/raw/eye_break_alert.wav và người dùng có thể
+// BẬT/TẮT trong Settings > Thông báo. Vì Android không cho đổi âm thanh của
+// một kênh đã tồn tại, app dùng 2 kênh riêng biệt: eye_break_channel (âm
+// thanh mặc định của hệ thống) và eye_break_channel_custom (file .wav).
+// Nếu thiết bị không dùng được file raw, các hàm lên lịch tự lùi về âm
+// thanh mặc định — báo thức nghỉ mắt không bao giờ bị mất vì lý do âm thanh.
 class NotificationService {
   NotificationService._();
 
@@ -56,15 +58,26 @@ class NotificationService {
 
   // Đổi tên này nếu bạn đặt tên file âm thanh khác trong thư mục res/raw.
   static const String _customSoundResourceName = 'eye_break_alert';
-  // QUAN TRỌNG: đặt true CHỈ SAU KHI bạn đã thật sự thêm file
-  // android/app/src/main/res/raw/eye_break_alert.mp3 (hoặc .wav/.ogg) vào
-  // project. Nếu để true mà file không tồn tại, Android sẽ ném
-  // PlatformException(invalid_sound, ...) ở CẢ 3 chế độ lên lịch báo thức
-  // trong scheduleBreakAlarm() -> báo thức không bao giờ được đặt thành
-  // công, và vì lỗi trước đây bị nuốt im lặng nên trông y hệt "bị OEM chặn"
-  // dù không phải vậy. Đây là nguyên nhân thật của lỗi "không nhắc nghỉ mắt"
-  // đã gặp — để false để dùng âm thanh mặc định của hệ thống, luôn hoạt động.
-  static const bool _useCustomSound = false;
+
+  // Kênh thông báo CÓ ÂM THANH RIÊNG. Android KHÔNG cho đổi âm thanh của một
+  // kênh đã tồn tại, nên phải có 2 kênh riêng biệt và chuyển qua lại giữa
+  // chúng khi người dùng bật/tắt tuỳ chọn trong Settings.
+  static const _customChannelId = 'eye_break_channel_custom';
+  static const _customChannelName = 'Eye Break Reminder (Custom Sound)';
+
+  // Khoá SharedPreferences lưu tuỳ chọn "âm thanh riêng" — do
+  // NotificationService sở hữu (SettingsProvider chỉ đọc/ghi qua service để
+  // không phải lặp lại chuỗi key ở 2 nơi).
+  static const String customSoundPrefKey = 'pref_custom_notification_sound';
+
+  // Âm thanh riêng BẬT mặc định (file res/raw/eye_break_alert.wav đã đóng gói
+  // sẵn trong APK). Nếu thiết bị không dùng được file raw (PlatformException
+  // invalid_sound) thì các hàm lên lịch tự LÙI về âm thanh mặc định của hệ
+  // thống — báo thức nghỉ mắt không bao giờ "chết" vì lý do âm thanh.
+  static const bool _customSoundDefault = true;
+
+  bool _customSoundEnabled = _customSoundDefault;
+  bool get customSoundEnabled => _customSoundEnabled;
 
   // --- Báo thức LẶP LẠI cho break reminder ---
   // TRƯỚC ĐÂY dùng android_alarm_manager_plus (AndroidAlarmManager.periodic)
@@ -113,6 +126,10 @@ class NotificationService {
   // vì đọc từ một giá trị được ghi bởi background isolate như trước.
   static const String _kRepeatStartedAtKey =
       'pref_break_repeat_started_at_millis';
+  // Title/body của báo thức lặp — lưu lại để có thể đặt lại báo thức khi
+  // người dùng đổi tuỳ chọn âm thanh (xem refreshRepeatingBreakAlarmSound).
+  static const String _kRepeatTitleKey = 'pref_break_repeat_title';
+  static const String _kRepeatBodyKey = 'pref_break_repeat_body';
 
   bool _initialized = false;
 
@@ -162,9 +179,13 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
 
-    // Tạo kênh thông báo với âm thanh riêng (nếu có file) — phải tạo kênh
-    // TRƯỚC khi gửi thông báo đầu tiên, vì Android không cho đổi âm thanh của
-    // một kênh đã tồn tại (phải tạo kênh mới nếu muốn đổi âm sau này).
+    // Đọc tuỳ chọn "âm thanh riêng" TRƯỚC khi tạo kênh.
+    final prefs = await SharedPreferences.getInstance();
+    _customSoundEnabled =
+        prefs.getBool(customSoundPrefKey) ?? _customSoundDefault;
+
+    // Kênh MẶC ĐỊNH (âm thanh hệ thống) — luôn tạo, kể cả khi người dùng
+    // đang bật âm thanh riêng, để bật/tắt được ngay mà không cần xoá kênh.
     final channel = AndroidNotificationChannel(
       _channelId,
       _channelName,
@@ -172,12 +193,24 @@ class NotificationService {
       importance: Importance.max,
       playSound: true,
       enableVibration: true,
-      sound: _useCustomSound
-          ? RawResourceAndroidNotificationSound(_customSoundResourceName)
-          : null,
       audioAttributesUsage: AudioAttributesUsage.alarm,
     );
     await androidPlugin?.createNotificationChannel(channel);
+
+    // Kênh CÓ ÂM THANH RIÊNG (res/raw/eye_break_alert.wav) — tách riêng vì
+    // Android không cho đổi âm thanh của một kênh đã tồn tại. Phải tạo kênh
+    // TRƯỚC khi gửi thông báo đầu tiên.
+    final customChannel = AndroidNotificationChannel(
+      _customChannelId,
+      _customChannelName,
+      description: 'Nhắc nghỉ mắt theo quy tắc 20-20-20 (âm thanh riêng)',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      sound: RawResourceAndroidNotificationSound(_customSoundResourceName),
+      audioAttributesUsage: AudioAttributesUsage.alarm,
+    );
+    await androidPlugin?.createNotificationChannel(customChannel);
 
     // Kênh riêng cho thông báo ghim đếm ngược: importance thấp, không âm
     // thanh/rung vì được cập nhật liên tục (mỗi giây) chứ không phải bắn 1
@@ -262,17 +295,22 @@ class NotificationService {
     }
   }
 
-  NotificationDetails _details({bool insistent = false}) {
+  // Chi tiết thông báo hết-giờ-nghỉ-mắt. `useCustomSound` cho phép ghim
+  // âm thanh cụ thể khi lên lịch (dùng cho cơ chế LÙI về âm thanh mặc định
+  // nếu âm thanh riêng không dùng được); mặc định lấy theo tuỳ chọn hiện tại
+  // của người dùng.
+  NotificationDetails _details({bool insistent = false, bool? useCustomSound}) {
+    final custom = useCustomSound ?? _customSoundEnabled;
     return NotificationDetails(
       android: AndroidNotificationDetails(
-        _channelId,
-        _channelName,
+        custom ? _customChannelId : _channelId,
+        custom ? _customChannelName : _channelName,
         channelDescription: 'Nhắc nghỉ mắt theo quy tắc 20-20-20',
         importance: Importance.max,
         priority: Priority.high,
         category: AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
-        sound: _useCustomSound
+        sound: custom
             ? RawResourceAndroidNotificationSound(_customSoundResourceName)
             : null,
         audioAttributesUsage: AudioAttributesUsage.alarm,
@@ -349,6 +387,47 @@ class NotificationService {
     // GIỜ được đặt, nhưng không ai biết vì sao. Giờ log rõ lỗi từng chế độ,
     // và verify lại bằng pendingNotificationRequests() sau khi "thành công"
     // để biết chắc hệ điều hành có thực sự nhận báo thức hay không.
+    final scheduled = await _scheduleAlarmWithSound(
+      scheduledDate: scheduledDate,
+      title: title,
+      body: body,
+      useCustomSound: _customSoundEnabled,
+    );
+    if (scheduled) return;
+
+    // ÂM THANH RIÊNG KHÔNG DÙNG ĐƯỢC (VD file raw lỗi -> PlatformException
+    // invalid_sound) -> LÙI về âm thanh mặc định của hệ thống. Báo thức nghỉ
+    // mắt phải được đặt được bằng mọi giá: mất âm thanh riêng còn hơn mất
+    // trọn cảnh báo (đây chính là lỗi "không nhắc nghỉ mắt" đã gặp trước đây).
+    if (_customSoundEnabled) {
+      debugPrint(
+        '[NotificationService] scheduleBreakAlarm: custom sound unusable, '
+        'retrying with the default system sound.',
+      );
+      final scheduledWithDefault = await _scheduleAlarmWithSound(
+        scheduledDate: scheduledDate,
+        title: title,
+        body: body,
+        useCustomSound: false,
+      );
+      if (scheduledWithDefault) return;
+    }
+    debugPrint(
+      '[NotificationService] scheduleBreakAlarm: ALL modes failed for $scheduledDate — '
+      'no alarm was registered with the OS. This is almost always an OEM restriction '
+      '(MIUI Autostart / battery optimization), not a plugin bug.',
+    );
+  }
+
+  // Thử đặt báo thức hết-giờ với 1 lựa chọn âm thanh (riêng hoặc mặc định)
+  // qua 3 chế độ lên lịch, từ đáng tin cậy nhất -> kém nhất. Trả về true nếu
+  // hệ thống xác nhận đã đăng ký báo thức.
+  Future<bool> _scheduleAlarmWithSound({
+    required DateTime scheduledDate,
+    required String title,
+    required String body,
+    required bool useCustomSound,
+  }) async {
     for (final mode in [
       AndroidScheduleMode.alarmClock,
       AndroidScheduleMode.exactAllowWhileIdle,
@@ -360,7 +439,7 @@ class NotificationService {
           title,
           body,
           scheduledDate,
-          _details(insistent: true),
+          _details(insistent: true, useCustomSound: useCustomSound),
           androidScheduleMode: mode,
           payload: breakReminderPayload,
         );
@@ -368,20 +447,16 @@ class NotificationService {
         final registered = pending.any((p) => p.id == _alarmNotificationId);
         debugPrint(
           '[NotificationService] scheduleBreakAlarm mode=$mode at=$scheduledDate '
-          'registeredWithOS=$registered',
+          'customSound=$useCustomSound registeredWithOS=$registered',
         );
-        if (registered) return;
+        if (registered) return true;
       } catch (e, st) {
         debugPrint(
           '[NotificationService] scheduleBreakAlarm mode=$mode FAILED: $e\n$st',
         );
       }
     }
-    debugPrint(
-      '[NotificationService] scheduleBreakAlarm: ALL modes failed for $scheduledDate — '
-      'no alarm was registered with the OS. This is almost always an OEM restriction '
-      '(MIUI Autostart / battery optimization), not a plugin bug.',
-    );
+    return false;
   }
 
   // --- Nhắc nghỉ mắt LẶP LẠI vô hạn ---
@@ -414,6 +489,11 @@ class NotificationService {
     await prefs.setInt(_kRepeatIntervalMinutesKey, intervalMinutes);
     await prefs.setString(_kOngoingTitleKey, ongoingTitle);
     await prefs.setString(_kOngoingSuffixKey, ongoingRemainingSuffix);
+    // Lưu luôn title/body của báo thức lặp để có thể ĐẶT LẠI báo thức khi
+    // người dùng đổi tuỳ chọn âm thanh (báo thức lặp là native thuần nên
+    // kênh/âm thanh bị ghim cố định lúc đặt lịch).
+    await prefs.setString(_kRepeatTitleKey, title);
+    await prefs.setString(_kRepeatBodyKey, body);
     final startedAt = DateTime.now();
     await prefs.setInt(_kRepeatStartedAtKey, startedAt.millisecondsSinceEpoch);
 
@@ -429,28 +509,30 @@ class NotificationService {
     // CỦA HỆ ĐIỀU HÀNH, không phải lỗi app. Vẫn dùng exactAllowWhileIdle cho
     // lần bắn ĐẦU TIÊN được chính xác nhất có thể; fallback về inexact nếu
     // thiết bị từ chối quyền báo thức chính xác.
-    try {
-      await notifications.periodicallyShowWithDuration(
-        _repeatingNotificationId,
-        title,
-        body,
-        Duration(minutes: intervalMinutes),
-        _details(insistent: true),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: breakReminderPayload,
-      );
-    } catch (e, st) {
+    var scheduled = await _scheduleRepeatingNative(
+      intervalMinutes: intervalMinutes,
+      title: title,
+      body: body,
+      useCustomSound: _customSoundEnabled,
+    );
+    if (!scheduled && _customSoundEnabled) {
+      // Âm thanh riêng không dùng được -> lùi về âm thanh mặc định hệ thống
+      // (báo thức lặp phải luôn chạy, mất âm thanh riêng còn hơn mất nhắc).
       debugPrint(
-        '[NotificationService] periodicallyShowWithDuration exact FAILED: $e\n$st',
+        '[NotificationService] scheduleRepeatingBreakAlarm: custom sound '
+        'unusable, retrying with the default system sound.',
       );
-      await notifications.periodicallyShowWithDuration(
-        _repeatingNotificationId,
-        title,
-        body,
-        Duration(minutes: intervalMinutes),
-        _details(insistent: true),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        payload: breakReminderPayload,
+      scheduled = await _scheduleRepeatingNative(
+        intervalMinutes: intervalMinutes,
+        title: title,
+        body: body,
+        useCustomSound: false,
+      );
+    }
+    if (!scheduled) {
+      debugPrint(
+        '[NotificationService] scheduleRepeatingBreakAlarm: could not register '
+        'the repeating alarm with the OS.',
       );
     }
 
@@ -463,12 +545,77 @@ class NotificationService {
     );
   }
 
+  // Đặt báo thức lặp (native thuần) với 1 lựa chọn âm thanh — thử chế độ
+  // chính xác trước rồi lùi về inexact. Trả về true nếu đặt thành công.
+  Future<bool> _scheduleRepeatingNative({
+    required int intervalMinutes,
+    required String title,
+    required String body,
+    required bool useCustomSound,
+  }) async {
+    for (final mode in [
+      AndroidScheduleMode.exactAllowWhileIdle,
+      AndroidScheduleMode.inexactAllowWhileIdle,
+    ]) {
+      try {
+        await notifications.periodicallyShowWithDuration(
+          _repeatingNotificationId,
+          title,
+          body,
+          Duration(minutes: intervalMinutes),
+          _details(insistent: true, useCustomSound: useCustomSound),
+          androidScheduleMode: mode,
+          payload: breakReminderPayload,
+        );
+        return true;
+      } catch (e, st) {
+        debugPrint(
+          '[NotificationService] periodicallyShowWithDuration mode=$mode '
+          'customSound=$useCustomSound FAILED: $e\n$st',
+        );
+      }
+    }
+    return false;
+  }
+
   Future<void> cancelRepeatingBreakAlarm() async {
     await notifications.cancel(_repeatingNotificationId);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kRepeatStartedAtKey);
     await prefs.remove(_kRepeatIntervalMinutesKey);
+    await prefs.remove(_kRepeatTitleKey);
+    await prefs.remove(_kRepeatBodyKey);
     await cancelOngoingCountdown();
+  }
+
+  // Bật/tắt âm thanh riêng cho thông báo hết-giờ-nghỉ-mắt. Khoá lưu trữ
+  // nằm trong SharedPreferences (đọc được cả bởi code Dart lẫn code native),
+  // và báo thức lặp đang chạy được ĐẶT LẠI để âm thanh mới có hiệu lực
+  // ngay (báo thức lặp là native thuần nên kênh/âm thanh bị ghim cố định).
+  Future<void> setCustomSoundEnabled(bool value) async {
+    _customSoundEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(customSoundPrefKey, value);
+    await refreshRepeatingBreakAlarmSound();
+  }
+
+  // Đặt lại báo thức lặp đang chạy (nếu có) để nhận kênh/âm thanh mới.
+  // Đặt lại với mốc bắt đầu MỚI — y hệt hành vi khi app khởi động lại — nên
+  // đồng hồ đếm ngược (getNextRepeatingFireAt) vẫn khớp với báo thức thật.
+  Future<void> refreshRepeatingBreakAlarmSound() async {
+    final prefs = await SharedPreferences.getInstance();
+    final interval = prefs.getInt(_kRepeatIntervalMinutesKey);
+    final title = prefs.getString(_kRepeatTitleKey);
+    final body = prefs.getString(_kRepeatBodyKey);
+    if (interval == null || interval <= 0) return;
+    if (title == null || body == null) return;
+    await scheduleRepeatingBreakAlarm(
+      intervalMinutes: interval,
+      title: title,
+      body: body,
+      ongoingTitle: prefs.getString(_kOngoingTitleKey) ?? title,
+      ongoingRemainingSuffix: prefs.getString(_kOngoingSuffixKey) ?? '',
+    );
   }
 
   // Vì báo thức lặp giờ là native thuần (không có callback Dart nào ghi lại

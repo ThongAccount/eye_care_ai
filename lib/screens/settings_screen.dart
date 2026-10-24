@@ -125,6 +125,17 @@ class SettingsScreen extends StatelessWidget {
                 value: settings.notifyBreaks,
                 onChanged: (v) => settings.setNotification('breaks', v),
               ),
+              // Âm thanh riêng cho thông báo hết-giờ-nghỉ-mắt. Bật/tắt được
+              // ngay: service tự đặt lại báo thức lặp đang chạy để âm thanh
+              // mới có hiệu lực (báo thức lặp là native thuần nên kênh/âm
+              // thanh bị ghim cố định lúc đặt lịch).
+              _ToggleTile(
+                icon: '🔔',
+                title: strings.customNotificationSound,
+                subtitle: strings.customNotificationSoundSubtitle,
+                value: settings.customNotificationSound,
+                onChanged: (v) => settings.setCustomNotificationSound(v),
+              ),
               _ToggleTile(
                 icon: '👁️',
                 title: strings.eyeTestReminders,

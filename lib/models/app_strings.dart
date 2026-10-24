@@ -83,6 +83,10 @@ class AppStrings {
   String get notifications => vi ? 'Thông báo' : 'Notifications';
   String get breakReminders => vi ? 'Nhắc nhở nghỉ ngơi' : 'Break Reminders';
   String get breakRemindersSubtitle => vi ? 'Nhận thông báo cho nghỉ ngơi 20-20-20' : 'Get notified for 20-20-20 breaks';
+  String get customNotificationSound => vi ? 'Âm thanh nhắc riêng' : 'Custom alert sound';
+  String get customNotificationSoundSubtitle => vi
+      ? 'Dùng âm thanh báo nghỉ mắt riêng của EyeCare AI thay cho âm thanh mặc định'
+      : 'Use the built-in EyeCare AI break alert instead of the system sound';
   String get eyeTestReminders => vi ? 'Nhắc nhở kiểm tra mắt' : 'Eye Test Reminders';
   String get eyeTestRemindersSubtitle => vi ? 'Nhắc kiểm tra thị lực hàng tuần' : 'Weekly vision screening alerts';
   String get habitTracking => vi ? 'Theo dõi thói quen' : 'Habit Tracking';
