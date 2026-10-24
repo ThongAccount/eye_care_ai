@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/env.dart';
+import '../config/legal_urls.dart';
 import '../providers/language_provider.dart';
+import '../services/legal_link_service.dart';
 import 'faq_accordion.dart';
 import 'feedback_form.dart';
 import 'settings_toggle_tile.dart';
@@ -69,6 +71,20 @@ class HelpSupportSection extends StatelessWidget {
           onTap: () => _openMailto(
             context,
             subject: strings.vi ? 'Đề xuất tính năng EyeCare AI' : 'EyeCare AI Feature Request',
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Bản Chính sách quyền riêng tư ĐẦY ĐỦ đã publish — bản trong app
+        // chỉ là tóm tắt, và Google Play yêu cầu URL công khai.
+        _ContactButton(
+          icon: Icons.privacy_tip_outlined,
+          label: strings.vi
+              ? 'Chính sách quyền riêng tư (trực tuyến)'
+              : 'Privacy Policy (online)',
+          onTap: () => LegalLinkService.open(
+            context,
+            LegalUrls.privacyPolicyUrl,
+            vi: strings.vi,
           ),
         ),
         SettingsSectionLabel(strings.feedbackTitle),

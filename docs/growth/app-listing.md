@@ -266,7 +266,7 @@ Use the Play full description with these edits:
 | Data Used to Track You | **Nothing** | No tracking, no ads, no third-party SDKs that track. `AnalyticsService` is a stub; if it is ever wired to a self-hosted endpoint, it must stay tracking-free (no IDFA, no cross-app identifiers). |
 | Contact Info — Email Address | Linked to you | Account e-mail |
 | Identifiers — User ID | Linked to you | Firebase UID |
-| Usage Data — Product Interaction | Linked to you | App usage/crash-style counters, only if analytics is enabled |
+| Usage Data — Product Interaction | Linked to you | Screen-on time and per-app usage — **only when cloud backup is enabled**, because it is included in the backup document the developer stores in Firebase. The analytics service is a stub, so no interaction or screen-view events are collected. |
 | Health & Fitness | Linked to you | Eye Health Score, sleep estimate, outdoor minutes — **only** if cloud backup / AI is used; note this in the privacy policy |
 | Diagnostics | Not collected | No crash SDK |
 | Purchases | Not collected | Free |

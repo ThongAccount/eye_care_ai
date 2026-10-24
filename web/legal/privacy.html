@@ -514,9 +514,9 @@
             <tr>
               <th scope="row">Guardian email address</th>
               <td>An email address you enter yourself, used to prepare a reminder for your chosen guardian.</td>
-              <td>Not by the app itself — the app opens your own mail client with the address pre-filled. <span class="todo">TODO — the mobile-P0 branch adds an optional server endpoint; this row must be rewritten once that ships</span></td>
-              <td>Whatever you choose in your mail app.</td>
-              <td>Stored locally in app preferences.</td>
+              <td>Only if this build was configured with a guardian-reminder endpoint. The background check runs on your device every 30 minutes; when your screen time crosses the target it sends that address, the date and your screen-time hours to the endpoint over HTTPS. With no endpoint configured, nothing leaves the device and the app falls back to opening your own mail client with the message pre-filled. <span class="todo">TODO — name the endpoint host and operator for the published build</span></td>
+              <td>The operator of the configured guardian-reminder endpoint, which forwards the notice to your chosen guardian — or, with no endpoint, whatever you choose in your mail app.</td>
+              <td>Stored locally in app preferences. A reminder is sent at most once per day.</td>
             </tr>
             <tr>
               <th scope="row">Diagnostics / analytics</th>
@@ -706,7 +706,8 @@
         <li><strong>Google Sign-In</strong> — only if you choose to link a Google account.</li>
         <li><strong>NVIDIA</strong> — the AI assistant, as described in section 07, and only when you actually use it.</li>
         <li><strong>GitHub</strong> — the public Releases API, used to check for app updates. No personal data is sent.</li>
-        <li><strong>Your own email client</strong> — the guardian reminder opens your mail app with the message pre-filled; the app never sends mail itself.</li>
+        <li><strong>Your own email client</strong> — when no guardian-reminder endpoint is configured, the guardian reminder opens your mail app with the message pre-filled; the app does not send mail itself in that case.</li>
+        <li><strong>The configured guardian-reminder endpoint</strong> — if this build was configured with one, the background check posts the guardian address, the date and your screen-time hours to that HTTPS endpoint so it can forward the reminder. <span class="todo">TODO — identify the endpoint host and its operator</span></li>
       </ul>
       <p>
         We may also disclose data if required by law, or as part of a corporate transaction, with
@@ -843,7 +844,7 @@
         <li>Should cloud backup be opt-in rather than automatic for signed-in users?</li>
         <li>What server-side retention should be published for the backup document?</li>
         <li>Confirm NVIDIA's retention and model-training terms for <code>integrate.api.nvidia.com</code>, and whether the embedded API credential should be replaced with a publisher-owned relay.</li>
-        <li>Once the guardian-email endpoint lands (mobile P0 branch), confirm the final data flow so section 03 and section 10 can be rewritten accurately.</li>
+        <li>For the guardian-reminder endpoint: what is the host name, who operates it, and where does the forwarded email go from there?</li>
         <li>Confirm the intended minimum age and the Google Play Families policy classification.</li>
         <li>Should a Vietnamese translation of this policy be published, and which version prevails if they differ?</li>
         <li>Confirm the exact in-app menu labels used in section 04 and section 12 (Delete local data / Export my data / Data collection).</li>

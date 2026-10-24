@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/legal_urls.dart';
 import '../dialogs/delete_account_dialog.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/settings_more_provider.dart';
 import '../screens/change_password_screen.dart';
+import '../services/legal_link_service.dart';
 import '../theme/app_colors.dart';
 import 'settings_toggle_tile.dart';
 
@@ -52,6 +54,20 @@ class PrivacySecuritySection extends StatelessWidget {
           description: strings.aiConfirmBeforeActingDesc,
           value: settings.aiConfirmBeforeActing,
           onChanged: settings.setAiConfirmBeforeActing,
+        ),
+        const Divider(height: 1),
+        // Bản Chính sách quyền riêng tư ĐẦY ĐỦ đã publish (Google Play bắt
+        // buộc có URL công khai). Nội dung trong app chỉ là tóm tắt.
+        SettingsNavTile(
+          title: strings.vi
+              ? 'Chính sách quyền riêng tư (trực tuyến)'
+              : 'Privacy Policy (online)',
+          icon: Icons.privacy_tip_outlined,
+          onTap: () => LegalLinkService.open(
+            context,
+            LegalUrls.privacyPolicyUrl,
+            vi: strings.vi,
+          ),
         ),
         SettingsSectionLabel(strings.sectionSecurity),
         SettingsNavTile(
