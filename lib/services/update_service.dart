@@ -77,6 +77,22 @@ class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
+  /// Chuẩn hoá ghi chú release trước khi hiển thị.
+  ///
+  /// Ghi chú release được render bằng widget Text thuần (không phải
+  /// markdown) trong modal "Có bản cập nhật" và màn "Nhật ký cập nhật", nên
+  /// các body cũ viết theo kiểu markdown ("**Commit:** ...") sẽ hiện ra với
+  /// dấu * nguyên văn cho người dùng. Bỏ header legacy và dấu ** để phần
+  /// ghi chú luôn hiển thị gọn gàng, đồng thời giữ nguyên các dòng bullet.
+  static String sanitizeNotes(String body) {
+    final lines = body
+        .split('\n')
+        .where((l) => !l.trimLeft().startsWith('**Commit:**'))
+        .map((l) => l.replaceAll('**', '').trimRight())
+        .toList();
+    return lines.join('\n').trim();
+  }
+
   // Chủ repo GitHub đang publish APK qua workflow build-apk.yml. Nếu nút
   // "Kiểm tra cập nhật" LUÔN báo lỗi/luôn "đang dùng bản mới nhất" dù rõ
   // ràng đã có bản mới, viêc ĐẦU TIÊN cần xác minh là 2 hằng số này khớp
@@ -165,7 +181,9 @@ class UpdateService {
           buildNumber: latestBuildNumber,
           versionName: (data['name'] ?? tag).toString(),
           downloadUrl: downloadUrl,
-          releaseNotes: (data['body'] ?? '').toString(),
+          releaseNotes: UpdateService.sanitizeNotes(
+            (data['body'] ?? '').toString(),
+          ),
         ),
       );
     } on DioException catch (e) {
@@ -213,7 +231,9 @@ class UpdateService {
         entries.add(ChangelogEntry(
           buildNumber: buildNumber,
           versionName: (item['name'] ?? tag).toString(),
-          notes: (item['body'] ?? '').toString(),
+          notes: UpdateService.sanitizeNotes(
+            (item['body'] ?? '').toString(),
+          ),
           publishedAt: DateTime.tryParse((item['published_at'] ?? '').toString()),
         ));
       }
