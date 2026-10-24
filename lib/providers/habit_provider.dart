@@ -123,7 +123,10 @@ class HabitProvider extends ChangeNotifier {
     HabitData(
       id: 'breaks',
       title: 'Eye Breaks',
-      subtitle: 'Front camera gaze detection',
+      // Camera gaze/distance scoring đã bị gỡ bỏ (26/09) — số lần nghỉ được
+      // đếm bằng nhắc thủ công + tự động. Giữ chuỗi này khớp nghĩa với
+      // strings.habitSubtitle('breaks') (app_strings.dart).
+      subtitle: 'Manually and auto-counted breaks',
       icon: '👁️',
       unit: 'breaks',
       target: 12,

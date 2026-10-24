@@ -695,7 +695,9 @@ class AppStrings {
       case 'outdoor':
         return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
       case 'breaks':
-        return vi ? 'Nhận diện ánh nhìn qua camera trước' : 'Front camera gaze detection';
+        // Camera distance/gaze scoring đã bị gỡ bỏ (26/09) — số lần nghỉ
+        // được đếm bằng nhắc thủ công + tự động.
+        return vi ? 'Đếm nghỉ ngơi thủ công và tự động' : 'Manually and auto-counted breaks';
       default:
         return '';
     }
