@@ -1068,7 +1068,7 @@ class AppStrings {
   String get docDataProtectionPolicy => vi ? 'Chính sách bảo vệ dữ liệu' : 'Data Protection Policy';
   String get docOpenSourceLicenses => vi ? 'Giấy phép mã nguồn mở' : 'Open Source Licenses';
   String get termsVersion => vi ? 'Phiên bản điều khoản 1.0' : 'Terms Version 1.0';
-  String get termsLastUpdated => vi ? 'Cập nhật lần cuối: Tháng 7, 2026' : 'Last Updated: July 2026';
+  String get termsLastUpdated => vi ? 'Cập nhật lần cuối: Tháng 10, 2026' : 'Last Updated: October 2026';
 
   // Help & Support section
   String get faqTitle => vi ? 'Câu hỏi thường gặp' : 'Frequently Asked Questions';

@@ -26,7 +26,7 @@
 | Reminders | 20-20-20 break reminders + persistent countdown notification + repeating native alarm + vibration | `NotificationService`, `ReminderProvider`, `eye_break_screen.dart` |
 | Reminders | Water reminder tied to break cycles | `ReminderProvider`, `eye_break_screen.dart` |
 | Reminders | Focus mode (notification blocking) | `focus_mode_service.dart` |
-| Reminders | Custom notification sound | ❌ still hardcoded off — `eye_break_alert.mp3` missing |
+| Reminders | Custom notification sound | ✅ `res/raw/eye_break_alert.wav` + Settings toggle; two channels (system / custom) because Android cannot change a channel's sound after creation; auto-falls back to the system sound if the raw file is unusable *(mobile P0, 2026-10-23)* |
 | Scoring | Eye Health Score (screen / breaks / environment / sleep / outdoor) with day-over-day deltas | `statistics_screen.dart`, `HabitProvider` |
 | Scoring | Streaks + achievements | `HabitProvider.streakDays`, `_AchievementPage` |
 | Scoring | Duolingo-style ranks (7 tiers) + Firestore leaderboard | `rank_screen.dart`, `leaderboard_service.dart` |
@@ -44,6 +44,10 @@
 | Data | Habits survey → personalized 30-day targets, timestamped, newest-wins | `HabitsSurveyScreen.applySurveyTargets()` |
 | AI | NVIDIA NIM chat assistant, ask-before-act confirm UI, auto-analysis on Home | `eye_chat_service.dart`, `chat_screen.dart`, `home_screen.dart` |
 | AI | AI Sensitivity / AI Voice | ❌ spec only, not implemented |
+| Guardian | Guardian reminder — native WorkManager check every 30 min; POSTs to a build-time HTTPS endpoint, `mailto:` fallback when none is set | `GuardianReminderWorker.kt`, `guardian_reminder_service.dart` |
+| Release | **INTERNET permission added to the release manifest** — release builds previously had *no* network access (the permission existed only in the debug/profile manifests) | `android/app/src/main/AndroidManifest.xml` |
+| Store | Rate App — store deep link, with GitHub Releases + feedback fallback while the listing is unpublished | `rate_app_service.dart`, `store_links.dart` |
+| Legal | Privacy Policy + Terms published on GitHub Pages and linked from Settings; in-app text is a summary, not the full document | `legal_urls.dart`, `web/legal/` |
 | i18n | English + Tiếng Việt | `LanguageProvider`, `AppStrings` |
 | UX | App border/frame, dark mode, accent colour + font, units (m/cm/ft/in) | `ThemeProvider`, `SettingsProvider` |
 
@@ -58,12 +62,12 @@
 - 🟡 **Analytics** — `analytics_service.dart` is a **stub**: 2 open TODOs (`:57`, `:63`), no real event logging.
 - 🟡 **AI Reminder Style** — the user's reminder style is injected into AI context
   (`chat_screen.dart:103`, `home_screen.dart:337`); no dedicated AI setting screen.
-- 🟡 **Privacy Policy / Terms** — in-app static text only; hosted pages being built on `feat/web-legal`.
+- ✅ **Privacy Policy / Terms** — published at `thongaccount.github.io/eye_care_ai/legal/privacy.html` and `…/legal/terms.html` (branch `gh-pages`), linked from Settings and Help; the in-app cards carry real summaries instead of placeholders.
 - ❌ **Snooze Duration** — genuinely absent (zero references anywhere in the tree).
 - ❌ **Blink Reminder** — genuinely absent; "blink" appears only as exercise/achievement copy.
 - ❌ **Blue Light Filter** — strings only in `AppStrings`, no implementation (OS-level).
-- ❌ **Rate App** — no store link yet (handoff in flight on `docs/growth-store-launch`).
-- ❌ **Custom notification sound** — `_useCustomSound` hardcoded false.
+- ✅ **Rate App** — shipped (`rate_app_service.dart`). Opens the Play/App Store listing when published, otherwise falls back to GitHub Releases + a feedback e-mail. Flip `StoreLinks.playListingPublished` when the Play listing goes live.
+- ✅ **Custom notification sound** — shipped with a Settings toggle; two notification channels are used because Android cannot change a channel's sound after creation.
 
 ### 🧹 Dead code — corrected (the old list was wrong)
 
@@ -78,10 +82,21 @@
 > The Aug-6 list ("remove `UsageService`, `eye_chat_service.dart`") would have broken the
 > setup flow and the AI assistant. Do not delete those two.
 
+### 📚 Launch docs (new)
+
+| Doc | What it gives you |
+|---|---|
+| `docs/web/README.md` | How the legal pages are published (gh-pages branch) and the verification checklist |
+| `docs/web/handoff-legal-urls.md` | The legal-URL wiring map + the open legal questions |
+| `docs/growth/app-listing.md` | Play + App Store listing copy, keywords, content rating, data-safety answers |
+| `docs/growth/screenshots-outline.md` | Which real screen goes in each of the 8 Play / 10 App Store slots |
+| `docs/growth/handoff-rate-app.md` | The rate-app flow (now applied) + the prompt rules for after launch |
+| `docs/growth/analytics-events.md` | Event taxonomy for the analytics stub, with the PII rules |
+| `docs/growth/retention-plan.md` | The 15 wishlist ideas mapped to what ships + the 3 retention moves |
+
 ### 🧱 Remaining technical debt
 
-- Custom notification sound (`eye_break_alert.mp3` in `res/raw/`).
-- Guardian email: UI + `mailto:` only — no background trigger, no real send.
+- Guardian email: the background trigger and the HTTPS send path have shipped, but **no endpoint is configured yet** — pass `GUARDIAN_EMAIL_ENDPOINT` at build time to enable automatic mail; without it the worker defers to the `mailto:` fallback.
 - Analytics logging stub (2 TODOs).
 - Stale string `habitSubtitle('breaks')` ("Front camera gaze detection" vs manual/auto-detect).
 - Health Connect setup guide missing from the Permissions sheet.
@@ -201,6 +216,13 @@ eef9226 merge: integrate upstream eye-test nav, dark-room service, changelog (5 
 Merged as `0ca34f1` (7 upstream commits, one merge commit) and pushed to `origin/main`
 (Oct-16 session). *Correction 2026-10-23: `main-merger` sync done; the remaining upstream commit
 (Eye Timeline, `eb39a7c`) was merged as `3bdfe1a` → `ba547c0` on `main` and shipped via Modal build 109.*
+
+**2026-10-24 integration round** — three lanes merged into `main` and shipped:
+mobile P0 (custom break alert sound, guardian-email background worker, the
+release-manifest `INTERNET` fix), web/legal (published Privacy Policy + Terms +
+bilingual landing page on the `gh-pages` branch), and growth (store listing pack,
+screenshot outline, rate-app flow, analytics taxonomy, retention plan).
+Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 
 ---
 
@@ -488,14 +510,14 @@ b2d2254 feat: replace emoji with Material Icons for consistency across the app
 ## 🎯 PRIORITY ORDER FOR NEXT SPRINT
 
 ### P0 (Critical)
-1. **Guardian Email auto-reminder** — Background check + real send via `GUARDIAN_EMAIL_ENDPOINT` *(in flight on `feat/mobile-p0`)*
-2. **Custom notification sound** — Add `eye_break_alert.mp3`, enable `_useCustomSound`
-3. **Ship legal pages + wire into Settings** — `feat/web-legal` → Privacy Policy / Terms URLs *(in flight)*
+1. **Set a guardian endpoint** — the worker and send path shipped; supply `GUARDIAN_EMAIL_ENDPOINT` at build time or automatic mail stays off
+2. **Replace the legal TODO chips** — entity name, jurisdiction, contact e-mail, effective date (blocks the Play submission)
+3. **Create the Play Developer account + listing** — `docs/growth/app-listing.md` is ready to paste
 
 ### P1 (Code Health)
 4. **Remove dead code** — `usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart` (only — keep `usage_service.dart` + `eye_chat_service.dart`)
-5. **Implement analytics logging** — `analytics_service.dart` TODOs at `:57` / `:63`
-6. **Fix stale strings** — `habitSubtitle('breaks')`, remove unused Eye Test strings
+5. **Implement analytics logging** — `analytics_service.dart` TODOs at `:57` / `:63`; the event schema is specced in `docs/growth/analytics-events.md`
+6. **Fix stale strings** — `habitSubtitle('breaks')` *(fixed in mobile P0)*, remove unused Eye Test strings
 
 ### P2 (Features)
 7. **Snooze Duration** — the one notification setting still missing
