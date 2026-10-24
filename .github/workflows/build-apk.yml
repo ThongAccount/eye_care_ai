@@ -38,6 +38,48 @@ jobs:
           fi
           echo "Source tree is clean of secret-like content."
 
+      # ------------------------------------------------------------------
+      # Upstream-identity guard.
+      #
+      # The app checks GitHub Releases for updates, using the repo name
+      # hard-coded in lib/services/update_service.dart. If that points at a
+      # DIFFERENT repo, the updater reads someone else's releases.
+      #
+      # This is not hypothetical: merges from upstream
+      # (Supertime1236/eye_care_ai) have twice carried upstream's own repo
+      # name into this fork - once in update_service.dart, once in the
+      # README links. Upstream publishes under the SAME build-N tag scheme,
+      # so a user on build-94 would be told build-106 is an update and
+      # offered a foreign APK. The merge looked clean, so only a guard
+      # catches it.
+      #
+      # Runs BEFORE the release is published: if this fails, no release and
+      # no APK are produced.
+      # ------------------------------------------------------------------
+      - name: Verify the updater targets this repository
+        run: |
+          SERVICE=lib/services/update_service.dart
+          EXPECTED_OWNER="${GITHUB_REPOSITORY%%/*}"
+          EXPECTED_REPO="${GITHUB_REPOSITORY#*/}"
+
+          OWNER=$(grep -oE "githubOwner = '[^']+'" "$SERVICE" | head -1 | sed "s/.*'\([^']*\)'.*/\1/")
+          REPO=$(grep -oE "githubRepo = '[^']+'" "$SERVICE" | head -1 | sed "s/.*'\([^']*\)'.*/\1/")
+
+          if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
+            echo "::error::Could not read githubOwner/githubRepo from $SERVICE"
+            exit 1
+          fi
+          if [ "$OWNER" != "$EXPECTED_OWNER" ] || [ "$REPO" != "$EXPECTED_REPO" ]; then
+            echo "::error::Updater targets $OWNER/$REPO but this build is ${GITHUB_REPOSITORY}."
+            echo "::error::Users would be offered another repository's APK as an update."
+            exit 1
+          fi
+          if ! grep -q "https://github.com/$OWNER/$REPO/releases" README.md; then
+            echo "::error::README.md does not link to $OWNER/$REPO releases."
+            exit 1
+          fi
+          echo "Updater targets $OWNER/$REPO - matches ${GITHUB_REPOSITORY}."
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
