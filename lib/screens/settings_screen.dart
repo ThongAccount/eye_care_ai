@@ -407,10 +407,15 @@ class SettingsScreen extends StatelessWidget {
                     _ListTileOption(
                       icon: '🛡️',
                       title: strings.guardianEmailTitle,
-                      // Đã có email -> nhắc người dùng biết app sẽ TỰ ĐỘNG
-                      // nhắc người bảo hộ khi vượt giờ (kiểm tra nền).
+                      // Đã có email -> mô tả đúng hành vi THẬT: nếu bản build có
+                      // cấu hình endpoint gửi mail thì app tự gửi cho người bảo hộ;
+                      // nếu KHÔNG có endpoint (trường hợp của mọi bản build hiện
+                      // nay) thì app chỉ phát hiện vượt giờ và mở app mail để
+                      // người dùng tự gửi.
                       subtitle: settings.guardianEmail.isNotEmpty
-                          ? strings.guardianEmailAuto
+                          ? (GuardianReminderService.instance.hasEndpoint
+                              ? strings.guardianEmailAuto
+                              : strings.guardianEmailDetectOnly)
                           : strings.guardianEmailHint,
                       valueLabel: settings.guardianEmail.isNotEmpty ? settings.guardianEmail : strings.guardianEmailAdd,
                       valueOnNewLine: true,

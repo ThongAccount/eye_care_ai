@@ -233,9 +233,16 @@ class AppStrings {
   String get guardianEmailPending => vi
       ? 'Đã vượt giờ — chạm để nhắc người bảo hộ.'
       : 'Limit exceeded — tap to notify the guardian.';
+  /// Đã cấu hình endpoint gửi mail lúc build (--dart-define=GUARDIAN_EMAIL_ENDPOINT)
+  /// → app TỰ GỬI mail cho người bảo hộ khi vượt giờ.
   String get guardianEmailAuto => vi
-      ? 'Tự động nhắc khi vượt giờ (kiểm tra nền mỗi 30 phút)'
-      : 'Notifies automatically when the limit is exceeded (checked in the background every 30 min)';
+      ? 'Tự động gửi mail cho người bảo hộ khi vượt giờ (kiểm tra nền mỗi 30 phút)'
+      : 'Emails the guardian automatically when the limit is exceeded (checked in the background every 30 min)';
+  /// CHƯA có endpoint → app vẫn phát hiện việc vượt giờ nền mỗi 30 phút, nhưng
+  /// không tự gửi được: nó chỉ nhắc người dùng mở app mail để tự gửi lời nhắc.
+  String get guardianEmailDetectOnly => vi
+      ? 'Phát hiện vượt giờ nền mỗi 30 phút — chạm để mở app mail và gửi lời nhắc'
+      : 'Detects the limit in the background every 30 min — tap to open your mail app and send the reminder';
   String get roadmapTitle => vi ? 'Lộ trình tính năng sắp tới' : 'Upcoming feature roadmap';
   List<String> get roadmapFeatures => vi
       ? [
@@ -629,13 +636,10 @@ class AppStrings {
   String get surveyDisclaimer => vi
       ? 'Đây là khuyến nghị chung, không thay thế tư vấn của bác sĩ nhãn khoa.'
       : 'These are general guidelines, not a substitute for advice from an eye doctor.';
-  String get snellenScreening => vi ? 'Cài nhắc nghỉ mắt sau khoảng thời gian' : 'Set a break reminder after a time interval';
   String get reminderSet => vi ? 'Đã bật nhắc nghỉ mắt' : 'Reminder set';
   String get reminderInterval => vi ? 'Nhắc nhở sau' : 'Reminder after';
   String get minutes => vi ? 'phút' : 'mins';
   String get confirm => vi ? 'Xác nhận' : 'Confirm';
-  String get visionScreening => vi ? 'Kiểm tra thị lực' : 'Vision Screening';
-  String get visionScreeningTitle => vi ? 'Kiểm tra thị lực nhanh giúp ước lượng thị lực của bạn. Hãy đứng cách màn hình khoảng 2 mét và đảm bảo đủ sáng.' : 'This quick Snellen chart test helps estimate your visual acuity. Find a well-lit area and stand about 6 feet from your screen.';
   String get ensureLighting => vi ? 'Đảm bảo ánh sáng tốt' : 'Ensure good lighting';
   String get maintainDistance => vi ? 'Giữ khoảng cách ~2 m' : 'Maintain ~6 ft distance';
   String get wearGlasses => vi ? 'Đeo kính nếu bạn thường dùng' : 'Wear glasses if you normally do';
