@@ -16,8 +16,8 @@ String _limitJson({
     'enabled': enabled,
     'dailyLimitMinutes': dailyLimitMinutes,
     'lastResetDate': lastResetDate,
-    if (lastExtraTimeGrantMillis != null)
-      'lastExtraTimeGrant': lastExtraTimeGrantMillis,
+    // jsonEncode giữ cả null; fromJson coi giá trị null là "chưa cấp thêm giờ".
+    'lastExtraTimeGrant': lastExtraTimeGrantMillis,
   });
 }
 
