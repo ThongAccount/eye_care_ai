@@ -1,7 +1,8 @@
 # EyeCare AI — Store Listing Pack (Google Play primary, App Store secondary)
 
-> Grounded in the code at `main` @ `521cb2e` (2026-10-24), re-verified at the `1.4.0+alpha`
-> version bump. Every claim below maps to a
+> Grounded in the code at `main` @ `521cb2e` (2026-10-24); the web/legal facts below were
+> re-checked against `main` @ `c6c37cd` (2026-10-26). The `1.4.0+alpha` version bump is unchanged.
+> Every claim below maps to a
 > file in the repo. Anything that is **not** shipped is marked as a TODO, not written as a
 > feature. Health-adjacent rules applied throughout: no "treats / prevents / cures /
 > diagnoses", no Snellen-style 20/20 score, no medical-device framing.
@@ -153,8 +154,8 @@ Play indexes title + short description + full description. Priority order by int
 | Category | **Health & Fitness** | Secondary: Productivity (screen-time users). If Play reviewers push back, move to Lifestyle — do **not** claim Medical. |
 | Tags | Health, Wellness, Productivity, Screen time, Habit tracker | Up to 5 |
 | Contact e-mail | `eyecareai.app@gmail.com` | already in-app |
-| External marketing site | GitHub repo / GitHub Pages landing page (in flight) | |
-| Privacy policy URL | **TODO** — required before submission | see §0 |
+| External marketing site | `https://thongaccount.github.io/eye_care_ai/` | GitHub Pages (`gh-pages` branch) — live, HTTP 200 |
+| Privacy policy URL | `https://thongaccount.github.io/eye_care_ai/legal/privacy.html` | live, HTTP 200 — Play rejects a listing without a public URL |
 | Government app | No | |
 | Financial features | None | no lending, no trading, no crypto |
 | Target audience | 13+ (no ads, no purchases, no user-generated content published) | consider 18+ to be conservative if the AI chat stays open |

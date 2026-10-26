@@ -11,13 +11,27 @@ web/
   site/
     index.html        Bilingual (EN / Tiếng Việt) landing page
     styles.css        Landing page styles — one "dim room" dark theme, no external assets
+    root-redirect.html  Published as `site/index.html`, so the legal pages' back-link resolves
   index.html          Flutter's own web entry point — DO NOT TOUCH
   favicon.png, icons/ Flutter web assets
+  robots.txt          Crawler rules for the published site
 ```
 
-Both legal pages link to each other and back to the landing page with **relative** paths
-(`../legal/privacy.html`, `../site/index.html`), so they work unchanged in every publishing
-layout below.
+Publishing is done by [`scripts/publish-pages.sh`](../../scripts/publish-pages.sh), which rebuilds
+the whole `gh-pages` tree from `web/` — no partial copies.
+
+Every link is **relative**, but each file's links are written for the position it is published
+at, not for its position in the repository:
+
+- the landing page is published at the **root** of the site, so it links to `legal/privacy.html`,
+  `legal/terms.html` and `favicon.png`;
+- the legal pages are published in `legal/`, so they link to each other with `privacy.html` /
+  `terms.html` and back to the landing page with `../site/index.html`, which the publish step
+  serves as a redirect to the canonical root URL.
+
+Getting this wrong is not cosmetic: with the previous paths (`../favicon.png`,
+`../legal/privacy.html`) the links resolved one level **above** the project and returned **404**,
+so the live landing page could not reach the privacy policy, the terms, or even its own icon.
 
 ---
 
@@ -35,27 +49,24 @@ icons/              <- copy of web/icons/
 legal/
   privacy.html      <- copy of web/legal/privacy.html
   terms.html        <- copy of web/legal/terms.html
+robots.txt          <- copy of web/robots.txt
+site/
+  index.html        <- copy of web/site/root-redirect.html (redirect to the canonical root)
 ```
 
-**One-time publish (git only, no toolchain):**
+**Publish (git only, no toolchain):**
 
 ```bash
 cd /workspace/eye_care_ai
 git fetch origin
 git worktree add -b gh-pages /workspace/temp/gh-pages origin/main
-cd /workspace/temp/gh-pages
-git rm -rf .                                  # empty the branch
-cp /workspace/eye_care_ai/web/site/index.html .
-cp /workspace/eye_care_ai/web/site/styles.css .
-cp /workspace/eye_care_ai/web/favicon.png .
-cp -r /workspace/eye_care_ai/web/icons .
-mkdir -p legal
-cp /workspace/eye_care_ai/web/legal/privacy.html legal/
-cp /workspace/eye_care_ai/web/legal/terms.html legal/
-git add -A
-git commit -m "docs: publish legal pages and landing site"
-git push origin gh-pages
+scripts/publish-pages.sh --out /workspace/temp/gh-pages --push
 ```
+
+The script rebuilds the **whole** tree from `web/`, verifies every expected file is present and
+non-empty before it commits, and only then pushes to `origin/gh-pages`. The old hand-written
+recipe started with `git rm -rf .` and never copied `robots.txt`, so following it deleted the
+live `robots.txt`; that class of mistake is now impossible.
 
 Then in the repository: **Settings → Pages → Source: Deploy from a branch → `gh-pages` / `root`**.
 The site is live about a minute later.
@@ -83,11 +94,13 @@ Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`.
 | Privacy Policy | `https://thongaccount.github.io/eye_care_ai/web/legal/privacy.html` |
 | Terms of Service | `https://thongaccount.github.io/eye_care_ai/web/legal/terms.html` |
 
-Two caveats: the repository root has no `index.html`, so `…/eye_care_ai/` itself returns 404, and
+Three caveats: the repository root has no `index.html`, so `…/eye_care_ai/` itself returns 404;
 Flutter's `web/index.html` is published too (it will render broken, because its Flutter bootstrap
-assets are not built) — harmless, but it is untidy.
+assets are not built) — harmless, but it is untidy; and the shipped relative links are written for
+the Option A layout, so in Option B the landing page's `legal/…` and `favicon.png` links resolve
+inside `web/site/` and 404. Option B needs the same `site/` redirect the publish script adds.
 
-Option A gives the shorter URLs and a clean root; prefer it.
+Option A gives the shorter URLs, a clean root and links that resolve; prefer it.
 
 ---
 
@@ -108,6 +121,10 @@ constant file and names the exact call sites.
 5. The app's Settings screen links to the published URLs, not to the local file paths.
 6. On a phone-sized viewport: the language toggle switches all copy, the headings stay in order,
    and focus is visible on every link and button.
+7. **Every relative link on the landing page resolves to 200** — check the resolved URL, not the
+   file name, because a wrong `../` silently lands one directory above the project:
+   `curl -s -o /dev/null -w '%{http_code}\n' https://thongaccount.github.io/eye_care_ai/{favicon.png,legal/privacy.html,legal/terms.html,robots.txt}`
+8. The legal pages' back-link (`../site/index.html`) lands on the landing page, not on a 404.
 
 ## Notes on the two design registers
 
