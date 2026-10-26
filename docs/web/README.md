@@ -11,7 +11,6 @@ web/
   site/
     index.html        Bilingual (EN / Tiếng Việt) landing page
     styles.css        Landing page styles — one "dim room" dark theme, no external assets
-    root-redirect.html  Published as `site/index.html`, so the legal pages' back-link resolves
   index.html          Flutter's own web entry point — DO NOT TOUCH
   favicon.png, icons/ Flutter web assets
   robots.txt          Crawler rules for the published site
@@ -20,18 +19,25 @@ web/
 Publishing is done by [`scripts/publish-pages.sh`](../../scripts/publish-pages.sh), which rebuilds
 the whole `gh-pages` tree from `web/` — no partial copies.
 
-Every link is **relative**, but each file's links are written for the position it is published
-at, not for its position in the repository:
+## The layout rule — read this before touching any link
 
-- the landing page is published at the **root** of the site, so it links to `legal/privacy.html`,
-  `legal/terms.html` and `favicon.png`;
-- the legal pages are published in `legal/`, so they link to each other with `privacy.html` /
-  `terms.html` and back to the landing page with `../site/index.html`, which the publish step
-  serves as a redirect to the canonical root URL.
+**Links in `web/site/index.html` and `web/legal/*.html` are relative to the PUBLISHED root**:
+`index.html` and `styles.css` sit at the root of the site, and `legal/` is a subfolder.
+`web/site/` and `web/legal/` are **source folders, not URL folders**.
 
-Getting this wrong is not cosmetic: with the previous paths (`../favicon.png`,
-`../legal/privacy.html`) the links resolved one level **above** the project and returned **404**,
-so the live landing page could not reach the privacy policy, the terms, or even its own icon.
+So:
+
+- the landing page (published at the root) links to `legal/privacy.html`, `legal/terms.html`
+  and `favicon.png`;
+- the legal pages (published in `legal/`) link to each other with `privacy.html` /
+  `terms.html`, and back to the landing page with `../index.html`.
+
+Getting this wrong is not cosmetic: the links used to be written for the source layout
+(`../favicon.png`, `../legal/privacy.html`, `../site/index.html`), so on the published site they
+resolved one directory **too high** and returned **404** — the live home page could not open the
+privacy policy, could not open the terms, had no icon, and the Home links inside both legal
+pages were dead. When you move a file, fix its links against the published layout, never against
+the repository layout.
 
 ---
 
@@ -50,8 +56,6 @@ legal/
   privacy.html      <- copy of web/legal/privacy.html
   terms.html        <- copy of web/legal/terms.html
 robots.txt          <- copy of web/robots.txt
-site/
-  index.html        <- copy of web/site/root-redirect.html (redirect to the canonical root)
 ```
 
 **Publish (git only, no toolchain):**
@@ -96,9 +100,10 @@ Settings → Pages → Source: Deploy from a branch → `main` / `/ (root)`.
 
 Three caveats: the repository root has no `index.html`, so `…/eye_care_ai/` itself returns 404;
 Flutter's `web/index.html` is published too (it will render broken, because its Flutter bootstrap
-assets are not built) — harmless, but it is untidy; and the shipped relative links are written for
-the Option A layout, so in Option B the landing page's `legal/…` and `favicon.png` links resolve
-inside `web/site/` and 404. Option B needs the same `site/` redirect the publish script adds.
+assets are not built) — harmless, but it is untidy; and the shipped links are written for the
+Option A layout, so in Option B the landing page's `legal/…` and `favicon.png` links resolve
+inside `web/site/` and 404. Option B therefore needs the files published flat, the way
+`scripts/publish-pages.sh` lays them out — it cannot publish the repository tree as-is.
 
 Option A gives the shorter URLs, a clean root and links that resolve; prefer it.
 
@@ -124,7 +129,9 @@ constant file and names the exact call sites.
 7. **Every relative link on the landing page resolves to 200** — check the resolved URL, not the
    file name, because a wrong `../` silently lands one directory above the project:
    `curl -s -o /dev/null -w '%{http_code}\n' https://thongaccount.github.io/eye_care_ai/{favicon.png,legal/privacy.html,legal/terms.html,robots.txt}`
-8. The legal pages' back-link (`../site/index.html`) lands on the landing page, not on a 404.
+8. The legal pages' Home links (`../index.html`) land on the landing page, not on a 404.
+9. The landing page's `og:image` and `twitter:image` URLs resolve — a social preview that points
+   at a missing file shows as a broken card, not as no card.
 
 ## Notes on the two design registers
 

@@ -22,8 +22,14 @@
 #   icons/            <- web/icons/
 #   legal/            <- web/legal/*.html
 #   robots.txt        <- web/robots.txt
-#   site/index.html   <- web/site/root-redirect.html  the legal pages link back
-#                                                   to `../site/index.html`
+#
+# LINK PATHS: every link inside the published files is relative to the PUBLISHED
+# root - index.html and styles.css sit at the root, legal/ is a subfolder - so
+# the landing page links to "legal/privacy.html" and "favicon.png", and the
+# legal pages link back to the landing page with "../index.html".
+# "web/site/" and "web/legal/" are SOURCE folders, not URL folders: copying
+# web/site/index.html to the root is what makes those paths correct, and
+# writing the links against the source layout is exactly what broke them.
 #
 set -euo pipefail
 
@@ -49,7 +55,6 @@ fi
 REQUIRED=(
   "web/site/index.html"
   "web/site/styles.css"
-  "web/site/root-redirect.html"
   "web/favicon.png"
   "web/robots.txt"
   "web/legal/privacy.html"
@@ -85,17 +90,16 @@ cp "$REPO_ROOT/web/site/styles.css"       "$OUT_DIR/styles.css"
 cp "$REPO_ROOT/web/favicon.png"           "$OUT_DIR/favicon.png"
 cp "$REPO_ROOT/web/robots.txt"            "$OUT_DIR/robots.txt"
 cp -r "$REPO_ROOT/web/icons"              "$OUT_DIR/icons"
-mkdir -p "$OUT_DIR/legal" "$OUT_DIR/site"
+mkdir -p "$OUT_DIR/legal"
 cp "$REPO_ROOT/web/legal/privacy.html"    "$OUT_DIR/legal/privacy.html"
 cp "$REPO_ROOT/web/legal/terms.html"      "$OUT_DIR/legal/terms.html"
-cp "$REPO_ROOT/web/site/root-redirect.html" "$OUT_DIR/site/index.html"
 
 # --- 4. verify the copy before it can be published ----------------------------
 EXPECTED=(
   "index.html" "styles.css" "favicon.png" "robots.txt"
   "icons/Icon-192.png" "icons/Icon-512.png"
   "icons/Icon-maskable-192.png" "icons/Icon-maskable-512.png"
-  "legal/privacy.html" "legal/terms.html" "site/index.html"
+  "legal/privacy.html" "legal/terms.html"
 )
 BROKEN=()
 for f in "${EXPECTED[@]}"; do
@@ -107,7 +111,7 @@ if [ ${#BROKEN[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "publish-pages: published $(find "$OUT_DIR" -type f ! -path '*/.git/*' | wc -l) files to $OUT_DIR"
+echo "publish-pages: published $(find "$OUT_DIR" -type f ! -name .git ! -path '*/.git/*' | wc -l) files to $OUT_DIR"
 
 # --- 5. commit + push ---------------------------------------------------------
 if [ "$PUSH" -eq 1 ]; then
@@ -122,16 +126,17 @@ Rebuilds the whole gh-pages tree from web/ so the published site always
 matches the repository and nothing that is live can be dropped by a partial
 copy.
 
-The landing page's relative links were written for the repository layout
-(web/site/index.html) and were broken in the published layout: ../favicon.png
-and ../legal/*.html resolved one level above the project and returned 404, so
-the live landing page could not reach the privacy policy, the terms or even
-its own icon. They now point at the published layout (favicon.png,
-legal/privacy.html, legal/terms.html).
+Every link was written for the SOURCE layout, where the landing page lives in
+web/site/ and the legal pages in web/legal/. The published site copies
+web/site/index.html to the root and web/legal/* into legal/, so those links
+resolved one directory too high and returned 404: the live home page could not
+open the privacy policy, could not open the terms, had no icon, and the Home
+links inside both legal pages were dead.
 
-robots.txt moves into web/ (it existed only on this branch) and site/index.html
-is published as a redirect to the canonical landing page, so the back-link
-inside the legal pages resolves instead of 404ing.
+The landing page now links to favicon.png, legal/privacy.html and
+legal/terms.html; both legal pages link back to the landing page with
+../index.html. robots.txt moves into web/ (it existed only on this branch), so
+the published tree always carries it.
 MSG
     git -C "$OUT_DIR" push origin HEAD:gh-pages
     echo "publish-pages: pushed to origin/gh-pages"
