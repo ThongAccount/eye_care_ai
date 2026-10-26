@@ -46,11 +46,15 @@ class AppUsageLimit {
         lastExtraTimeGrant = null;
 
   /// Đã được cấp thêm giờ trong lần khóa HIỆN TẠI chưa.
-  bool get hasExtraTimeInCurrentLock =>
+  bool get hasExtraTimeInCurrentLock => hasExtraTimeAt(DateTime.now());
+
+  /// Bản có tham số thời gian — để logic khoá (và test) không phụ thuộc vào
+  /// "now" ẩn bên trong getter.
+  bool hasExtraTimeAt(DateTime now) =>
       lastExtraTimeGrant != null &&
       lastResetDate != null &&
       dateCode(lastExtraTimeGrant!) == lastResetDate &&
-      DateTime.now().difference(lastExtraTimeGrant!) < const Duration(minutes: 5);
+      now.difference(lastExtraTimeGrant!) < const Duration(minutes: 5);
 
   factory AppUsageLimit.fromJson(Map<String, dynamic> json) {
     return AppUsageLimit(
