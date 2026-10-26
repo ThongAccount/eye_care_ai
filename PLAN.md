@@ -50,15 +50,21 @@
 | **App Store IPA** | `build-ios.yml` is `workflow_dispatch`-only and exports with `method: development` (`ios/ExportOptions.plist`) → no distributable IPA can be produced |
 | **iOS build** | iOS **source** exists (`ios/Runner/AppDelegate.swift`, `Info.plist`, `Runner.entitlements`, `Assets.xcassets` — 49 files), but there is no macOS/Xcode runner, no iOS CI, and no signing → no iOS artifact can be produced here |
 | **iOS feature parity** | Usage Access, exact alarms, the dark-room foreground service and the home-screen widget are **Android-only** — the iOS build would be missing the core of the product |
+| **App-lock enforcement** | the gate can never fire: `armGate` is always called with an empty blocked-app list (`app_usage_monitor.dart:69`), the native watcher only shows the overlay when the foreground package is in that set (`AppLockOverlayManager.kt:169-175`), `showGateOverlay` has no Dart caller, and the `AppLockOverlay` Flutter screen (`app_lock_overlay.dart:17`) is never routed to. The settings sheet and the overlay **preview** work; the lock itself does not |
 | **Contextual rating prompt** | 0 references — "Rate App" is a manual Settings tile only, never asked at a streak milestone or after a weekly report |
 | **Guardian auto-send** | the worker + HTTPS send path shipped (`GuardianReminderWorker.kt`, `guardian_reminder_service.dart:32`), but **no endpoint value is configured anywhere** — `GUARDIAN_EMAIL_ENDPOINT` is only a dart-define constant. Without it the app falls back to opening a pre-filled mail client |
-| **Play / App Store listing links** | `store_links.dart:17` `playListingPublished = false`, `:20` `appStoreListingPublished = false`, `:23` `appStoreId = ''` → "Rate App" opens GitHub Releases + a feedback e-mail instead of a store page |
+| **Play / App Store listing links** | `store_links.dart:17` `playListingPublished = false`, `:20` `appStoreListingPublished = false`, `:23` `appStoreId = ''` → `buildStoreUri` returns null on every platform, so "Rate App" always shows the fallback dialog (thanks → `mailto:eyecareai.app@gmail.com` → GitHub Releases) |
+| **Social preview image** | no `og:image` and no `twitter:card` in `web/site/index.html` — shared links render with no preview image |
+| **Landing page imagery** | 0 `<img>` tags in `web/site/index.html` — no screenshots, no phone mockups, no app icon on the page |
+| **Vietnamese legal pages** | 0 `lang="vi"` in either legal page — the landing page's Vietnamese legal buttons open the **English** documents |
+| **`LICENSE` file** | the repo has none (README says MIT, the terms page has a chip asking for it) → GitHub detects no licence for the repo |
+| **`sitemap.xml` / 404 page** | absent; `robots.txt` exists **only on the `gh-pages` branch**, not in `main` |
 
 ### 🟡 B. Available but incomplete
 
 | Item | What is there | What is missing |
 |---|---|---|
-| **App lock / usage limit** | the counter **is** implemented and wired: `usage_limit_provider.dart:66` ← `app_usage_monitor.dart:55` ← `main_shell.dart:97`/`:175`, fed by real UsageStats, with daily reset + a 5-minute "+5 min" grant | **no blocked-app picker** — `armGate` is called with `blockedPackages: []` ("Phase 1"), so it locks the app wholesale rather than chosen apps. Also needs the Usage Access permission to work at all |
+| **App lock / usage limit** | the counter **is** implemented and wired: `usage_limit_provider.dart:66` ← `app_usage_monitor.dart:55` ← `main_shell.dart:97`/`:175`, fed by real UsageStats, with daily reset + a 5-minute "+5 min" grant; the overlay preview and the settings sheet both render | ⚠️ **enforcement never fires** — `armGate` is always called with an empty list (`app_usage_monitor.dart:69`, "chưa có blocked-app picker"), and the native watcher shows the gate only when the foreground package is in that set (`AppLockOverlayManager.kt:169-175`), so with an empty set the overlay **never appears**. `showGateOverlay` has no Dart caller and the `AppLockOverlay` Flutter screen (`app_lock_overlay.dart:17`) is never routed to. The budget is also only recomputed while the Dart process is alive |
 | **Analytics** | consent screen + `pref_consent_given` + a toggle | no endpoint, no events, no schema test — so every experiment in `docs/growth/retention-plan.md` is currently unmeasurable |
 | **Cloud sync** | backup/restore includes the daily snapshots (`cloud_backup_service.dart:31-32`) and writes them back on restore | it is a **manual** backup/restore, not live sync; no conflict resolution across devices. It also **defaults to ON** for signed-in users (`settings_more_provider.dart:34`, `:47`) → that must be declared in the Play Data Safety form, or flipped to opt-in |
 | **Achievements / badges** | 9 badges whose progress is computed from real data (`_buildItems` in `home_screen.dart` uses `totalEyeBreaksAllTime` / `streakDays`) — the old hardcoded `unlocked: true` is gone | no distance- or environment-based tiers, and nothing outside break counts |
@@ -73,7 +79,7 @@
 
 | Blocker | State |
 |---|---|
-| **Legal facts** | 41 `TODO` chips live on the published pages — 27 in `privacy.html`, 14 in `terms.html`, of which 2 are bare `TODO` prose markers → **39 question chips covering 36 distinct questions**: legal entity name, jurisdiction, registered address, contact e-mail, effective date, retention windows, NVIDIA sub-processor terms, Firestore rules, guardian-endpoint operator |
+| **Legal facts** | **44 unfilled markers live on the published pages**: 41 chip spans (27 in `privacy.html`, 14 in `terms.html`) of which 2 are legend examples → **39 question chips**, **plus 5 plain-text prose TODOs in the page footers** (privacy L801-803: legal entity name, postal address, privacy e-mail; terms L629-630: entity name, postal address). Distinct underlying facts: **36** counting each chip as its own question, **32** when a fact asked twice (body + footer, or on both pages) is merged — the footer prose repeats facts already asked in the body. Still needed: legal entity name, jurisdiction, registered address, contact e-mail, effective date, retention windows, NVIDIA sub-processor terms, Firestore rules, guardian-endpoint operator. ⚠️ **7 of the 39 chips are not collected in Appendix B** (privacy L477 usage-history window, L692 analytics-off, L705 Firestore rules, L715 publisher-structure clause, L761 security commitments; terms L494 explicit clause, L621 arbitration/mediation) → answering only Appendix B still leaves them open |
 | **Play Developer account** + legal developer name | `docs/growth/app-listing.md:29` — **TODO, user must provide**; `:286` still asks personal vs organisation |
 | **Play upload key** | CI signs with the app **release** key; only `android/app/ci-fallback-keystore.jks` sits in the repo. A dedicated upload key is required before the first Play upload |
 | **Play listing fields** | `app-listing.md:22` iOS app name still `Eye Care Ai` (rename to `EyeCare AI`), `:157` privacy-policy URL still TODO (the page is live now — this one is fillable today) |
@@ -90,6 +96,12 @@
 | 3 dead files, 0 references each | `lib/providers/usage_provider.dart`, `lib/widgets/usage_pie_chart.dart`, `lib/services/storage_service.dart` — still present, still unreferenced |
 | Focus-mode DND grant not cached | `focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42` `isNotificationPolicyAccessGranted` is re-checked every time, so the re-check banner can reappear |
 | 3 unused Eye Test strings | `eyeTestHint`, `eyeTestInstruction`, `eyeTestTitle` — 0 call sites outside `app_strings.dart` |
+| **No Pages automation** | nothing in `.github/workflows/` publishes `gh-pages` — every legal-page change needs a manual republish (in sync today). Worse, the publish recipe in `docs/web/README.md:44-57` does not copy `robots.txt`, so following it would **delete the live robots.txt** |
+| **Broken favicon path** | `web/site/index.html:11` uses `href="../favicon.png"` → resolves to `https://thongaccount.github.io/favicon.png` → **404**; the file is at `/eye_care_ai/favicon.png` (200). One-line fix |
+| **In-app terms date runs ahead of the pages** | the app shows "Terms Version 1.0 / Last Updated: October 2026" (`app_strings.dart:1070-1071`) while both published pages still carry the effective/last-updated dates as TODO |
+| **Guardian copy overstates what ships** | the Settings copy implies an automatic guardian reminder, but no build has an endpoint configured — today the worker only writes a pending flag and opens the user's mail client |
+| **Stale docs** | `docs/web/handoff-legal-urls.md:4`, `:38-39` ("nothing applied to `lib/`", "cards are still placeholders") are false since `6f00eef`; `docs/growth/app-listing.md:3` (grounded at an old SHA), `:156` ("marketing site in flight" — it is live), `:157` (privacy URL still TODO while the page is live) |
+| **`web/index.html` is Flutter's untouched template** | harmless today (it is not deployed), but a trap if anyone ever publishes `web/` as a Flutter build |
 | Analytics stub | `analytics_service.dart:57`, `:63` |
 | Setup wizard asks for Usage Access first | `setup_wizard_screen.dart:44-51` — the permission-heavy step comes before notifications, which is the opposite of the "value first" onboarding in `docs/growth/retention-plan.md` Move 3 |
 | Stale iOS HealthKit strings | `ios/Runner/Info.plist:66`, `:68` still declare `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` although the `health` package was removed — App Review will ask why |
@@ -196,7 +208,7 @@
 | Version | Bumped `1.3.0+alpha` → **`1.4.0+alpha`** (minor, not patch: 46 commits of new features landed after the 1.3.0 cut on 2026-09-08). In-app it reads `EyeCare AI v1.4.0 (build N)`; `versionCode` = CI run number. Verified end-to-end on build 85 — APK manifest `versionName=1.4.0`, `versionCode=85`. |
 | Play artifact | **Android App Bundle (`.aab`) now built alongside the APK** — Play rejects APK uploads for new apps. CI attaches `eye_care_ai-<version>-<sha>-build<N>.aab` to the same GitHub Release; Modal produces one with `--build-aab` (build 111 verified: signed with the release key, `versionName=1.4.0`, `versionCode=111`, INTERNET permission present). |
 | CI gates | `flutter analyze` + `flutter test` now run **before** the release build — a failing test can no longer ship. |
-| Legal | Privacy/Terms published and returning HTTP 200. Still 41 `TODO` chips waiting on the user (27 in privacy.html, 14 in terms.html) — 2 of them are bare `TODO` prose markers, so 39 chips mark actual open questions covering **36 distinct questions** (35 if the one line-break-only duplicate is merged): legal entity name, jurisdiction, contact e-mail, effective date, registered address, and the data-retention / NVIDIA-endpoint details. |
+| Legal | Privacy/Terms published and returning HTTP 200, and the live bytes match `main` (no drift). Still **44 unfilled markers**: 41 chip spans (27 privacy + 14 terms) of which 2 are legend examples → 39 question chips, **plus 5 plain-text prose TODOs in the page footers** (privacy L801-803, terms L629-630). Distinct facts: **36** counting each chip as its own question, **32** when a fact asked twice is merged. 7 of the 39 chips are not collected in Appendix B. Waiting on the user: legal entity name, jurisdiction, contact e-mail, effective date, registered address, and the data-retention / NVIDIA-endpoint details. |
 | Versioning rule | The in-app updater compares **build numbers** (GitHub release tag `build-<N>` vs the installed `versionCode`), not the version name — so a version-string bump never affects the update flow. |
 | Release notes | The CI generates the GitHub release body from **every** commit between the previous release and this build — subject + description, plain text, Conventional Commit prefix stripped. That body is exactly what the in-app "Update Available" modal and the changelog screen render, so **every commit must carry a description body**. Legacy bodies are cleaned by `UpdateService.sanitizeNotes()`. |
 
@@ -300,8 +312,11 @@
   Shipped in `Release v1.3.0+alpha` (`feat/app-lock` merged to main + main-merger, branch deleted).
   *2026-10-26: the "usage-limit counter unfinished" note is **stale** — the counter is implemented and
   wired end-to-end (`usage_limit_provider.dart:66` ← `app_usage_monitor.dart:55` ← `main_shell.dart:97`/`:175`,
-  fed by real UsageStats, daily reset + 5-minute extra-time grant). What is missing is the
-  **blocked-app picker** — `armGate` still passes `blockedPackages: []` (Phase 1).*
+  fed by real UsageStats, daily reset + 5-minute extra-time grant). ⚠️ But the **enforcement never fires**:
+  `armGate` always passes an empty blocked-app list (`app_usage_monitor.dart:69`), the native watcher only
+  shows the gate for a package in that set (`AppLockOverlayManager.kt:169-175`), `showGateOverlay` has no
+  Dart caller and `AppLockOverlay` (`app_lock_overlay.dart:17`) is never routed to. The UI preview works;
+  the lock does not.*
 - [~] **Guardian email** — Notion now *(Partial)* (PLAN had it ❌ missing). Still no background auto-send.
 - [~] **Cập nhật trực tiếp (không xóa cài lại)** — Notion [x] + "*Đang cải thiện*":
   in-app update via GitHub Releases now implemented (`UpdateService`, manual check button,
