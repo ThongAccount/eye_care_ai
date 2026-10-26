@@ -2,14 +2,138 @@
 
 > Source: Notion page "PATCHES" (26/07/2026) + SETTINGS spec + Feature wishlist
 > Status legend: ✅ Done · 🟡 Partial · ❌ Not Started
-> **Current truth: § NOTION SYNC — 2026-10-26 (top of file).**
+> **Current truth: § CURRENT GAPS — 2026-10-26 (top of file).**
 > Historical layers kept for provenance:
+> - § NOTION SYNC — 2026-10-26 — the Notion page reconciled against the code.
 > - § CODE-VERIFIED REFRESH (2026-10-23) — the code-grounded baseline the 10-26 sync re-checks.
 > - § NOTION REFRESH (2026-10-15) — Notion snapshot deltas.
 > - § Aug-6 audit (below) — ⚠️ **HISTORICAL, superseded.** Its ❌ rows were re-verified
 >   against the code on 2026-10-23 and several were wrong (features that shipped since).
 >   Sections marked `[HISTORICAL]` are retained verbatim for the record; use the
 >   code-verified tables instead of them.
+
+---
+
+## 🚧 CURRENT GAPS — 2026-10-26 (what is **not** available in the repo right now)
+
+> **Why this section:** the layers below record what shipped. This one records the opposite —
+> every feature that a user, a reviewer or a store can **not** get from the current build.
+> **Method:** repo-wide sweep of `lib/`, `android/`, `ios/`, `web/`, `docs/` at `main` @ `a67e056`,
+> live URL checks, a read of every open marker in this file, and a certificate check on the
+> shipped build-98 artifacts. "0 references" means the string/symbol does not exist in the tree.
+> **Headline:** the app is feature-rich and shippable as an alpha. What is missing clusters in
+> **analytics, iOS, store submission and 8 wishlist features** — plus a few small in-app items and
+> the user-side legal/store facts.
+
+### ❌ A. Not available at all (code-verified absent)
+
+| Item | Evidence |
+|---|---|
+| **Analytics event logging** | `analytics_service.dart:57` / `:63` are no-op stubs, and **0 call sites** invoke `logEvent` / `logScreenView` anywhere in `lib/`. The 87 events in `docs/growth/analytics-events.md` are spec-only. Consent capture works; the pipeline does not exist |
+| **Analytics config** | `AnalyticsConfig` / `ANALYTICS_ENDPOINT` does not exist in `lib/config/` — there is nowhere to point a backend even if someone wanted to |
+| **Snooze Duration** (notification) | 0 references in `lib/` |
+| **Blink Reminder** | "blink" appears only as exercise copy (`app_strings.dart:416`, `:432`, `:448`), an achievement (`app_strings.dart:303`) and rank titles (`rank_tier.dart:70`, `:82`) — no reminder |
+| **Blue Light Filter** | strings only in `AppStrings`; OS-level, unimplemented |
+| **AI Voice** / **AI Sensitivity** (Low/Med/High) | 0 references in `lib/` (the only "sensitivity" string is eye-test *contrast* sensitivity) |
+| **Daily Quests** (3/day, tied to Rank) | 0 word-boundary hits in `lib/` |
+| **Recovery Day / streak protection** | 0 references; a missed day resets the streak to 0 — no grace token |
+| **Adaptive Goals** (auto tighten / relax) | nothing adapts automatically; the app only *suggests* a lower break target in a user-driven dialog (`adjust_break_goal_dialog.dart`, called once per session from `main_shell.dart:157`) |
+| **Personal Eye Profile** (data-derived) | 0 references. Only the manual "Vision Profile" setting exists (`SettingsProvider.visionProfile`) — no data-derived baseline |
+| **"What if?" simulator** | 0 references |
+| **Distance History** distribution | camera distance scoring was removed on 05/09; distance survives only as a live hint during the eye test |
+| **AI Weekly Eye Coach** | the weekly report is **data-only** (`habit_provider.dart:417`, weekly notification `notification_service.dart:749`). The AI has chat + a one-shot Home auto-analysis of *current* state — no weekly aggregation, no coach persona |
+| **Night phone-usage display** ("last activity 23:48, 5 of 7 nights") | only the sleep **estimate** in hours exists (`UsageService.getSleepEstimateMinutes()`); the Notion display does not |
+| **Eye-exercise streak → leaderboard rank** | 0 references to an exercise streak. Habit streaks exist (`HabitProvider.streakDays`) but are not tied to eye-exercise completion |
+| **Crash reporting** | no `sentry` / `firebase_crashlytics` in `pubspec.yaml` |
+| **Store graphics for Play** | **0 files**: no 512×512 Play icon, no 1024×500 feature graphic, no phone/tablet screenshots. The repo only has `assets/icon/app_icon.png`, the adaptive-icon foreground and `web/icons/*` — none in Play's required sizes |
+| **Firestore security rules** | not in the repo — only a suggested snippet in a comment (`leaderboard_service.dart:63-64`). The deployed rules are unverified; wrong read rules break the leaderboard in production |
+| **App Store IPA** | `build-ios.yml` is `workflow_dispatch`-only and exports with `method: development` (`ios/ExportOptions.plist`) → no distributable IPA can be produced |
+| **iOS build** | iOS **source** exists (`ios/Runner/AppDelegate.swift`, `Info.plist`, `Runner.entitlements`, `Assets.xcassets` — 49 files), but there is no macOS/Xcode runner, no iOS CI, and no signing → no iOS artifact can be produced here |
+| **iOS feature parity** | Usage Access, exact alarms, the dark-room foreground service and the home-screen widget are **Android-only** — the iOS build would be missing the core of the product |
+| **Contextual rating prompt** | 0 references — "Rate App" is a manual Settings tile only, never asked at a streak milestone or after a weekly report |
+| **Guardian auto-send** | the worker + HTTPS send path shipped (`GuardianReminderWorker.kt`, `guardian_reminder_service.dart:32`), but **no endpoint value is configured anywhere** — `GUARDIAN_EMAIL_ENDPOINT` is only a dart-define constant. Without it the app falls back to opening a pre-filled mail client |
+| **Play / App Store listing links** | `store_links.dart:17` `playListingPublished = false`, `:20` `appStoreListingPublished = false`, `:23` `appStoreId = ''` → "Rate App" opens GitHub Releases + a feedback e-mail instead of a store page |
+
+### 🟡 B. Available but incomplete
+
+| Item | What is there | What is missing |
+|---|---|---|
+| **App lock / usage limit** | the counter **is** implemented and wired: `usage_limit_provider.dart:66` ← `app_usage_monitor.dart:55` ← `main_shell.dart:97`/`:175`, fed by real UsageStats, with daily reset + a 5-minute "+5 min" grant | **no blocked-app picker** — `armGate` is called with `blockedPackages: []` ("Phase 1"), so it locks the app wholesale rather than chosen apps. Also needs the Usage Access permission to work at all |
+| **Analytics** | consent screen + `pref_consent_given` + a toggle | no endpoint, no events, no schema test — so every experiment in `docs/growth/retention-plan.md` is currently unmeasurable |
+| **Cloud sync** | backup/restore includes the daily snapshots (`cloud_backup_service.dart:31-32`) and writes them back on restore | it is a **manual** backup/restore, not live sync; no conflict resolution across devices. It also **defaults to ON** for signed-in users (`settings_more_provider.dart:34`, `:47`) → that must be declared in the Play Data Safety form, or flipped to opt-in |
+| **Achievements / badges** | 9 badges whose progress is computed from real data (`_buildItems` in `home_screen.dart` uses `totalEyeBreaksAllTime` / `streakDays`) — the old hardcoded `unlocked: true` is gone | no distance- or environment-based tiers, and nothing outside break counts |
+| **"Why did my score change?"** | day-over-day factor deltas (`habit_provider.dart:338-341`) and per-factor explainers | no points ledger ("−4 phone time, −2 dark room") |
+| **Daily Eye Report** | Home "today's suggestions" + Weekly/Monthly tabs in Statistics + a scheduled **weekly report notification** (Mondays 07:30, `notification_service.dart:749-788`) | no dedicated daily report card, no 30-day daily view, no share card (sharing is limited to data/PDF export) |
+| **Smart Notification Priority** | Focus mode blocks *other* apps' notifications (`focus_mode_service.dart`) | the app's own alerts are not de-duplicated — the water reminder rides along on the break notification |
+| **AI Reminder Style** | the chosen style is injected into the AI context (`chat_screen.dart:103`, `home_screen.dart:337`) | no dedicated AI-settings screen |
+| **Brightness Tips** | actionable — `smart_brightness_dialog.dart:72` calls `BrightnessService.applySystemBrightness(target)` | — |
+| **Streak** | a real streak counter + a 21:00 reminder | it counts an **app-open check-in** (`device_data_service.dart:721` `_kCheckInPrefix`), so a user who never opens the app loses the streak |
+
+### 🚫 C. Launch blockers that are **user-side** (no code can close them)
+
+| Blocker | State |
+|---|---|
+| **Legal facts** | 41 `TODO` chips live on the published pages — 27 in `privacy.html`, 14 in `terms.html`, of which 2 are bare `TODO` prose markers → **39 question chips covering 36 distinct questions**: legal entity name, jurisdiction, registered address, contact e-mail, effective date, retention windows, NVIDIA sub-processor terms, Firestore rules, guardian-endpoint operator |
+| **Play Developer account** + legal developer name | `docs/growth/app-listing.md:29` — **TODO, user must provide**; `:286` still asks personal vs organisation |
+| **Play upload key** | CI signs with the app **release** key; only `android/app/ci-fallback-keystore.jks` sits in the repo. A dedicated upload key is required before the first Play upload |
+| **Play listing fields** | `app-listing.md:22` iOS app name still `Eye Care Ai` (rename to `EyeCare AI`), `:157` privacy-policy URL still TODO (the page is live now — this one is fillable today) |
+| **Store graphics** | the Play icon, feature graphic and 8 screenshots do not exist yet — they need a device and a design pass |
+| **iOS** | Apple Developer account, `com.eyecare.eyeCareAi` distribution signing, an App Store ID, iOS screenshots/metadata, and a macOS build machine |
+| **Guardian endpoint** | a real HTTPS endpoint URL to pass as `GUARDIAN_EMAIL_ENDPOINT` at build time |
+| **Keystore rotation** | pending — the current key has signed every build since the start |
+| **Vietnamese legal translation** + `LICENSE` file | still undecided |
+
+### 🧹 D. Tech debt still physically in the repo
+
+| Item | Evidence |
+|---|---|
+| 3 dead files, 0 references each | `lib/providers/usage_provider.dart`, `lib/widgets/usage_pie_chart.dart`, `lib/services/storage_service.dart` — still present, still unreferenced |
+| Focus-mode DND grant not cached | `focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42` `isNotificationPolicyAccessGranted` is re-checked every time, so the re-check banner can reappear |
+| 3 unused Eye Test strings | `eyeTestHint`, `eyeTestInstruction`, `eyeTestTitle` — 0 call sites outside `app_strings.dart` |
+| Analytics stub | `analytics_service.dart:57`, `:63` |
+| Setup wizard asks for Usage Access first | `setup_wizard_screen.dart:44-51` — the permission-heavy step comes before notifications, which is the opposite of the "value first" onboarding in `docs/growth/retention-plan.md` Move 3 |
+| Stale iOS HealthKit strings | `ios/Runner/Info.plist:66`, `:68` still declare `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` although the `health` package was removed — App Review will ask why |
+| `docs/growth/app-listing.md` accuracy | `:187` says location is sampled "while the app is open" — stale, `ACCESS_BACKGROUND_LOCATION` is declared (`AndroidManifest.xml:68`) and a WorkManager outdoor sampler runs; `:193` says only the e-mail prefix is published — stale, the leaderboard publishes `displayName` **and** `avatarUrl` (`leaderboard_service.dart:80-95`); `:171-172` content-rating wording still says "nickname" |
+| Toolchain drift | Gradle 8.14 / AGP 8.11.1 / Kotlin 2.2.20 — Flutter warns these will be dropped |
+
+### 🕳️ E. Notion "15 idea groups" — what is actually there (verified 2026-10-26)
+
+| # | Idea | State |
+|---|---|---|
+| 1 | Eye Health Score 2.0 | ✅ shipped, **4 factors** (no distance) |
+| 2 | "Why did my score change?" | 🟡 deltas only, no points ledger |
+| 3 | Daily Eye Report (7/30-day) | 🟡 weekly/monthly tabs + a weekly notification, no daily card |
+| 4 | AI Weekly Eye Coach | ❌ not shipped |
+| 5 | Adaptive Goals | 🟡 suggestion dialog only |
+| 6 | Streak Protection (Recovery Day) | ❌ not shipped |
+| 7 | Eye Health Timeline | ✅ shipped |
+| 8 | Smart Notification Priority | 🟡 focus mode only |
+| 9 | Distance History | ❌ not shipped |
+| 10 | Sleep Pattern from night usage | 🟡 estimate shipped, the "23:48 · 5/7 nights" display is not |
+| 11 | Eye Test History | ✅ shipped (no per-eye trend chart) |
+| 12 | Achievements 2.0 | 🟡 9 badges, break-count based |
+| 13 | Daily Quests | ❌ not shipped |
+| 14 | Personal Eye Profile | ❌ not shipped |
+| 15 | "What if?" simulator | ❌ not shipped |
+
+### ✅ F. Rows that used to be gaps and are **not** any more
+
+- `habitSubtitle('breaks')` — now "Manually and auto-counted breaks" (`app_strings.dart:687-702`); the old "Front camera gaze detection" text is gone.
+- Achievement unlock logic — computed from real data, not hardcoded `unlocked: true` (`home_screen.dart` `_buildItems`).
+- Brightness Tips — actionable (calls the brightness service).
+- Health Connect setup guide — **obsolete**: the app does not use Health Connect at all (explicitly removed; sleep is estimated from usage times).
+- Rate App + hosted Privacy/Terms — shipped; the HISTORICAL SETTINGS rows that still say "not implemented / in flight" were stale text.
+
+### 🔐 G. Signing & key exposure — checked on the shipped build-98 artifacts
+
+| Check | Result |
+|---|---|
+| **Which key signed the APK?** | The **real release key**: `CN = EyeCare AI, O = ThongAccount, C = VN`, alias `EYECARE_`, SHA-256 `BC:C2:3B:01:74:69:2F:4D:D3:76:83:4F:18:C9:1D:F1:AB:7A:01:71:BF:F5:D0:B1:36:BF:7F:84:F4:70:C0:11` — extracted from the APK's v2 signing block (`0x7109871a`) |
+| **And the AAB?** | Identical certificate, same fingerprint (v1 signature `META-INF/EYECARE_.RSA`) |
+| **Was it the committed fallback keystore?** | **No.** `android/app/ci-fallback-keystore.jks` holds a different cert — `CN = EyeCare AI CI Fallback`, SHA-256 `39:0C:E6:16:78:27:0E:46:E6:7B:0A:57:9C:02:12:C8:78:E6:AD:8D:1C:90:BB:AC:03:43:31:E4:F5:03:22:1A` |
+| **Latent risk** | `build-apk.yml:142-145` **silently skips** the release-signing step when `KEYSTORE_BASE64` is missing, and `build.gradle.kts:74-105` then signs with the committed fallback. It did not happen in build 98, but it would sign with a key that is public in the repo. The build should **fail** instead of falling back |
+| **Play upload key** | still not configured — only `release` / `ciFallback` exist, no Play App Signing upload config |
+| **NVIDIA NIM key** | compiled into the binary (`--dart-define=NIM_API_KEY`, `build-apk.yml:227` / `:271`) → extractable from the downloaded APK. Move it behind a backend proxy before a public release |
 
 ---
 
@@ -173,8 +297,11 @@
 
 ### 📋 PATCHES — status deltas
 - [x] **Lock ứng dụng khi reach usage limit** — DONE since audit (was absent from PLAN).
-  Beta: overlay finished + testable, usage-limit counter unfinished. Shipped in
-  `Release v1.3.0+alpha` (`feat/app-lock` merged to main + main-merger, branch deleted).
+  Shipped in `Release v1.3.0+alpha` (`feat/app-lock` merged to main + main-merger, branch deleted).
+  *2026-10-26: the "usage-limit counter unfinished" note is **stale** — the counter is implemented and
+  wired end-to-end (`usage_limit_provider.dart:66` ← `app_usage_monitor.dart:55` ← `main_shell.dart:97`/`:175`,
+  fed by real UsageStats, daily reset + 5-minute extra-time grant). What is missing is the
+  **blocked-app picker** — `armGate` still passes `blockedPackages: []` (Phase 1).*
 - [~] **Guardian email** — Notion now *(Partial)* (PLAN had it ❌ missing). Still no background auto-send.
 - [~] **Cập nhật trực tiếp (không xóa cài lại)** — Notion [x] + "*Đang cải thiện*":
   in-app update via GitHub Releases now implemented (`UpdateService`, manual check button,
@@ -475,9 +602,15 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 - [x] About / Giới thiệu — `SettingsMorePage` (Help section)
 - [x] Version / Phiên bản — Footer in `SettingsScreen`
 - [x] Contact Us / Liên hệ — `feedback_form.dart` → email
-- [ ] Rate App / Đánh giá ứng dụng — **Not implemented** (no store link; handoff in flight on `docs/growth-store-launch`)
-- [~] Privacy Policy / Chính sách quyền riêng tư — in-app static text only; hosted page in flight on `feat/web-legal`
-- [~] Terms of Service / Điều khoản sử dụng — in-app static text only; hosted page in flight on `feat/web-legal`
+- [x] Rate App / Đánh giá ứng dụng — **shipped** (`rate_app_service.dart`); opens the store listing once
+  `StoreLinks.playListingPublished` flips to true, otherwise falls back to GitHub Releases + a feedback e-mail.
+  *2026-10-26: this row previously said "Not implemented (no store link; handoff in flight)" — stale text.*
+- [x] Privacy Policy / Chính sách quyền riêng tư — published at `thongaccount.github.io/eye_care_ai/legal/privacy.html`
+  (HTTP 200), linked from Settings + Help; the in-app card carries a summary, not the full document.
+  *2026-10-26: this row previously said "in-app static text only; hosted page in flight on `feat/web-legal`" — stale.*
+- [x] Terms of Service / Điều khoản sử dụng — published at `thongaccount.github.io/eye_care_ai/legal/terms.html`
+  (HTTP 200), linked from Settings + Help.
+  *2026-10-26: this row previously said "in-app static text only; hosted page in flight on `feat/web-legal`" — stale.*
 
 ---
 
@@ -520,7 +653,7 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 | 📊 Weekly Eye Health Report | ✅ | Weekly report + PDF export via the `pdf` package |
 | 📈 Streak cho Habits | ✅ | `HabitProvider.streakDays`, `RankProvider`, leaderboard |
 | 🏆 Achievement/Badges | 🟡 | `_AchievementPage` ships; unlock logic still partly hardcoded |
-| ☁️ Đồng bộ Firebase | 🟡 | Leaderboard + cloud backup/restore (`cloud_backup_service.dart`); no cross-device habit sync |
+| ☁️ Đồng bộ Firebase | 🟡 | Leaderboard + cloud backup/restore (`cloud_backup_service.dart`); the backup **includes the daily snapshots** (`daily_snapshot_`, `daily_factors_` — `cloud_backup_service.dart:31-32`) and restores them, so habit history moves between devices. But it is a manual backup/restore, not live sync, and there is no conflict resolution |
 | 🤖 AI Eye Health Score | ✅ | Live NVIDIA NIM assistant + Home auto-analysis (ask-before-act) |
 | 🌳 Outdoor Detection (tự động) | ✅ | GPS-based in `DeviceDataService.startOutdoorTracking` |
 | 📱 Widget màn hình chính | ✅ | `home_widget_service.dart` + `EyeWidgetProvider.kt` |
@@ -547,12 +680,17 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 - [ ] **Remove dead code**: `usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart`
   - ⚠️ Do **NOT** remove `usage_service.dart` (used by `setup_provider.dart`) or `eye_chat_service.dart` (used by `chat_screen.dart`)
 - [ ] **Implement analytics logging** — `analytics_service.dart` is a stub (2 TODOs)
-- [ ] **Fix stale strings**: `habitSubtitle('breaks')` says "Front camera gaze detection" but uses manual/auto-detect
+- [ ] **Fix stale strings**: `habitSubtitle('breaks')` ✅ **fixed** (now "Manually and auto-counted breaks",
+  `app_strings.dart:687-702`); still open: remove the 3 unused Eye Test strings (`eyeTestHint`,
+  `eyeTestInstruction`, `eyeTestTitle` — 0 call sites)
 - [ ] **iOS build** — Resolve Mac/Apple Dev blocker
 - [ ] **Crash reporting** (Sentry/Crashlytics)
 - [ ] **Keystore rotation** (noted in project note)
-- [ ] **Health Connect setup guide** in Permissions bottom sheet
-- [ ] **Persist Focus Mode DND grant state** to avoid re-check banner
+- [x] ~~**Health Connect setup guide** in Permissions bottom sheet~~ — **OBSOLETE**: the app does not use
+  Health Connect at all (the `health` package and the Health Connect permission were removed; sleep is
+  estimated from usage times). There is nothing to guide.
+- [ ] **Persist Focus Mode DND grant state** to avoid re-check banner — still open
+  (`focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42`, re-checked every time)
 
 ---
 
@@ -593,14 +731,16 @@ b2d2254 feat: replace emoji with Material Icons for consistency across the app
 ### P1 (Code Health)
 4. **Remove dead code** — `usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart` (only — keep `usage_service.dart` + `eye_chat_service.dart`)
 5. **Implement analytics logging** — `analytics_service.dart` TODOs at `:57` / `:63`; the event schema is specced in `docs/growth/analytics-events.md`
-6. **Fix stale strings** — `habitSubtitle('breaks')` *(fixed in mobile P0)*, remove unused Eye Test strings
+6. **Fix stale strings** — `habitSubtitle('breaks')` ✅ fixed; remove the 3 unused Eye Test strings
+   (`eyeTestHint`, `eyeTestInstruction`, `eyeTestTitle` — 0 call sites)
 
 ### P2 (Features)
 7. **Snooze Duration** — the one notification setting still missing
 8. **Achievement/Badges dynamic** — Replace hardcoded `_AchievementPage` with real unlock logic
 9. **Health Connect guide** — Add to Permissions bottom sheet
 10. **Persist Focus Mode state** — Avoid re-check banner
-11. **Brightness Tips → actionable** — text exists; wire it to the brightness service
+11. ~~**Brightness Tips → actionable**~~ — ✅ **done**: `smart_brightness_dialog.dart:72` calls
+    `BrightnessService.applySystemBrightness(target)`
 
 ### P3 (Platform)
 12. **iOS build** — Mac/Apple Dev account
