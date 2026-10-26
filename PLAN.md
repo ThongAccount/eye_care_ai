@@ -2,13 +2,59 @@
 
 > Source: Notion page "PATCHES" (26/07/2026) + SETTINGS spec + Feature wishlist
 > Status legend: ✅ Done · 🟡 Partial · ❌ Not Started
-> **Current truth: § CODE-VERIFIED REFRESH — 2026-10-23 (top of file).**
+> **Current truth: § NOTION SYNC — 2026-10-26 (top of file).**
 > Historical layers kept for provenance:
+> - § CODE-VERIFIED REFRESH (2026-10-23) — the code-grounded baseline the 10-26 sync re-checks.
 > - § NOTION REFRESH (2026-10-15) — Notion snapshot deltas.
 > - § Aug-6 audit (below) — ⚠️ **HISTORICAL, superseded.** Its ❌ rows were re-verified
 >   against the code on 2026-10-23 and several were wrong (features that shipped since).
 >   Sections marked `[HISTORICAL]` are retained verbatim for the record; use the
 >   code-verified tables instead of them.
+
+---
+
+## 📌 NOTION SYNC — 2026-10-26 (user-pasted page, reconciled against code)
+
+> **Source:** the user pasted the live Notion page "Eye Care AI" into Product Lab on
+> 2026-10-26 (PATCHES → Tiến độ → Target → 15 idea groups → SETTINGS → upcoming-features
+> list) and asked for PLAN.md to be updated from it.
+> **Method:** every ✅ / ❌ / open item in that paste was re-checked against the source
+> tree at `main` @ `211ad17`. Notion is a wishlist snapshot; **the code is the truth.**
+> Where they disagree, the code wins and the disagreement is recorded here instead of
+> silently overwriting either side.
+> **Net result:** 13 rows checked, **9 corrections**, 0 regressions. The Notion page is a *wishlist* —
+> it lags the code in both directions (it still lists the custom notification sound as open, and
+> still shows the old fork/merge state).
+
+### 🔍 Notion row → what the code actually says
+
+| Notion row | Notion says | Code says (verified 2026-10-26) | Action |
+|---|---|---|---|
+| Thêm âm thanh custom cho thông báo | `[ ]` open | ✅ **shipped** — `android/app/src/main/res/raw/eye_break_alert.wav` (49 KB) + Settings toggle; two channels (system/custom) because Android cannot change a channel's sound after creation; auto-falls back to the system sound | Notion stale → PLAN corrected |
+| Lock ứng dụng khi reach usage limit | `[x]` + *"counter chưa hoàn thiện, overlay xong, đang ở fork, đợi merge với `main-merger`"* | ✅ shipped on `main` since v1.3.0+alpha (`AppLockOverlayManager.kt`, `lib/models/app_usage_limit.dart`, `lib/providers/usage_limit_provider.dart`, `lib/screens/app_lock_overlay.dart`, `lib/services/app_usage_monitor.dart`); the fork → `main-merger` → `main` path is **done**, so "đang ở fork / đợi merge" is stale. The usage-limit **counter** is still the rough edge | Notion note stale → PLAN corrected |
+| "Áp dụng mục tiêu" không cập nhật Habits | `[x]` | ✅ genuinely fixed — `HabitProvider.applySurveyTargets()` (`habit_provider.dart:684`), awaited at `habits_survey_screen.dart:783`; timestamped targets, newest-wins against the Firestore overwrite | Notion ✅ confirmed |
+| Nghỉ mắt: hết countdown mới tính 1 lần + gửi thông báo | `[x]` | ✅ fixed (real-clock countdown, no make-up cycles after long absence, decimal-`target` cast fix) | Notion ✅ confirmed |
+| Chỉ đăng nhập 1 lần khi vừa tải app (lưu lịch sử, tài khoản, mật khẩu) | `[x]` | ✅ outcome true, **mechanism in PLAN was wrong**: `pref_guest_mode` no longer exists anywhere in `lib/` (0 hits). Session persistence is Firebase Auth's own — `authStateChanges` (`auth_provider.dart:11`), `currentUser` (`profile_provider.dart:29`). No plaintext password is stored; passwords only flow through Firebase Auth calls | PLAN evidence corrected |
+| Target: "Apply Target" 4 mức (⭐/🙂/💪/✏️) | spec, no checkbox | ✅ fully implemented — see § TARGET below for the exact factors, the range rule and the **5th level Notion does not mention** | Plan spec enriched |
+| Eye Health Score 2.0 mock: `📏 Khoảng cách 91%` | design mock | ⚠️ **the live score has 4 factors, not 5** — distance was dropped as a scoring factor on 05/09 (battery/privacy); `loadDailyFactorScores` returns null for `distanceScore` (`device_data_service.dart:588`). Live factors = screen time / environment / eye breaks / sleep. Outdoor is a habit, **not** a score factor | PLAN corrected |
+| Chuỗi làm bài tập mắt → xếp hạng theo chuỗi | `[ ]` | ❌ genuinely absent — 0 references to an exercise streak. Habit streaks exist (`HabitProvider.streakDays`) but are **not** tied to eye-exercise completion | Notion `[ ]` confirmed |
+| Đổi model AI (provider khác) | `[ ]` | still open — unchanged | no change |
+| Việc check thời gian ngoài trời còn bất ổn | `[ ]` | still open — outdoor is GPS-based (`DeviceDataService.startOutdoorTracking`) | no change |
+| "Repo github: `Supertime1236/eye_care_ai`" + *"todos có `*` đang ở fork `ThongAccount/eye_care_ai`, đang đợi merge với `main-merger`"* | fork pending | ⚠️ stale — the fork lane **has been merged** upstream through `main-merger` and into `main`. `main` is our release branch (`githubOwner = 'ThongAccount'`); `main-merger` is the upstream-sync staging branch and deliberately keeps `Supertime1236` as the updater owner | Notion note corrected |
+| SETTINGS spec (Units / 20-20-20 / Notifications / AI / Privacy / Vision Profile / Reminder Style / Viewing Distance) | full tree | unchanged from § SETTINGS SPEC — the only newly-shipped entry is the custom notification **Sound** | Plan spec unchanged |
+| "Tính năng sắp tới" wishlist (16 bullets) | list | unchanged from the 2026-10-15 table; Focus mode, PDF export, next-break countdown widget, night-read mode and the water reminder are all ✅ now — already recorded in § FEATURE WISHLIST | no change |
+
+### 🧾 Rows edited by this sync
+
+1. § Shipped features → **Scoring** row — factor list corrected to the live four.
+2. § NOTION REFRESH 10-15 → **Custom notification sound** `[ ]` → `[x]` (shipped).
+3. § NOTION REFRESH 10-15 → **Đăng nhập 1 lần** — `pref_guest_mode` evidence replaced with the Firebase Auth path.
+4. § NOTION REFRESH 10-15 → **fork note** — "đang đợi merge" → merged.
+5. § PATCHES 26/07 → **Remaining Polish** — custom sound `[ ]` → `[x]`.
+6. § SETTINGS SPEC → **Notifications / Sound** — Partial → shipped.
+7. § TECH DEBT → **Custom notification sound** `[ ]` → `[x]`.
+8. § FEATURE WISHLIST → **Eye Health Score 2.0** — distance-factor caveat added.
+9. § TARGET → formula factors, file:line evidence and the extra `keep` level added.
 
 ---
 
@@ -38,7 +84,7 @@
 | Reminders | Water reminder tied to break cycles | `ReminderProvider`, `eye_break_screen.dart` |
 | Reminders | Focus mode (notification blocking) | `focus_mode_service.dart` |
 | Reminders | Custom notification sound | ✅ `res/raw/eye_break_alert.wav` + Settings toggle; two channels (system / custom) because Android cannot change a channel's sound after creation; auto-falls back to the system sound if the raw file is unusable *(mobile P0, 2026-10-23)* |
-| Scoring | Eye Health Score (screen / breaks / environment / sleep / outdoor) with day-over-day deltas | `statistics_screen.dart`, `HabitProvider` |
+| Scoring | Eye Health Score — **4 live factors: screen time / environment / eye breaks / sleep**, with day-over-day deltas. Distance was **dropped** as a scoring factor on 05/09 (battery/privacy) and there is no separate outdoor factor | `statistics_screen.dart`, `HabitProvider` (`screenTimeScore`, `environmentScore`, `eyeBreaksScore`, `sleepScore`), `device_data_service.dart:588` |
 | Scoring | Streaks + achievements | `HabitProvider.streakDays`, `_AchievementPage` |
 | Scoring | Duolingo-style ranks (7 tiers) + Firestore leaderboard | `rank_screen.dart`, `leaderboard_service.dart` |
 | Environment | Dark-room foreground service (native Kotlin) | `dark_room_background_service.dart` |
@@ -140,10 +186,16 @@
   `await`, timestamped targets (newest wins vs Firestore overwrite), `pref_survey_result` (12/10 log).
 - [x] **Nghỉ mắt: hết countdown mới tính 1 lần + gửi通知** — FIXED (real-clock countdown,
   no make-up cycles after long absence, decimal-`target` cast fix) (12/10 log).
-- [x] **Đăng nhập 1 lần, giữ phiên** — DONE (Firebase persists session, `pref_guest_mode`,
-  no plaintext password) (12/10 log).
-- [ ] **Custom notification sound** — still open (both sources agree).
+- [x] **Đăng nhập 1 lần, giữ phiên** — DONE (Firebase Auth persists the session, no plaintext
+  password). ⚠️ **2026-10-26:** the old evidence `pref_guest_mode` **no longer exists** in `lib/`
+  (0 hits) — persistence now runs through Firebase Auth's own `authStateChanges`
+  (`auth_provider.dart:11`) / `currentUser` (`profile_provider.dart:29`). (12/10 log)
+- [x] **Custom notification sound** — ✅ **SHIPPED** (2026-10-23, mobile P0): `res/raw/eye_break_alert.wav`
+  + Settings toggle, two channels (system/custom) because Android cannot change a channel's sound
+  after creation. *The 2026-10-15 "still open (both sources agree)" note was stale.*
 - Note: todos marked `*` live on fork `ThongAccount/eye_care_ai`, merged upstream via `main-merger`.
+  *2026-10-26: the fork lane has since been merged upstream through `main-merger` **and** into
+  `main` — "đang ở fork / đợi merge" in the Notion page is stale.*
 
 ### 📓 Tiến độ — 13 dated logs (condensed)
 - **31/08**: AI quick-prompts always visible; Eye Test Count habit (7-day count, tap → `EyeTestScreen`);
@@ -199,7 +251,11 @@ Confirmed details: 20-20-20 rule uses **20 feet** (keep Imperial); distance unit
 AI Sensitivity Low/Medium/High still spec-only.
 
 ### 💡 15 idea groups (Nhóm 1–5, condensed — full text in Notion page body)
-1. Eye Health Score 2.0 (per-factor: screen/distance/environment/breaks/sleep) — ✅ largely live.
+1. Eye Health Score 2.0 (per-factor: screen/distance/environment/breaks/sleep) — ✅ largely live, but
+   **the live score has 4 factors, not 5**: distance was dropped as a scoring factor on 05/09
+   (battery/privacy — `loadDailyFactorScores` returns null for `distanceScore`,
+   `device_data_service.dart:588`), and outdoor is a habit, not a score factor. The Notion mock
+   still shows "📏 Khoảng cách 91%".
 2. "Why did my score change?" attribution (e.g. −4 phone time, −2 dark-room, +1 breaks).
 3. Daily Eye Report (+ 7/30-day views).
 4. AI Weekly Eye Coach on aggregated data (NVIDIA NIM; **AI must not invent data**).
@@ -316,7 +372,10 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 - [x] **Outdoor Time khảo sát lần đầu hiển thị sai (mặc định 90p)** — Fixed via `HabitProvider.ready` future + `markSurveyCompleted` order
 
 ### Remaining Polish
-- [ ] **Thêm âm thanh custom cho thông báo** — `_useCustomSound = false` hardcoded; need `eye_break_alert.mp3` in `res/raw/`
+- [x] **Thêm âm thanh custom cho thông báo** — ✅ SHIPPED 2026-10-23 (mobile P0):
+  `android/app/src/main/res/raw/eye_break_alert.wav` (49 KB) + Settings toggle; two channels
+  (system/custom) because Android cannot change a channel's sound after creation; falls back to
+  the system sound if the raw asset is unusable. *The old "`_useCustomSound = false` hardcoded" note was stale.*
 - [x] **Thoát vào lại app phải thêm quyền chuông thông báo** — `requestExactAlarmsPermission` (once), `requestIgnoreBatteryOptimizations` (once)
 
 ---
@@ -324,20 +383,24 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 ## 🎯 TARGET: Improve "Apply Target" Post-Survey
 
 > **Status**: ✅ **Fully Implemented** in `HabitsSurveyScreen._buildResults`
+> Re-verified against the code on **2026-10-26** (the Notion paste of the same spec) — the factors
+> and ranges below are the ones the app really uses.
 
 ### Spec from Notion
 - [x] Per-habit steps: Screen Time → Outdoor → Sleep → Eye Breaks
 - [x] Each step shows: Current, Recommended, 4 target levels
 - [x] **⭐ Recommended (default)**: `Target = Current + (Recommended - Current) × 0.5`
-- [x] **🙂 Easy**: Closer to Current (less change)
-- [x] **💪 Challenge**: Closer to Recommended (more change)
+- [x] **🙂 Easy**: Closer to Current (less change) — **`× 0.25`** (`eye_health_standards.dart:79`)
+- [x] **💪 Challenge**: Closer to Recommended (more change) — **`× 0.75`** (`eye_health_standards.dart:81`)
 - [x] **✏️ Custom**: User input with validation range
   - Decrease metrics (Screen Time): `[Recommended, Current]`
   - Increase metrics (Outdoor, Sleep, Breaks): `[Current, Recommended]`
-  - Error if outside range
-- [x] Summary screen "Your Personalized Plan" after 4 steps
+  - Error if outside range — `EyeHealthStandards.inCustomRange` (`eye_health_standards.dart:92`)
+- [x] Summary screen "Your Personalized Plan" after 4 steps — `AppStrings.targetYourPlan` (`app_strings.dart:618`)
 - [x] Only apply on "Apply" button; exit mid-way = no changes
-- [x] Implemented in `EyeHealthStandards.calculateTargetValue` + `inCustomRange`
+- [x] Implemented in `EyeHealthStandards.calculateTargetValue` (`eye_health_standards.dart:72`) + `inCustomRange`
+- [x] **5th level not in the Notion spec**: `TargetLevel.keep` ("Giữ nguyên") — offered when the habit is
+  already at the standard, so the user can keep the current value instead of moving.
 
 ---
 
@@ -374,7 +437,9 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 
 ### 🔔 Notifications / Thông báo
 - [x] Enable Notifications / Bật thông báo — Master toggle via individual toggles
-- [x] Sound / Âm thanh — **Partial**: uses system alarm sound; [ ] Custom sound (see PATCHES)
+- [x] Sound / Âm thanh — ✅ **shipped**: system sound **and** a custom alert
+  (`res/raw/eye_break_alert.wav`) on a separate notification channel — Android cannot change a
+  channel's sound after the channel exists
 - [x] Vibration / Rung — `vibrationPattern` in `NotificationService._details`
 - [ ] Snooze Duration / Thời gian hoãn — **Not implemented** (confirmed still absent 2026-10-23 — zero references in the tree)
 
@@ -477,7 +542,7 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 > ⚠️ [HISTORICAL — corrected against the code on 2026-10-23.]
 
 - [x] **Auto-update via GitHub Releases** — ✅ done (`update_service.dart`)
-- [ ] **Custom notification sound** (`eye_break_alert.mp3` in `res/raw/`)
+- [x] **Custom notification sound** — ✅ done (`res/raw/eye_break_alert.wav`; separate notification channel)
 - [ ] **Guardian Email auto-send** on screen time overuse
 - [ ] **Remove dead code**: `usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart`
   - ⚠️ Do **NOT** remove `usage_service.dart` (used by `setup_provider.dart`) or `eye_chat_service.dart` (used by `chat_screen.dart`)
