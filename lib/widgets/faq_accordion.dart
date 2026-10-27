@@ -8,20 +8,20 @@ List<MapEntry<String, String>> _faqs(bool vi) => [
       MapEntry(
         vi ? 'Eye Care AI hoạt động như thế nào?' : 'How does Eye Care AI work?',
         vi
-            ? 'Ứng dụng dùng camera thiết bị và thói quen sử dụng để ước tính thời gian màn hình, tần suất chớp mắt, khoảng cách nhìn, từ đó gợi ý nghỉ ngơi và bài tập phù hợp.'
-            : 'It uses your device camera and usage patterns to estimate screen time, blink rate, and distance, then suggests breaks and exercises tailored to your habits.',
+            ? 'Ứng dụng đọc thời gian màn hình từ hệ điều hành, ghi lại các thói quen bạn nhập — nghỉ mắt, giấc ngủ, thời gian ngoài trời — và có thể chạy một bài kiểm tra mắt ngắn bằng camera trước. Từ đó app gợi ý nghỉ ngơi và bài tập phù hợp với thói quen của bạn.'
+            : 'It reads your screen time from the phone, keeps track of the habits you log — breaks, sleep, outdoor time — and can run a short eye test with the front camera. From that it suggests breaks and exercises that fit your habits.',
       ),
       MapEntry(
         vi ? 'Thời gian màn hình được tính như thế nào?' : 'How is screen time calculated?',
         vi
-            ? 'Chúng tôi theo dõi thời gian sử dụng ứng dụng ở chế độ nền trước, kết hợp dữ liệu cảm biến để ước tính thời gian nhìn màn hình chủ động so với thời gian rảnh.'
-            : 'We track foreground app usage on your device and combine it with sensor data to estimate active screen-viewing time versus idle time.',
+            ? 'Chúng tôi đọc thời gian dùng app ở chế độ nền mà hệ điều hành đã ghi nhận, cộng với số nghỉ mắt, giấc ngủ và thời gian ngoài trời do chính app ghi. Thời gian màn hình không được ước tính từ camera hay cảm biến nào.'
+            : 'We read the foreground app usage your operating system already records, plus the breaks, sleep and outdoor time the app itself logs. Screen time is not estimated from the camera or any other sensor.',
       ),
       MapEntry(
         vi ? 'Vì sao tính năng phát hiện ngoài trời không hoạt động?' : "Why doesn't outdoor detection work?",
         vi
-            ? 'Tính năng này dựa vào ánh sáng môi trường và cảm biến vị trí. Hãy đảm bảo đã bật quyền vị trí, chuyển động và bạn ở ngoài trời ít nhất một phút.'
-            : 'Outdoor detection relies on ambient light and location sensors. Make sure location and motion permissions are enabled and you are outside for at least a minute.',
+            ? 'Thời gian ngoài trời được phát hiện bằng GPS: app lấy mẫu khoảng một lần mỗi phút khi đang mở, và khoảng mỗi 15 phút khi chạy nền. Việc lấy mẫu khi chạy nền cần quyền vị trí "Luôn cho phép".'
+            : 'Outdoor time is detected with GPS: the app samples a good satellite fix about once a minute while it is open, and about every 15 minutes in the background. The background samples need the "Allow all the time" location permission.',
       ),
       MapEntry(
         vi ? 'AI tạo gợi ý như thế nào?' : 'How does AI generate recommendations?',

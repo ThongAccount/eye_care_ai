@@ -10,12 +10,10 @@ class AppStrings {
   final bool vi;
   const AppStrings(this.vi);
 
-  String get appTitle => 'EyeCare AI';
 
   String get home => vi ? 'Trang chủ' : 'Home';
   String get test => vi ? 'Kiểm tra' : 'Test';
   String get habits => vi ? 'Thói quen' : 'Habits';
-  String get stats => vi ? 'Thống kê' : 'Stats';
   String get chat => vi ? 'Chat' : 'Chat';
   String get settings => vi ? 'Cài đặt' : 'Settings';
 
@@ -30,7 +28,6 @@ class AppStrings {
   String get welcomeTitle => 'EyeCare AI';
   String get eyeHealthScore => vi ? 'Điểm sức khỏe mắt' : 'Eye Health Score';
   String get goodProgress => vi ? 'Tiến triển tốt! Giữ vững.' : 'Good progress! Keep it up.';
-  String get fromLastWeek => vi ? '+5 so với tuần trước' : '+5 from last week';
 
   // Nhãn 5 yếu tố breakdown của Eye Health Score 2.0 (xem _ScoreCard trong
   // home_screen.dart) — mỗi yếu tố là 1 thanh %, kèm 1 emoji cố định (không
@@ -170,14 +167,6 @@ class AppStrings {
       : 'On · no GPS fix yet (using 18:00–06:00 fallback)';
   // Tự động điều chỉnh độ sáng (liên tục theo cảm biến, khác "Gợi ý độ
   // sáng" ở trên vốn chỉ áp 1 lần khi người dùng tự bấm).
-  String get autoBrightnessTitle => vi ? 'Tự động điều chỉnh độ sáng' : 'Auto-adjust brightness';
-  String get autoBrightnessSubtitle => vi
-      ? 'Tăng/giảm độ sáng màn hình liên tục theo ánh sáng môi trường xung quanh'
-      : 'Continuously raises/lowers screen brightness to match the light around you';
-  String get metricUnits => vi ? 'Đơn vị mét' : 'Metric Units';
-  String get imperialUnits => vi ? 'Đơn vị Anh' : 'Imperial Units';
-  String get metricUnitsSubtitle => vi ? 'Xem centimet và giờ' : 'Centimeters, hours';
-  String get imperialUnitsSubtitle => vi ? 'Xem inch và giờ' : 'Inches, hours';
   String get measurementUnits => vi ? 'Đơn vị đo lường' : 'Measurement Units';
   String get dateTime => vi ? 'Ngày & Giờ' : 'Date & Time';
   String get metricMeters => vi ? 'Mét' : 'Meters';
@@ -186,7 +175,6 @@ class AppStrings {
   String get hour24 => vi ? 'Định dạng 24 giờ' : '24-hour Clock';
   String get language => vi ? 'Ngôn ngữ' : 'Language';
   String get selectOption => vi ? 'Chọn lựa' : 'Select option';
-  String get chooseValue => vi ? 'Chọn giá trị' : 'Choose value';
   String get cancel => vi ? 'Hủy' : 'Cancel';
   String get languageSubtitle => vi ? 'Chuyển giữa tiếng Anh và tiếng Việt' : 'Switch between English and Vietnamese';
   String get vietnamese => vi ? 'Tiếng Việt' : 'Vietnamese';
@@ -198,8 +186,6 @@ class AppStrings {
 
   // App Lock (giới hạn sử dụng hằng ngày)
   String get appLockTileTitle => vi ? 'Giới hạn thời gian' : 'Usage Limit';
-  String get appLockTileSubtitle =>
-      vi ? 'Khóa app khi dùng quá thời gian cho phép' : 'Lock the app after the daily limit';
   String get appLockTitle => vi ? 'Đã hết thời gian dùng hôm nay' : 'Daily limit reached';
   String get appLockBody => vi
       ? 'Bạn đã đạt giới hạn thời gian hôm nay. Hãy nghỉ ngơi cho đôi mắt — tiếp tục dùng sẽ kích hoạt khóa tạm thời.'
@@ -243,49 +229,10 @@ class AppStrings {
   String get guardianEmailDetectOnly => vi
       ? 'Phát hiện vượt giờ nền mỗi 30 phút — chạm để mở app mail và gửi lời nhắc'
       : 'Detects the limit in the background every 30 min — tap to open your mail app and send the reminder';
-  String get roadmapTitle => vi ? 'Lộ trình tính năng sắp tới' : 'Upcoming feature roadmap';
-  List<String> get roadmapFeatures => vi
-      ? [
-          'Weekly Eye Health Report',
-          'Streak cho Habits',
-          'Achievement/Badges',
-          'Đồng bộ Firebase',
-          'AI Eye Health Score',
-          'Outdoor Detection (tự động)',
-          'Widget ngoài màn hình chính',
-          'Export PDF Report',
-          'Biểu đồ cải thiện mắt',
-          'Bài tập mắt có hướng dẫn',
-          'Widget countdown lần nghỉ tiếp theo',
-          'So sánh xu hướng sức khỏe mắt theo tuần/tháng',
-          'Chế độ đọc ban đêm',
-          'Nhắc nhắc uống nước kèm nghỉ mắt',
-          'Báo thức cập nhật thời gian báo tiếp theo',
-        ]
-      : [
-          'Weekly Eye Health Report',
-          'Streak for Habits',
-          'Achievement/Badges',
-          'Firebase Sync',
-          'AI Eye Health Score',
-          'Outdoor Detection (auto)',
-          'Home screen widget',
-          'Export PDF Report',
-          'Eye improvement chart',
-          'Guided eye exercises',
-          'Next-break countdown widget',
-          'Weekly/monthly eye health trend comparison',
-          'Night-reading mode',
-          'Water reminder + eye break',
-          'Next reminder update in notification bar',
-        ];
 
   String get eyeCareSettingVisionProfile => vi ? 'Hồ sơ thị lực' : 'Vision Profile';
   String get eyeCareSettingReminderStyle => vi ? 'Kiểu nhắc nhở' : 'Reminder Style';
   String get eyeCareSettingViewingDistance => vi ? 'Khoảng cách xem' : 'Viewing Distance';
-  String get eyeCareSettingDistanceUnit => vi ? 'Đơn vị khoảng cách' : 'Distance Unit';
-  String get eyeCareSettingMetric => vi ? 'Mét' : 'Metric (Meters)';
-  String get eyeCareSettingImperial => vi ? 'Feet' : 'Imperial (Feet)';
   String get eyeCareSettingVisionGlasses => vi ? 'Đeo kính' : 'Glasses';
   String get eyeCareSettingVisionContacts => vi ? 'Kính áp tròng' : 'Contact Lens';
   String get eyeCareSettingVisionNoCorrection => vi ? 'Không sử dụng kính' : 'No Vision Correction';
@@ -294,27 +241,12 @@ class AppStrings {
   String get eyeCareSettingStyleStrict => vi ? 'Nghiêm ngặt' : 'Strict';
   String get eyeCareSettingDistanceAuto => vi ? 'Tự động phát hiện' : 'Auto Detect';
   String get eyeCareSettingDistanceManual => vi ? 'Thủ công' : 'Manual';
-  String get eyeCareSettingMeter => vi ? 'Mét' : 'Meter';
-  String get eyeCareSettingCentimeter => vi ? 'Centimét' : 'Centimeter';
-  String get eyeCareSettingFeet => vi ? 'Feet' : 'Feet';
-  String get eyeCareSettingInch => vi ? 'Inch' : 'Inch';
   String get achievementBadges => vi ? 'Thành tựu' : 'Achievements';
   String get ranking => vi ? 'Xếp hạng' : 'Ranking';
   String get achievementTitle => vi ? 'Thành tựu của bạn' : 'Your achievements';
   String get achievementUnlocked => vi ? 'Đã mở khóa' : 'Unlocked';
   String get achievementLocked => vi ? 'Chưa mở khóa' : 'Locked';
   String get achievementMood => vi ? 'Cứ mỗi lần bạn hoàn thành mục tiêu, EyeCare AI sẽ lưu lại và thông báo ngay khi thành tựu được mở khóa.' : 'Every time you complete a goal, EyeCare AI saves it and notifies you immediately when an achievement is unlocked.';
-  String get achievementEyeRest => vi ? 'Nghỉ ngơi cho mắt' : 'Rest for the eyes';
-  String get achievementRookie => vi ? '20-20-20 Rookie' : '20-20-20 Rookie';
-  String get achievementMaster => vi ? 'Eye Break Master' : 'Eye Break Master';
-  String get achievementLegend => vi ? 'Blink Legend' : 'Blink Legend';
-  String get achievementGuardian => vi ? 'Guardian of Vision' : 'Guardian of Vision';
-  String get achievementEyeRestDesc => vi ? 'Hoàn thành quy tắc 20-20-20 lần đầu.' : 'Complete the 20-20-20 rule for the first time.';
-  String get achievementRookieDesc => vi ? 'Hoàn thành quy tắc 20-20-20 lần đầu.' : 'Complete the 20-20-20 rule for the first time.';
-  String get achievementMasterDesc => vi ? 'Hoàn thành 5 lần nghỉ mắt.' : 'Complete 5 eye breaks.';
-  String get achievementLegendDesc => vi ? 'Hoàn thành 15 lần nghỉ mắt.' : 'Complete 15 eye breaks.';
-  String get achievementGuardianDesc => vi ? 'Không bỏ lỡ bất kỳ nhắc nhở nghỉ mắt nào trong 30 ngày.' : 'Never miss any eye-break reminder for 30 days.';
-  String get underDevelopment => vi ? 'Đang phát triển' : 'Under development';
 
   // Bottom sheet "Quyền sử dụng dữ liệu"
   String get dataUsagePermissions => vi ? 'Quyền sử dụng dữ liệu' : 'Data usage permissions';
@@ -364,25 +296,6 @@ class AppStrings {
 
   // Bộ lọc ánh sáng xanh — bật/tắt lớp phủ hổ phách toàn app (xem
   // MaterialApp.builder trong main.dart) để giảm mỏi mắt buổi tối.
-  String get blueLightFilter => vi ? 'Bộ lọc ánh sáng xanh' : 'Blue Light Filter';
-  String get blueLightFilterSubtitle => vi
-      ? 'Phủ 1 lớp màu ấm lên toàn màn hình, giảm ánh sáng xanh gây mỏi mắt vào ban đêm'
-      : 'Applies a warm tint over the whole screen, reducing blue light that strains eyes at night';
-  String get blueLightIntensity => vi ? 'Độ đậm' : 'Intensity';
-  String get darkMode => vi ? 'Chế độ tối' : 'Dark Mode';
-  String get darkModeSubtitle => vi ? 'Bật/tắt nhanh giao diện tối' : 'Quickly switch to a dark interface';
-  String get brightnessTipsBody => vi
-      ? 'Chỉnh độ sáng màn hình khớp với ánh sáng xung quanh — đừng để màn hình sáng hơn hoặc tối hơn nhiều so với căn phòng, vì độ chênh lệch lớn khiến mắt phải điều tiết liên tục và nhanh mỏi.\n\n'
-          '• Trong phòng tối: giảm độ sáng, bật Chế độ tối hoặc Bộ lọc ánh sáng xanh.\n'
-          '• Ngoài trời/nơi nhiều ánh sáng: tăng độ sáng đủ để chữ rõ, tránh nheo mắt.\n'
-          '• Bật độ sáng tự động (Auto-brightness) trong cài đặt máy để màn hình tự điều chỉnh theo môi trường.\n'
-          '• Giữ khoảng cách 50-65cm giữa mắt và màn hình.'
-      : 'Match your screen brightness to the light around you — a screen that\'s much brighter or dimmer than '
-          'the room forces your eyes to keep adjusting and tires them faster.\n\n'
-          '• In a dark room: lower brightness, use Dark Mode or the Blue Light Filter.\n'
-          '• Outdoors or in bright light: raise brightness enough to read comfortably without squinting.\n'
-          '• Turn on Auto-brightness in your device settings so it adapts automatically.\n'
-          '• Keep your screen 50-65cm (20-25in) from your eyes.';
 
   // Nhập tay giờ ngủ (fallback khi Health Connect không có dữ liệu)
   String get manualSleepTitle => vi ? 'Nhập giờ ngủ đêm qua' : 'Log last night\'s sleep';
@@ -399,19 +312,6 @@ class AppStrings {
       : 'Sleep hours are estimated from the gap between your last phone use last night and your first phone use this morning — not a direct sleep measurement, so it may be inaccurate. If it looks wrong, you can enter your actual sleep hours below.';
   String get save => vi ? 'Lưu' : 'Save';
 
-  List<String> get quickPrompts => vi
-      ? [
-          'Làm sao giảm mỏi mắt?',
-          'Thức ăn tốt cho mắt',
-          'Giải thích quy tắc 20-20-20',
-          'Khi nào khám mắt?',
-        ]
-      : [
-          'How to reduce eye strain?',
-          'Best foods for eye health',
-          '20-20-20 rule explained',
-          'When to see an eye doctor?',
-        ];
 
   String get eyeTest => vi ? 'Kiểm tra mắt' : 'Eye Test';
   String get stepLabel => vi ? 'Bước' : 'Step';
@@ -507,12 +407,6 @@ class AppStrings {
   String get eyeTestFair => vi ? 'Mắt có thể đang mỏi nhẹ, nên nghỉ ngơi thêm.' : 'Your eyes may be a bit tired; take a short rest.';
   String get eyeTestNeedsCare => vi ? 'Mắt đang cần nghỉ và theo dõi tốt hơn.' : 'Your eyes need more rest and attention.';
   String get eyeTestSummaryBody => vi ? 'Hãy dành vài phút nghỉ mắt, nhìn xa và giảm thời gian màn hình nếu cảm thấy mỏi.' : 'Take regular screen breaks, look away from the screen, and reduce exposure if you feel strain.';
-  String get eyeTestReading => vi ? 'Đọc rõ' : 'Reading';
-  String get eyeTestFocus => vi ? 'Tập trung' : 'Focus';
-  String get eyeTestGoodShort => vi ? 'Ổn định' : 'Stable';
-  String get eyeTestWeakShort => vi ? 'Cần chú ý' : 'Needs care';
-  String get eyeTestStableShort => vi ? 'Tốt' : 'Good';
-  String get eyeTestNeedBreakShort => vi ? 'Nghỉ mắt' : 'Take a break';
   String get eyeTestRetake => vi ? 'Làm lại' : 'Retake';
 
   // ---------------- Eye Break reminder screen ----------------
@@ -568,7 +462,6 @@ class AppStrings {
   String get surveyEntrySubtitle => vi
       ? 'Trả lời vài câu hỏi để nhận mục tiêu phù hợp với bạn'
       : 'Answer a few questions to get targets tailored to you';
-  String get surveyEntryButton => vi ? 'Bắt đầu' : 'Start';
   String get surveyTitle => vi ? 'Khảo sát sức khỏe mắt' : 'Eye Health Survey';
   String get surveyAgeQuestion => vi ? 'Bạn thuộc nhóm tuổi nào?' : 'Which age group are you in?';
   String get surveyAgeHelper => vi
@@ -608,9 +501,7 @@ class AppStrings {
   String get surveyTargetLabel => vi ? 'Khuyến nghị' : 'Recommended';
   String get surveyGoodStatus => vi ? 'Đạt chuẩn' : 'On track';
   String get surveyNeedsWorkStatus => vi ? 'Cần cải thiện' : 'Needs work';
-  String get surveyApplyButton => vi ? 'Áp dụng làm mục tiêu của tôi' : 'Apply as my targets';
   String get targetSelectionTitle => vi ? 'Chọn mục tiêu của bạn' : 'Choose your target';
-  String get targetSelectOption => vi ? 'Chọn một mức mục tiêu' : 'Pick a target level';
   String get targetOptionRecommended => vi ? 'Khuyến nghị' : 'Recommended';
   String get targetOptionEasy => vi ? 'Dễ dàng' : 'Easy';
   String get targetOptionChallenge => vi ? 'Thử thách' : 'Challenge';
@@ -630,37 +521,19 @@ class AppStrings {
   String get targetNext => vi ? 'Tiếp theo' : 'Next';
   String get targetBack => vi ? 'Quay lại' : 'Back';
   String get inchUnit => vi ? 'inch' : 'in';
-  String get surveyAppliedMessage =>
-      vi ? 'Đã cập nhật mục tiêu trên trang Habits!' : 'Your Habits targets have been updated!';
   String get surveyRetake => vi ? 'Làm lại khảo sát' : 'Retake survey';
   String get surveyDisclaimer => vi
       ? 'Đây là khuyến nghị chung, không thay thế tư vấn của bác sĩ nhãn khoa.'
       : 'These are general guidelines, not a substitute for advice from an eye doctor.';
-  String get reminderSet => vi ? 'Đã bật nhắc nghỉ mắt' : 'Reminder set';
-  String get reminderInterval => vi ? 'Nhắc nhở sau' : 'Reminder after';
   String get minutes => vi ? 'phút' : 'mins';
   String get confirm => vi ? 'Xác nhận' : 'Confirm';
-  String get ensureLighting => vi ? 'Đảm bảo ánh sáng tốt' : 'Ensure good lighting';
-  String get maintainDistance => vi ? 'Giữ khoảng cách ~2 m' : 'Maintain ~6 ft distance';
-  String get wearGlasses => vi ? 'Đeo kính nếu bạn thường dùng' : 'Wear glasses if you normally do';
-  String get startTest => vi ? 'Bắt đầu kiểm tra' : 'Start Test';
-  String get coverYour => vi ? 'Che mắt của bạn' : 'Cover Your';
   String get useHandCover => vi ? 'Dùng tay che mắt. Giữ mắt còn lại nhìn vào màn hình.' : 'Use your hand to cover your eye. Keep the uncovered eye focused on the screen.';
-  String get continueText => vi ? 'Tiếp tục' : 'Continue';
-  String get readSmallestLine => vi ? 'Đọc dòng nhỏ nhất bạn nhìn rõ' : 'Read the smallest line you can see clearly';
-  String get eyeLabelLeft => vi ? 'Mắt trái' : 'Left Eye';
-  String get eyeLabelRight => vi ? 'Mắt phải' : 'Right Eye';
-  String get selectYourResult => vi ? 'Chọn kết quả của bạn:' : 'Select your result:';
-  String get testComplete => vi ? 'Hoàn thành kiểm tra!' : 'Test Complete!';
-  String get aiInsight => vi ? 'Thông tin AI' : 'AI Insight';
-  String get retakeTest => vi ? 'Kiểm tra lại' : 'Retake Test';
 
   String get dailyHabits => vi ? 'Thói quen hàng ngày' : 'Daily Habits';
   String get featureInDevelopment => vi ? 'Tính năng này đang được phát triển' : 'This feature is under development';
   String get trackRoutines => vi ? 'Theo dõi thói quen thân thiện với mắt' : 'Track your eye-friendly routines';
   String get todaysProgress => vi ? 'Tiến trình hôm nay' : 'Today\'s Progress';
   String get target => vi ? 'Mục tiêu' : 'Target';
-  String get habitsCompleted => vi ? 'thói quen đã hoàn thành' : 'habits completed';
 
   String completedHabits(int completed, int total) =>
       vi ? '$completed/$total thói quen đã hoàn thành' : '$completed of $total habits completed';
@@ -697,7 +570,13 @@ class AppStrings {
       case 'sleep':
         return vi ? 'Ước lượng từ giờ dùng máy — bấm để nhập tay' : 'Estimated from usage times — tap to enter manually';
       case 'outdoor':
-        return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
+        // Outdoor time is detected with GPS ONLY (no light sensor since the
+        // lux reading was dropped — see device_data_service.dart) and sampled
+        // every ~1 min while the app is open, plus a background task every
+        // ~15 min (DarkRoomBackgroundService).
+        return vi
+            ? 'GPS — mỗi phút khi app mở, mỗi ~15 phút khi chạy nền'
+            : 'GPS — every minute in the app, every ~15 min in the background';
       case 'breaks':
         // Camera distance/gaze scoring đã bị gỡ bỏ (26/09) — số lần nghỉ
         // được đếm bằng nhắc thủ công + tự động.
@@ -738,20 +617,6 @@ class AppStrings {
   String get online => vi ? 'Đang hoạt động' : 'Online';
   String get askAboutEyeHealth => vi ? 'Hỏi về sức khỏe mắt...' : 'Ask about eye health...';
 
-  String get chatApiKeySetupTitle => vi ? 'Kết nối trợ lý AI' : 'Connect AI assistant';
-  String get chatApiKeySetupBody => vi
-      ? 'Nhập khoá Gemini API (miễn phí tại aistudio.google.com/apikey) để bắt đầu trò chuyện thật với AI. '
-          'Khoá chỉ được lưu trên máy bạn, không gửi đi đâu khác ngoài Google.'
-      : 'Enter your Gemini API key (free at aistudio.google.com/apikey) to start chatting with a real AI. '
-          'The key is stored only on your device and sent only to Google.';
-  String get chatApiKeyHint => vi ? 'Dán khoá API vào đây (AIzaSy...)' : 'Paste your API key (AIzaSy...)';
-  String get chatApiKeySave => vi ? 'Lưu & bắt đầu' : 'Save & start';
-  String get chatApiKeyCancel => vi ? 'Để sau' : 'Later';
-  String get chatApiKeyChange => vi ? 'Đổi khoá API' : 'Change API key';
-  String get chatDisabledTitle => vi ? 'AI Chat đang bảo trì' : 'AI Chat Under Maintenance';
-  String get chatDisabledSubtitle => vi
-      ? 'Tính năng chat AI sẽ quay lại trong thời gian tới.'
-      : 'AI chat will return soon.';
   String get chatErrorMissingKey =>
       vi ? 'Chưa thiết lập khoá API. Nhấn vào biểu tượng ⚙️ ở trên để thêm khoá.' : 'No API key set. Tap the ⚙️ icon above to add one.';
   String get chatErrorInvalidKey =>
@@ -820,12 +685,6 @@ class AppStrings {
                   'eye exam every 1-2 years, or annually if you wear glasses/contacts.',
         };
 
-  String get chatFallbackResponse => vi
-      ? 'Câu hỏi hay đấy! Theo các hướng dẫn chung, việc nghỉ ngơi đều đặn, ánh sáng tốt và khám mắt định kỳ '
-          'là những yếu tố quan trọng. Bạn có muốn mình gợi ý thêm về thời gian màn hình, dinh dưỡng, hay bài tập cho mắt không?'
-      : 'That\'s a great question about eye health! Based on general guidelines, '
-          'maintaining regular breaks, good lighting, and annual eye check-ups are key. '
-          'Would you like specific tips on screen time, nutrition, or vision exercises?';
     // ---------------- AI actions & confirmation ----------------
   String get aiConfirmBeforeActingTitle =>
       vi ? 'Hỏi trước khi AI tự thao tác' : 'Ask before AI takes action';
@@ -846,7 +705,6 @@ class AppStrings {
   String get sleep => vi ? 'Giấc ngủ' : 'Sleep';
   String get hourUnit => vi ? 'giờ' : 'hrs';
   String get pointUnit => vi ? 'điểm' : 'pts';
-  String get visionAiFeedback => vi ? 'Thị lực của bạn nằm trong phạm vi bình thường. Mắt phải của bạn cho thấy khả năng nhìn kém hơn một chút — hãy cân nhắc khám mắt chuyên nghiệp nếu tình trạng này kéo dài.' : 'Your vision is within normal range. Your right eye shows slightly lower acuity — consider scheduling a professional eye exam if this persists.';
 
   String get statistics => vi ? 'Thống kê' : 'Statistics';
   String get trackTrends => vi ? 'Theo dõi xu hướng sức khỏe mắt' : 'Track your eye health trends';
@@ -901,7 +759,6 @@ class AppStrings {
   String get grantUsageAccess => vi ? 'Cấp quyền xem thời gian sử dụng' : 'Grant usage access';
 
   // ---------------- First-Time Setup Wizard ----------------
-  String get setupWizardTitle => vi ? 'Thiết lập ban đầu' : 'Initial Setup';
   String get setupWelcomeTitle => vi ? 'Chào mừng đến với EyeCare AI 👋' : 'Welcome to EyeCare AI 👋';
   String get setupWelcomeBody => vi
       ? 'Cấp vài quyền dưới đây để app theo dõi thói quen dùng điện thoại, nhắc bạn nghỉ mắt đúng lúc và đọc được giấc ngủ — chỉ mất khoảng 1 phút. Bước nào cũng có thể bỏ qua và cấp lại sau trong Cài đặt.'
@@ -961,7 +818,6 @@ class AppStrings {
   String get setupBannerTitle => vi ? 'Hoàn tất thiết lập' : 'Finish setup';
   String setupBannerSubtitle(int granted, int total) =>
       vi ? 'Đã cấp $granted/$total quyền' : '$granted/$total permissions granted';
-  String get setupBannerAction => vi ? 'Tiếp tục' : 'Continue';
 
   // ---------------- Change target sheet ----------------
   String get changeTargetButton => vi ? 'Đổi mục tiêu' : 'Change Target';
@@ -1028,8 +884,8 @@ class AppStrings {
       : 'Before you begin, please review how we handle your data.';
   String get consentCollectTitle => vi ? 'Dữ liệu thu thập' : 'What We Collect';
   String get consentCollectBody => vi
-      ? 'Thời gian sử dụng, thời gian ngoài trời, giấc ngủ, nghỉ mắt (cảm biến thiết bị).\nCâu trả lời khảo sát của bạn (nhóm tuổi, thói quen).\nTin nhắn chat AI (khi tính năng được bật lại).'
-      : 'Screen time, outdoor minutes, sleep, eye breaks (device sensors).\nYour survey answers (age group, habits).\nAI chat messages (when re-enabled).';
+      ? 'Thời gian sử dụng, thời gian ngoài trời, giấc ngủ, nghỉ mắt (cảm biến thiết bị).\nCâu trả lời khảo sát của bạn (nhóm tuổi, thói quen).\nTin nhắn chat AI.'
+      : 'Screen time, outdoor minutes, sleep, eye breaks (device sensors).\nYour survey answers (age group, habits).\nAI chat messages.';
   String get consentUseTitle => vi ? 'Mục đích sử dụng' : 'How We Use It';
   String get consentUseBody => vi
       ? 'Tính điểm sức khỏe mắt.\nĐưa ra gợi ý cá nhân hóa.\nCải thiện AI (ẩn danh, khi bật).'
@@ -1040,10 +896,6 @@ class AppStrings {
       : 'Data stored locally on your device.\nNever sold to third parties.\nYou can delete all data anytime in Settings.';
   String get consentAccept => vi ? 'Chấp nhận & Tiếp tục' : 'Accept & Continue';
   String get consentDecline => vi ? 'Từ chối' : 'Decline';
-  String get consentWithdraw => vi ? 'Rút đồng ý' : 'Withdraw Consent';
-  String get consentWithdrawDesc => vi
-      ? 'Rút đồng ý sẽ xóa tất cả dữ liệu và đặt lại ứng dụng.'
-      : 'Withdrawing consent will delete all data and reset the app.';
 
   // ---- Export ----
   String get exportMyData => vi ? 'Xuất dữ liệu của tôi' : 'Export My Data';
@@ -1065,12 +917,6 @@ class AppStrings {
   String get delete => vi ? 'Xóa' : 'Delete';
 
   // Terms of Service section
-  String get docAppUsagePolicy => vi ? 'Chính sách sử dụng ứng dụng' : 'App Usage Policy';
-  String get docUserResponsibilities => vi ? 'Trách nhiệm người dùng' : 'User Responsibilities';
-  String get docAiDisclaimer => vi ? 'Tuyên bố miễn trừ AI' : 'AI Disclaimer';
-  String get docMedicalDisclaimer => vi ? 'Tuyên bố miễn trừ y tế' : 'Medical Disclaimer';
-  String get docDataProtectionPolicy => vi ? 'Chính sách bảo vệ dữ liệu' : 'Data Protection Policy';
-  String get docOpenSourceLicenses => vi ? 'Giấy phép mã nguồn mở' : 'Open Source Licenses';
   String get termsVersion => vi ? 'Phiên bản điều khoản 1.0' : 'Terms Version 1.0';
   String get termsLastUpdated => vi ? 'Cập nhật lần cuối: Tháng 10, 2026' : 'Last Updated: October 2026';
 
@@ -1084,12 +930,10 @@ class AppStrings {
   String get feedbackHint =>
       vi ? 'Cho chúng tôi biết cần cải thiện gì ở Eye Care AI...' : 'Tell us how we can improve Eye Care AI...';
   String get submitFeedback => vi ? 'Gửi qua Email' : 'Send via Email';
-  String get feedbackThanks => vi ? 'Cảm ơn bạn đã phản hồi!' : 'Thanks for your feedback!';
   String get feedbackNoEmailApp => vi
       ? 'Không tìm thấy ứng dụng email trên máy. Vui lòng gửi góp ý tới eyecareai.app@gmail.com'
       : 'No email app found on this device. Please send feedback to eyecareai.app@gmail.com';
   String get aboutTitle => vi ? 'Giới thiệu' : 'About';
-  String get commitCopied => vi ? 'Đã sao chép commit SHA' : 'Commit SHA copied';
 
   // Sign out / change password flows
   String get signOutConfirmTitle => vi ? 'Đăng xuất?' : 'Sign Out?';
