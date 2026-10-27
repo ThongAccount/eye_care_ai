@@ -113,10 +113,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with WidgetsBindi
 
   /// Sắp xếp các bước theo `kSetupWizardStepOrder` — thứ tự trong lít literal
   /// bên trên chỉ là cách liệt kê cấu hình, KHÔNG phải thứ tự hiển thị.
+  ///
+  /// Chỉ dựng trang cho các bước ÁP DỤNG được ở nền tảng này
+  /// (`applicableSetupSteps`): trên iOS, Usage Access / DND / overlay không có
+  /// màn hình cài đặt nào để mở — hiện chúng là hỏi quyền ma.
   List<_StepConfig> _orderedSteps(List<_StepConfig> configs) {
     final byId = {for (final config in configs) config.id: config};
     return [
-      for (final id in kSetupWizardStepOrder) byId[id]!,
+      for (final id in applicableSetupSteps()) byId[id]!,
     ];
   }
 
