@@ -570,7 +570,13 @@ class AppStrings {
       case 'sleep':
         return vi ? 'Ước lượng từ giờ dùng máy — bấm để nhập tay' : 'Estimated from usage times — tap to enter manually';
       case 'outdoor':
-        return vi ? 'GPS + cảm biến ánh sáng' : 'GPS + light sensor';
+        // Outdoor time is detected with GPS ONLY (no light sensor since the
+        // lux reading was dropped — see device_data_service.dart) and sampled
+        // every ~1 min while the app is open, plus a background task every
+        // ~15 min (DarkRoomBackgroundService).
+        return vi
+            ? 'GPS — mỗi phút khi app mở, mỗi ~15 phút khi chạy nền'
+            : 'GPS — every minute in the app, every ~15 min in the background';
       case 'breaks':
         // Camera distance/gaze scoring đã bị gỡ bỏ (26/09) — số lần nghỉ
         // được đếm bằng nhắc thủ công + tự động.
@@ -878,8 +884,8 @@ class AppStrings {
       : 'Before you begin, please review how we handle your data.';
   String get consentCollectTitle => vi ? 'Dữ liệu thu thập' : 'What We Collect';
   String get consentCollectBody => vi
-      ? 'Thời gian sử dụng, thời gian ngoài trời, giấc ngủ, nghỉ mắt (cảm biến thiết bị).\nCâu trả lời khảo sát của bạn (nhóm tuổi, thói quen).\nTin nhắn chat AI (khi tính năng được bật lại).'
-      : 'Screen time, outdoor minutes, sleep, eye breaks (device sensors).\nYour survey answers (age group, habits).\nAI chat messages (when re-enabled).';
+      ? 'Thời gian sử dụng, thời gian ngoài trời, giấc ngủ, nghỉ mắt (cảm biến thiết bị).\nCâu trả lời khảo sát của bạn (nhóm tuổi, thói quen).\nTin nhắn chat AI.'
+      : 'Screen time, outdoor minutes, sleep, eye breaks (device sensors).\nYour survey answers (age group, habits).\nAI chat messages.';
   String get consentUseTitle => vi ? 'Mục đích sử dụng' : 'How We Use It';
   String get consentUseBody => vi
       ? 'Tính điểm sức khỏe mắt.\nĐưa ra gợi ý cá nhân hóa.\nCải thiện AI (ẩn danh, khi bật).'
