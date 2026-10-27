@@ -122,6 +122,62 @@ in more than one place in `lib/`. The handoff note in
 [`handoff-legal-urls.md`](handoff-legal-urls.md) proposes a single `lib/config/legal_urls.dart`
 constant file and names the exact call sites.
 
+## Proving the verify job's wait
+
+`.github/workflows/publish-pages.yml` publishes on every push to `main` that touches `web/`, then
+a second job waits until GitHub Pages is really serving the new tree before asserting anything
+about it. Three variables steer that wait. **CI sets none of them** — they exist so the same wait
+logic can be exercised against a scratch site:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PAGES_BASE_URL` | the URL the app itself uses (read from `lib/config/legal_urls.dart`) | Point the check at another site. |
+| `PAGES_WAIT_ATTEMPTS` | `60` | How many times the wait looks at the site. |
+| `PAGES_WAIT_PAUSE` | `10` | Seconds between checks. |
+
+### The proof that was actually run
+
+Not a hypothetical. This is how the wait was validated, in this order:
+
+1. **The wait on a real, current site.** Dispatch the workflow on a branch whose `web/` tree
+   already matches `main` (`workflow_dispatch`). The publish job logs `published 11 files` then
+   `nothing changed, nothing to publish` — a no-op, because `web/` did not change — and the verify
+   job logs `pages is serving this commit's whole tree (after 1 checks)`, then `200` on every URL
+   including `/og-image.png`. A dispatch whose `web/` tree is unchanged is still a valid test of
+   the wait: the wait is about Pages serving **this commit**, and a whole-tree match can only pass
+   when it is.
+2. **The case that failed before this fix** — a tree Pages has **not** built yet must NOT pass.
+   Serve the previous tree and run the wait against it. Scratch under `/workspace/temp`, never
+   `/tmp`:
+
+   ```bash
+   # the tree as it was BEFORE the publish: an older gh-pages, or the current one with the
+   # file this commit adds removed - here the card, because main has already published it
+   git worktree add --detach /workspace/temp/stale origin/gh-pages
+   rm -f /workspace/temp/stale/og-image.png
+
+   ( cd /workspace/temp/stale && python3 -m http.server 8792 )
+
+   # the wait, exactly as the workflow runs it, extracted from the workflow itself
+   python3 -c "import yaml;print(yaml.safe_load(open('.github/workflows/publish-pages.yml'))['jobs']['verify']['steps'][1]['run'])" \
+     > /workspace/temp/wait.sh
+
+   cd <checkout of this commit>
+   PAGES_BASE_URL=http://127.0.0.1:8792 PAGES_WAIT_ATTEMPTS=6 PAGES_WAIT_PAUSE=1 \
+     bash /workspace/temp/wait.sh
+   ```
+
+   Against that stale tree the loop prints `waiting for pages: check n/6, og-image.png is not
+   this commit's file yet` and keeps waiting; copy the current tree in while it waits and it then
+   passes. Left alone it exhausts the 6 checks and fails with an explicit error rather than a
+   wrong assertion. The old single-file condition, given the same scratch site, passed on the
+   first check and then failed the assertions — which is precisely what it did in CI.
+3. Clean up: `git worktree remove /workspace/temp/stale`, then stop the server and delete
+   `/workspace/temp/wait.sh`.
+
+The negative case is proven locally against a deliberately stale site, and the positive case is
+proven live with a real dispatch. If you change the wait, re-run both before trusting it.
+
 ## Verification checklist before publishing
 
 1. Both legal pages open over HTTP (not `file://`) and return **200**.
