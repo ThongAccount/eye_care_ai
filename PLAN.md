@@ -97,7 +97,7 @@
 | Item | Evidence |
 |---|---|
 | ~~3 dead files, 0 references each~~ | ✅ **deleted 2026-10-27** — `lib/providers/usage_provider.dart`, `lib/widgets/usage_pie_chart.dart`, `lib/services/storage_service.dart` (0 bytes). Chief re-verified: the only remaining hits for `UsageProvider` / `UsagePieChart` were inside the two files that define them |
-| Focus-mode DND grant not cached | `focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42` `isNotificationPolicyAccessGranted` is re-checked every time, so the re-check banner can reappear |
+| ~~Focus-mode DND grant not cached~~ | ✅ **fixed 2026-10-27** — `focus_mode_service.dart` caches the grant in SharedPreferences (`pref_focus_mode_dnd_granted`): `hasAccess()` only asks native when the cache says "not granted", and `enable()` returning false clears the cache, so a manual revoke in system Settings is still detected. Test: `test/focus_mode_service_test.dart` |
 | ~~Unused `AppStrings` getters~~ | ✅ **pruned 2026-10-27** — 86 getters removed in a verified sweep (dropped-feature copy, old API-key setup, "chat under maintenance", consent-withdraw and legal-section titles, eye-test/survey labels). Chief re-swept independently: **442 getters declared, 0 with zero references**; every removed name has 0 hits outside `app_strings.dart` |
 | ~~**No Pages automation**~~ | ✅ **done 2026-10-27** — `.github/workflows/publish-pages.yml` publishes `gh-pages` from `main` on a push that touches `web/**` (or the script/workflow), using the same `scripts/publish-pages.sh` a human runs, and then verifies the live site (privacy-page sha256 + 7 URLs + the link markers). First real run: publish ✅, verify ✅, correctly a no-op because the site was already current |
 | **In-app terms date runs ahead of the pages** | the app shows "Terms Version 1.0 / Last Updated: October 2026" (`app_strings.dart:1070-1071`) while both published pages still carry the effective/last-updated dates as TODO |
@@ -305,7 +305,7 @@
 - Analytics logging stub (2 TODOs).
 - Stale string `habitSubtitle('breaks')` ("Front camera gaze detection" vs manual/auto-detect).
 - Health Connect setup guide missing from the Permissions sheet.
-- Focus-mode DND grant state not persisted (re-check banner reappears).
+- ~~Focus-mode DND grant state not persisted (re-check banner reappears)~~ — ✅ fixed 2026-10-27 (cached in SharedPreferences).
 - iOS build blocked on Mac/Apple Developer account.
 - No crash reporting (Sentry/Crashlytics).
 - Keystore rotation still pending.
@@ -724,8 +724,9 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 - [x] ~~**Health Connect setup guide** in Permissions bottom sheet~~ — **OBSOLETE**: the app does not use
   Health Connect at all (the `health` package and the Health Connect permission were removed; sleep is
   estimated from usage times). There is nothing to guide.
-- [ ] **Persist Focus Mode DND grant state** to avoid re-check banner — still open
-  (`focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42`, re-checked every time)
+- [x] ~~**Persist Focus Mode DND grant state** to avoid re-check banner~~ — ✅ **done 2026-10-27**
+  (`focus_mode_service.dart`: the grant is cached in SharedPreferences, `enable()` returning false clears it;
+  test `test/focus_mode_service_test.dart`)
 
 ---
 
