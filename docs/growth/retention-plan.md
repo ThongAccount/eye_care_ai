@@ -60,11 +60,13 @@ report. The report is a feature nobody is told about. The one daily re-engagemen
 that does exist is the break reminder — which is a task, not a moment of reflection.
 
 **P3 — The activation tax is paid before any value.** Order today: consent screen →
-habits survey → permission wizard (Usage Access, notifications, battery optimisation,
-full-screen intent, DND policy) → then value. Usage Access is a system-settings detour
-with no runtime dialog — the single most likely place for an install to die. The 20-20-20
-reminder, meanwhile, needs **only** the notification permission, and it is the product's
-core value.
+habits survey → permission wizard (notifications first, then location, activity recognition,
+full-screen intent, battery optimisation, DND policy, overlay, and **Usage Access last**) →
+then value. Usage Access is a system-settings detour with no runtime dialog — the single most
+likely place for an install to die — so it is asked LAST, after the notification permission
+that the 20-20-20 reminder needs has already been granted (order fixed 2026-10-27, see
+`kSetupWizardStepOrder`). The 20-20-20 reminder, meanwhile, needs **only** the notification
+permission, and it is the product's core value.
 
 ---
 
@@ -160,6 +162,9 @@ currently pure upside — the Eye Timeline (wishlist #7) can be the raw material
    empty — grant Usage Access and your score starts working."* Same for camera (eye test
    hints), location (outdoor minutes) and battery optimisation (reminders that fire on
    time).
+   *Partly done 2026-10-27:* Usage Access now comes **last** in the wizard and the
+   notification permission is asked first, so the detour can no longer cost the user the
+   reminder. The day-2 ask with the value reason is still open.
 3. Gate the "full value" moment on those grants, and show a one-time banner on Home when
    a factor is still empty.
 
