@@ -9,10 +9,13 @@ import '../services/usage_service.dart';
 import '../utils/permission_helper.dart';
 
 /// Từng bước quyền trong First-Time Setup Wizard, theo đúng thứ tự hiện ra.
-/// Thứ tự có chủ đích: Usage Access trước tiên vì gần như MỌI tính năng cốt
-/// lõi (thói quen Phone Usage, điểm sức khỏe mắt, thống kê, VÀ CẢ ước lượng
-/// giấc ngủ — xem UsageStatsHandler.getSleepEstimate()) đều phụ thuộc vào
-/// nó; các quyền còn lại bổ trợ cho từng thói quen/tính năng riêng lẻ.
+/// Thứ tự có chủ đích: quyền THÔNG BÁO đến trước, vì nhắc nghỉ mắt 20-20-20
+/// chỉ cần quyền này và đó là giá trị cốt lõi của app. Usage Access để CUỐI
+/// vì nó là chuyển hướng sang Cài đặt hệ thống (không có popup, người dùng
+/// phải tự bật tay) — hỏi nó sớm làm nhiều người dùng bỏ luôn cả wizard và
+/// mất luôn quyền thông báo. Các quyền còn lại bổ trợ cho từng thói quen/tính
+/// năng riêng lẻ. Thứ tự cụ thể: `kSetupWizardStepOrder` bên dưới — xem
+/// docs/growth/retention-plan.md (Move 3).
 ///
 /// BỎ bước `sleep` riêng (trước đây xin quyền Health Connect) — Sleep giờ
 /// suy ra từ chính Usage Access ở trên, không cần quyền riêng nữa. THÊM 4
@@ -30,6 +33,23 @@ enum SetupStepId {
   focusMode,
   overlay,
 }
+
+/// Thứ tự các bước trong Setup Wizard — nguồn DUY NHẤT (xem
+/// setup_wizard_screen.dart, dựng các trang theo danh sách này).
+///
+/// VALUE FIRST: thông báo (runtime popup, một chạm) → các quyền phụ trợ →
+/// Usage Access (chuyển hướng Cài đặt hệ thống) CUỐI CÙNG. Người dùng bỏ
+/// qua ở bước cuối vẫn đã có quyền thông báo để nhận nhắc 20-20-20.
+const List<SetupStepId> kSetupWizardStepOrder = [
+  SetupStepId.notifications,
+  SetupStepId.location,
+  SetupStepId.activityRecognition,
+  SetupStepId.fullScreenIntent,
+  SetupStepId.batteryOptimization,
+  SetupStepId.focusMode,
+  SetupStepId.overlay,
+  SetupStepId.usageAccess,
+];
 
 class SetupProvider extends ChangeNotifier {
   static const _kWizardCompletedKey = 'pref_setup_wizard_completed';

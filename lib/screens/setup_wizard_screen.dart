@@ -13,16 +13,22 @@ import '../utils/app_icon.dart';
 import '../utils/permission_helper.dart';
 import 'main_shell.dart';
 
-/// First-Time Setup Wizard — chuỗi màn hình xin quyền TUẦN TỰ (usage access
-/// -> notifications -> vị trí -> hoạt động -> popup toàn màn hình -> chạy
-/// nền -> focus mode), hiện đúng 1 lần sau khi đăng nhập lần đầu (xem
-/// main.dart _AppGate). Mỗi bước quyền đều có thể "Bỏ qua" — không có bước
-/// nào là điều kiện bắt buộc để vào app, khác với
-/// HabitsSurveyScreen(mandatory: true). Quyền bỏ qua ở đây vẫn có thể cấp
-/// lại sau qua banner ở Home (xem widgets/setup_status_banner.dart).
+/// First-Time Setup Wizard — chuỗi màn hình xin quyền TUẦN TỰ, theo thứ tự
+/// ở `kSetupWizardStepOrder` (nguồn duy nhất): thông báo -> vị trí -> hoạt
+/// động -> popup toàn màn hình -> chạy nền -> focus mode -> overlay -> usage
+/// access. Hiện đúng 1 lần sau khi đăng nhập lần đầu (xem main.dart
+/// _AppGate). Mỗi bước quyền đều có thể "Bỏ qua" — không có bước nào là điều
+/// kiện bắt buộc để vào app, khác với HabitsSurveyScreen(mandatory: true).
+/// Quyền bỏ qua ở đây vẫn có thể cấp lại sau qua banner ở Home (xem
+/// widgets/setup_status_banner.dart).
+///
+/// VALUE FIRST: quyền thông báo (popup runtime, một chạm) đến trước vì nhắc
+/// nghỉ mắt 20-20-20 chỉ cần quyền này; Usage Access (chuyển hướng Cài đặt
+/// hệ thống) để CUỐI để người dùng bỏ qua bước nặng vẫn có được giá trị
+/// cốt lõi. Xem docs/growth/retention-plan.md (Move 3).
 ///
 /// BỎ bước "Giấc ngủ" (Health Connect) — Sleep giờ suy ra từ chính Usage
-/// Access ở bước đầu, không cần quyền riêng nữa (xem device_data_service.dart).
+/// Access, không cần quyền riêng nữa (xem device_data_service.dart).
 class SetupWizardScreen extends StatefulWidget {
   const SetupWizardScreen({super.key});
 
@@ -41,7 +47,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with WidgetsBindi
   // lại app. Lúc quay lại (didChangeAppLifecycleState resumed) là thời
   // điểm duy nhất biết được họ vừa bật hay chưa -> phải refresh lại trạng
   // thái ngay lúc đó.
-  late final List<_StepConfig> _steps = [
+  late final List<_StepConfig> _steps = _orderedSteps([
     _StepConfig(
       id: SetupStepId.usageAccess,
       emoji: '📊',
@@ -103,7 +109,16 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with WidgetsBindi
       onGrant: () => PermissionHelper.openOverlaySettings(),
       opensExternalSettings: true,
     ),
-  ];
+  ]);
+
+  /// Sắp xếp các bước theo `kSetupWizardStepOrder` — thứ tự trong lít literal
+  /// bên trên chỉ là cách liệt kê cấu hình, KHÔNG phải thứ tự hiển thị.
+  List<_StepConfig> _orderedSteps(List<_StepConfig> configs) {
+    final byId = {for (final config in configs) config.id: config};
+    return [
+      for (final id in kSetupWizardStepOrder) byId[id]!,
+    ];
+  }
 
   // +2: trang Welcome ở đầu, trang Done ở cuối.
   int get _totalPages => _steps.length + 2;

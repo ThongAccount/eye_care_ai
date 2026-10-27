@@ -103,7 +103,7 @@
 | **In-app terms date runs ahead of the pages** | the app shows "Terms Version 1.0 / Last Updated: October 2026" (`app_strings.dart:1070-1071`) while both published pages still carry the effective/last-updated dates as TODO |
 | **`web/index.html` is Flutter's untouched template** | harmless today (it is not deployed), but a trap if anyone ever publishes `web/` as a Flutter build |
 | Analytics stub | `analytics_service.dart:57`, `:63` |
-| Setup wizard asks for Usage Access first | `setup_wizard_screen.dart:44-51` — the permission-heavy step comes before notifications, which is the opposite of the "value first" onboarding in `docs/growth/retention-plan.md` Move 3 |
+| ~~Setup wizard asks for Usage Access first~~ | ✅ **fixed 2026-10-27** — the wizard order now comes from one constant, `kSetupWizardStepOrder` (`setup_provider.dart`): notifications first, Usage Access **last**, so a user who skips the heavy system-settings detour still has the notification permission the 20-20-20 reminder needs. Test: `test/setup_wizard_order_test.dart`. ⚠️ still open: the day-2 ask with the value reason (retention-plan Move 3, step 2) |
 | Toolchain drift | Gradle 8.14 / AGP 8.11.1 / Kotlin 2.2.20 — Flutter warns these will be dropped |
 
 ### 🕳️ E. Notion "15 idea groups" — what is actually there (verified 2026-10-26)
