@@ -81,31 +81,73 @@ jobs:
           if [ -z "$base" ]; then
             base="https://thongaccount.github.io/eye_care_ai"
           fi
-          echo "base: $base"
+          # Set only outside CI, to exercise this same wait logic against a
+          # scratch site: CI always uses the URL the app itself uses.
+          if [ -n "${PAGES_BASE_URL:-}" ]; then
+            base="${PAGES_BASE_URL%/}"
+          fi
+          # The wait is tuned so a slow Pages build is waited out rather than
+          # guessed at. CI keeps the defaults; the local proof documented in
+          # docs/web/README.md shrinks both.
+          attempts="${PAGES_WAIT_ATTEMPTS:-60}"
+          pause="${PAGES_WAIT_PAUSE:-10}"
+          echo "base: $base (waiting up to $attempts x ${pause}s)"
 
-          # The published copy of the privacy policy must be byte-identical to
-          # the one in this commit; that is how we know Pages has picked up the
-          # new build and not the previous one.
-          expected_privacy="$(sha256sum web/legal/privacy.html | cut -d' ' -f1)"
+          # Build the tree this commit is supposed to publish, with the SAME
+          # script the publish job runs. That is the file list this job needs,
+          # so it can never drift from what the publish job copies.
+          expected_dir="$(mktemp -d)"
+          trap 'rm -rf "$expected_dir"' EXIT
+          bash scripts/publish-pages.sh --out "$expected_dir"
 
-          # The Pages build only starts after the branch push lands, so the
-          # first checks will usually still see the old site.
-          updated=0
-          for attempt in $(seq 1 60); do
-            code="$(curl -s -o /dev/null -w '%{http_code}' "$base/" || true)"
-            live_sha="$(curl -s "$base/legal/privacy.html" | sha256sum | cut -d' ' -f1 || true)"
-            if [ "$code" = "200" ] && [ "$live_sha" = "$expected_privacy" ]; then
-              echo "pages is serving the new build (after $attempt checks)"
-              updated=1
+          # Every published file, as a path relative to the site root.
+          published=()
+          while IFS= read -r f; do
+            published+=("${f#./}")
+          done < <(cd "$expected_dir" && find . -type f | sort)
+
+          # WAIT CONDITION - read this before changing the loop.
+          #
+          # Pages starts building only after the publish job pushes to
+          # gh-pages, so the first checks usually still see the previous tree.
+          # Waiting for ONE file to match is not enough, and that is not a
+          # theory: this loop used to stop as soon as the live privacy page's
+          # sha256 matched this commit's, which is already true on the first
+          # check whenever the commit does not touch the privacy page. The
+          # og-image publish changed none of it, so the loop exited immediately
+          # and the job then failed on a tree Pages had still to build.
+          #
+          # So the wait ends only when the published tree is serving THIS
+          # commit: EVERY file the script publishes must be byte-identical to
+          # the tree just built from this commit. One unchanged file matching is
+          # not evidence - an unchanged file inside an unfinished tree is
+          # exactly the trap - while a whole-tree match cannot be true of a
+          # stale build either.
+          served=0
+          for attempt in $(seq 1 "$attempts"); do
+            served=1
+            for rel in "${published[@]}"; do
+              live="$(curl -s "$base/$rel" | sha256sum | cut -d' ' -f1 || true)"
+              want="$(sha256sum "$expected_dir/$rel" | cut -d' ' -f1)"
+              if [ "$live" != "$want" ]; then
+                echo "waiting for pages: check $attempt/$attempts, $rel is not this commit's file yet"
+                served=0
+                break
+              fi
+            done
+            if [ "$served" = "1" ]; then
+              echo "pages is serving this commit's whole tree (after $attempt checks)"
               break
             fi
-            echo "waiting for pages: check $attempt/60, landing=$code"
-            sleep 10
+            sleep "$pause"
           done
-          if [ "$updated" -ne 1 ]; then
-            echo "::error::the published site did not pick up the new build in time" >&2
+          if [ "$served" -ne 1 ]; then
+            echo "::error::the published site did not serve this commit's tree within the wait window" >&2
             exit 1
           fi
+
+          # The live tree is this commit's tree now, so the assertions below
+          # can no longer be looking at a build that has not finished.
 
           failed=0
           for path in / /favicon.png /og-image.png /styles.css /robots.txt /icons/Icon-512.png /legal/privacy.html /legal/terms.html; do
