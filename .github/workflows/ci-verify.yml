@@ -17,6 +17,9 @@ on:
     branches:
       - 'fix/**'
       - 'feat/**'
+      - 'chore/**'
+      - 'ci/**'
+      - 'docs/**'
   workflow_dispatch: {}
 
 jobs:
