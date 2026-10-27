@@ -1,0 +1,141 @@
+# Publishes the static site (landing page + legal pages) to the `gh-pages`
+# branch, which is the branch GitHub Pages serves for this repository.
+#
+# The publish itself is done by `scripts/publish-pages.sh` - the same script a
+# human runs by hand - so CI and a manual publish cannot drift apart. The
+# workflow only decides WHEN to run it, and then checks that the site really
+# came back up with every link working.
+#
+# It pushes to `origin/gh-pages` and to nothing else: `main` and `main-merger`
+# are never touched here.
+
+name: Publish Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+      - 'scripts/publish-pages.sh'
+      - '.github/workflows/publish-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two publishes must never race for the gh-pages branch: the second one waits.
+concurrency:
+  group: publish-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the site to gh-pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      # The branch that Pages serves, checked out as a worktree of this
+      # repository so the script can rebuild it and push it. actions/checkout
+      # insists on a path under the workspace, so the worktree is created with
+      # plain git here - it shares this checkout's credentials, so the push
+      # needs no extra setup.
+      - name: Check out gh-pages
+        env:
+          GH_PAGES_DIR: ${{ runner.temp }}/gh-pages
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin gh-pages
+          git worktree add "$GH_PAGES_DIR" FETCH_HEAD
+
+      # The script rebuilds the whole tree from web/, commits it when something
+      # changed, pushes to origin/gh-pages, and exits 0 without doing anything
+      # when the site is already up to date.
+      - name: Publish the site to gh-pages
+        env:
+          GH_PAGES_DIR: ${{ runner.temp }}/gh-pages
+        run: bash scripts/publish-pages.sh --out "$GH_PAGES_DIR" --push
+
+  verify:
+    name: Verify the published site
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+
+      - name: Wait for Pages and check every published URL
+        run: |
+          set -euo pipefail
+
+          # The canonical base URL comes from the same constant the app uses,
+          # so CI and the app can never disagree about where the site lives.
+          base="$(grep -oE "https://[^']+/eye_care_ai" lib/config/legal_urls.dart | head -1 || true)"
+          if [ -z "$base" ]; then
+            base="https://thongaccount.github.io/eye_care_ai"
+          fi
+          echo "base: $base"
+
+          # The published copy of the privacy policy must be byte-identical to
+          # the one in this commit; that is how we know Pages has picked up the
+          # new build and not the previous one.
+          expected_privacy="$(sha256sum web/legal/privacy.html | cut -d' ' -f1)"
+
+          # The Pages build only starts after the branch push lands, so the
+          # first checks will usually still see the old site.
+          updated=0
+          for attempt in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$base/" || true)"
+            live_sha="$(curl -s "$base/legal/privacy.html" | sha256sum | cut -d' ' -f1 || true)"
+            if [ "$code" = "200" ] && [ "$live_sha" = "$expected_privacy" ]; then
+              echo "pages is serving the new build (after $attempt checks)"
+              updated=1
+              break
+            fi
+            echo "waiting for pages: check $attempt/60, landing=$code"
+            sleep 10
+          done
+          if [ "$updated" -ne 1 ]; then
+            echo "::error::the published site did not pick up the new build in time" >&2
+            exit 1
+          fi
+
+          failed=0
+          for path in / /favicon.png /styles.css /robots.txt /icons/Icon-512.png /legal/privacy.html /legal/terms.html; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$base$path" || true)"
+            echo "$code  $base$path"
+            if [ "$code" != "200" ]; then
+              failed=1
+            fi
+          done
+
+          # The links that used to be dead: the landing page must point at the
+          # legal pages with their published paths, and both legal pages must
+          # point back at the landing page.
+          landing="$(curl -s "$base/")"
+          for marker in 'href="legal/privacy.html"' 'href="legal/terms.html"' 'href="favicon.png"'; do
+            case "$landing" in
+              *"$marker"*) ;;
+              *) echo "::error::the landing page is missing $marker" >&2; failed=1 ;;
+            esac
+          done
+          for page in legal/privacy.html legal/terms.html; do
+            body="$(curl -s "$base/$page")"
+            case "$body" in
+              *'href="../index.html"'*) ;;
+              *) echo "::error::$page does not link back to the landing page" >&2; failed=1 ;;
+            esac
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::the published site failed its checks" >&2
+            exit 1
+          fi
+          echo "every published URL returns 200 and every link resolves"
