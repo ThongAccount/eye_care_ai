@@ -14,7 +14,7 @@ web/
   index.html          Flutter's own web entry point — DO NOT TOUCH
   favicon.png, icons/ Flutter web assets
   og-image.png        Social preview card, 1200x630 (the og:image / twitter:image)
-  robots.txt          Crawer rules for the published site
+  robots.txt          Crawler rules for the published site
 ```
 
 Publishing is done by [`scripts/publish-pages.sh`](../../scripts/publish-pages.sh), which rebuilds
