@@ -48,7 +48,7 @@ receiver reconstruct the user's health profile. So:
 | AI chat text, AI replies, the habit "context block" sent to NIM | free-text health context |
 | Location (coordinates, place names, GPS samples) | location data |
 | Installed app names / package names / the app-usage breakdown | third-party app inventory |
-| E-mail address, display name, guardian e-mail, leaderboard nickname | direct identifier |
+| E-mail address, display name, guardian e-mail, the leaderboard display name and profile-photo URL | direct identifier |
 | Hardware identifiers (IMEI, Android ID, MAC, advertising ID) | prohibited |
 | Exact timestamps of sensor events or activity | reconstructable timeline |
 

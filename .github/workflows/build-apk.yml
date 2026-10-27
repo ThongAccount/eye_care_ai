@@ -132,6 +132,29 @@ jobs:
           flutter clean
           (cd android && chmod +x gradlew && ./gradlew --stop) || true
 
+      # ------------------------------------------------------------------
+      # Release signing — HARD FAIL when the release key is missing.
+      #
+      # The old behaviour was: if KEYSTORE_BASE64 was empty, print
+      # "Skipping — no keystore secret" and exit 0. The Gradle build then
+      # fell through to android/app/ci-fallback-keystore.jks, which is
+      # COMMITTED to this repo — so a release could end up signed with a
+      # key that anybody with the source can sign with, and a Play upload
+      # key that is not private at all.
+      #
+      # Verified on the shipped build-98: the APK and the AAB were both
+      # signed with the real key (CN = EyeCare AI, O = ThongAccount), NOT
+      # the fallback — so this was a LATENT risk, not a live compromise.
+      # The point of this guard is that it can never become one.
+      #
+      # Now: no release key => no release. The job goes red BEFORE any
+      # artifact is built, so a fallback-signed APK/AAB can never be
+      # published to GitHub Releases or handed to Google Play.
+      #
+      # Nothing else moves: the AAB is still built AFTER the APK release
+      # is published (see the comment above that step), and the
+      # build-<N> tag / release naming is untouched.
+      # ------------------------------------------------------------------
       - name: Setup release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -140,12 +163,39 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "Skipping — no keystore secret"
-            exit 0
+            echo "::error::KEYSTORE_BASE64 secret is empty — aborting the release build."
+            echo "::error::Without it the build would silently fall back to android/app/ci-fallback-keystore.jks, a keystore that is committed to this repository."
+            echo "::error::Add the release keystore to the repository secrets (Settings > Secrets and variables > Actions) and re-run."
+            exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.tmp.jks
+          if [ ! -s android/app/release-keystore.tmp.jks ]; then
+            echo "::error::The decoded release keystore is empty — aborting before the build."
+            rm -f android/app/release-keystore.tmp.jks
+            exit 1
+          fi
+          # Belt and braces: refuse to publish a release signed with the
+          # committed fallback keystore even if that file was uploaded as
+          # the secret by mistake. The check happens BEFORE anything is
+          # put in place, so a rejected keystore never lands on disk.
+          if [ -f android/app/ci-fallback-keystore.jks ]; then
+            FALLBACK_SHA=$(sha256sum android/app/ci-fallback-keystore.jks | awk '{print $1}')
+            RELEASE_SHA=$(sha256sum android/app/release-keystore.tmp.jks | awk '{print $1}')
+            if [ "$FALLBACK_SHA" = "$RELEASE_SHA" ]; then
+              echo "::error::The release keystore is byte-identical to the committed ci-fallback keystore — aborting."
+              rm -f android/app/release-keystore.tmp.jks
+              exit 1
+            fi
+            echo "Release keystore sha256: $RELEASE_SHA (differs from the committed fallback)."
+          fi
+          mv android/app/release-keystore.tmp.jks android/app/release-keystore.jks
           printf "storeFile=release-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
             "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+          if [ ! -s android/key.properties ]; then
+            echo "::error::android/key.properties was not written — aborting before the build."
+            exit 1
+          fi
+          echo "Release signing material is in place."
 
       - name: Read version
         id: version

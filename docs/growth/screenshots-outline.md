@@ -141,10 +141,11 @@ Statistics frame rather than shipping an Android screenshot.
 
 ## Capture notes and pitfalls
 
-1. **No fake leaderboard.** The leaderboard lists real accounts with the e-mail prefix as
-   nickname (`leaderboard_service.dart:83`). For a store frame, either use a build seeded
-   with a test leaderboard, or **blur the names**. Never ship other users' e-mail prefixes
-   in a Play screenshot.
+1. **No fake leaderboard.** The leaderboard lists real accounts with their **display name**
+   (which falls back to the e-mail prefix) **and their profile-photo URL**
+   (`leaderboard_service.dart:80-95`). For a store frame, either use a build seeded
+   with a test leaderboard, or **blur the names and the avatars**. Never ship other users'
+   e-mail prefixes or profile photos in a Play screenshot.
 2. **No fake health numbers.** Every number in a screenshot must come from a real day of
    use. A 92/100 score with four full factor bars is fine if it is real; inventing one is
    a misrepresentation and reviewers do check.
