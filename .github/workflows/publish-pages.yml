@@ -108,7 +108,7 @@ jobs:
           fi
 
           failed=0
-          for path in / /favicon.png /styles.css /robots.txt /icons/Icon-512.png /legal/privacy.html /legal/terms.html; do
+          for path in / /favicon.png /og-image.png /styles.css /robots.txt /icons/Icon-512.png /legal/privacy.html /legal/terms.html; do
             code="$(curl -s -o /dev/null -w '%{http_code}' "$base$path" || true)"
             echo "$code  $base$path"
             if [ "$code" != "200" ]; then
@@ -118,9 +118,11 @@ jobs:
 
           # The links that used to be dead: the landing page must point at the
           # legal pages with their published paths, and both legal pages must
-          # point back at the landing page.
+          # point back at the landing page. The social card is checked here too,
+          # because a meta tag that points at a file the publish script does not
+          # copy is a 404 that only a crawler would ever notice.
           landing="$(curl -s "$base/")"
-          for marker in 'href="legal/privacy.html"' 'href="legal/terms.html"' 'href="favicon.png"'; do
+          for marker in 'href="legal/privacy.html"' 'href="legal/terms.html"' 'href="favicon.png"' 'og-image.png"'; do
             case "$landing" in
               *"$marker"*) ;;
               *) echo "::error::the landing page is missing $marker" >&2; failed=1 ;;
