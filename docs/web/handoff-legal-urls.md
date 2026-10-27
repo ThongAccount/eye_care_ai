@@ -1,9 +1,11 @@
 # Handoff — legal page URLs and the app-side wiring
 
-For: **Chief** (owns `lib/`). Nothing in this note has been applied to `lib/`; the branch only
-contains the pages themselves.
+For: **Chief** (owns `lib/`). **Status: the wiring in §3 has been applied** — commit `6f00eef`
+("feat: wire published legal pages into settings with real in-app summaries") is on `main`, the
+pages are published on the `gh-pages` branch, and the three URLs below are the live ones. What
+remains open is the publisher's facts (§4) and a few copy details, not the wiring.
 
-## 1. What is on this branch
+## 1. What is published
 
 | File | Purpose |
 | --- | --- |
@@ -26,26 +28,24 @@ const landingPageUrl     = 'https://thongaccount.github.io/eye_care_ai/';
 Fallback if Pages is served from `main` root instead: prefix every path with `/web/`
 (`…/eye_care_ai/web/legal/privacy.html`, `…/eye_care_ai/web/site/`).
 
-## 3. Suggested wiring (one file, three call sites)
+## 3. The wiring (one file, three call sites) — applied
 
-Create `lib/config/legal_urls.dart` with the constants above, then:
+`lib/config/legal_urls.dart` holds the constants above, and the three call sites are live:
 
-1. **`lib/screens/settings_more_page.dart`** — the page already renders two cards,
-   `PrivacySecuritySection` and `TermsOfServiceSection` (`SettingsMoreSection.privacy` /
-   `.terms`). Add a third nav tile ("Privacy Policy (online)" / "Terms of Service (online)") that
-   opens the URL with `url_launcher` (`launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)`).
-   `url_launcher` is already a dependency.
-2. **`lib/widgets/terms_of_service_section.dart`** — the six cards in there are still placeholders
-   ("Placeholder body — replace with your real App Usage Policy text."). Two options:
-   - point the "Chính sách bảo vệ dữ liệu / Data Protection Policy" card and the "Chính sách sử
-     dụng ứng dụng / App Usage Policy" card at the published pages, and
-   - replace the remaining placeholder bodies with the short summaries that already exist in
-     sections 02–04 of `web/legal/terms.html` (medical disclaimer, AI disclaimer, user
-     responsibilities), so the in-app text stops saying "placeholder".
-   The version footer (`strings.termsVersion` / `strings.termsLastUpdated` in
-   `lib/models/app_strings.dart`) should show the same version and date as the published pages.
-3. **`lib/widgets/help_support_section.dart`** — the "Help & Support" card is a natural second
-   home for the privacy-policy link.
+1. **`lib/screens/settings_more_page.dart`** — renders `PrivacySecuritySection` and
+   `TermsOfServiceSection` (`SettingsMoreSection.privacy` / `.terms`).
+2. **`lib/widgets/terms_of_service_section.dart`** — **done** in `6f00eef`. The section now renders
+   five real in-app summaries in English and Vietnamese (App Usage Policy, User Responsibilities,
+   AI Disclaimer, Medical Disclaimer, Data Protection Policy), the Flutter licence list, and two
+   external cards — "Privacy Policy (online)" and "Terms of Service (online)" — that open the
+   published pages through `LegalUrls`. The placeholder bodies are gone (0 hits for
+   "Placeholder body" in `lib/`).
+   *One copy detail is still open:* the version footer (`strings.termsVersion` /
+   `strings.termsLastUpdated` in `lib/models/app_strings.dart`) shows "Terms Version 1.0" and
+   "Last Updated: October 2026", while both published pages still carry the effective date and
+   the last-updated date as TODO chips. Set the date once, in both places.
+3. **`lib/widgets/help_support_section.dart`** — the "Help & Support" section carries the
+   "Privacy Policy (online)" button, alongside the feedback form.
 
 Keep the URLs in `lib/config/legal_urls.dart` only; do not paste them into `app_strings.dart` as
 duplicated string literals.

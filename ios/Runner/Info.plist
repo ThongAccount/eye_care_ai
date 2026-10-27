@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Eye Care Ai</string>
+	<string>EyeCare AI</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -63,17 +63,10 @@
 	<string>EyeCare AI uses your location to estimate how much time you spend outdoors for the Outdoor Time habit.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>EyeCare AI uses motion data to detect reading posture and nighttime movement for the Reading Time and Sleep habits.</string>
-	<key>NSHealthShareUsageDescription</key>
-	<string>EyeCare AI reads your sleep data from Health to fill in the Sleep habit automatically.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>EyeCare AI does not write any data to Health; this permission is required by the underlying framework.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>EyeCare AI uses your location in the background to track how much time you spend outdoors each day.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>EyeCare AI uses your location in the background to track how much time you spend outdoors each day.</string>
-	<!-- NOTE: reading real sleep data also requires enabling the "HealthKit"
-	     capability for the Runner target in Xcode (Signing & Capabilities),
-	     which cannot be set from this plist alone. -->
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
