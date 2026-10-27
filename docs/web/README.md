@@ -13,7 +13,8 @@ web/
     styles.css        Landing page styles — one "dim room" dark theme, no external assets
   index.html          Flutter's own web entry point — DO NOT TOUCH
   favicon.png, icons/ Flutter web assets
-  robots.txt          Crawler rules for the published site
+  og-image.png        Social preview card, 1200x630 (the og:image / twitter:image)
+  robots.txt          Crawer rules for the published site
 ```
 
 Publishing is done by [`scripts/publish-pages.sh`](../../scripts/publish-pages.sh), which rebuilds
@@ -51,6 +52,7 @@ Short URLs, and the Flutter `web/` build never gets published by accident.
 index.html          <- copy of web/site/index.html
 styles.css          <- copy of web/site/styles.css
 favicon.png         <- copy of web/favicon.png
+og-image.png        <- copy of web/og-image.png
 icons/              <- copy of web/icons/
 legal/
   privacy.html      <- copy of web/legal/privacy.html
@@ -62,10 +64,14 @@ robots.txt          <- copy of web/robots.txt
 
 ```bash
 cd /workspace/eye_care_ai
-git fetch origin
-git worktree add -b gh-pages /workspace/temp/gh-pages origin/main
+git fetch origin gh-pages
+git worktree add --detach /workspace/temp/gh-pages FETCH_HEAD
 scripts/publish-pages.sh --out /workspace/temp/gh-pages --push
 ```
+
+Base the worktree on `origin/gh-pages`, never on `origin/main`: the published branch has a
+history of its own, so a worktree built from `main` is rejected by the push as a
+non-fast-forward. A detached worktree is what the CI workflow does too.
 
 The script rebuilds the **whole** tree from `web/`, verifies every expected file is present and
 non-empty before it commits, and only then pushes to `origin/gh-pages`. The old hand-written
@@ -131,7 +137,9 @@ constant file and names the exact call sites.
    `curl -s -o /dev/null -w '%{http_code}\n' https://thongaccount.github.io/eye_care_ai/{favicon.png,legal/privacy.html,legal/terms.html,robots.txt}`
 8. The legal pages' Home links (`../index.html`) land on the landing page, not on a 404.
 9. The landing page's `og:image` and `twitter:image` URLs resolve — a social preview that points
-   at a missing file shows as a broken card, not as no card.
+   at a missing file shows as a broken card, not as no card. They point at `og-image.png`, the
+   1200x630 card in `web/`, which the publish script copies to the root of the published site:
+   `curl -s -o /dev/null -w '%{http_code}\n' https://thongaccount.github.io/eye_care_ai/og-image.png`
 
 ## Notes on the two design registers
 

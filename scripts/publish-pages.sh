@@ -20,6 +20,7 @@
 #   index.html        <- web/site/index.html        landing page, canonical URL
 #   styles.css        <- web/site/styles.css
 #   favicon.png       <- web/favicon.png
+#   og-image.png      <- web/og-image.png           social preview card, 1200x630
 #   icons/            <- web/icons/
 #   legal/            <- web/legal/*.html
 #   robots.txt        <- web/robots.txt
@@ -42,7 +43,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT_DIR="${2:?--out needs a path}"; shift 2 ;;
     --push) PUSH=1; shift ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) awk 'NR > 1 && /^#/ { print; next } NR > 1 { exit }' "$0"; exit 0 ;;
     *) echo "publish-pages: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -57,6 +58,7 @@ REQUIRED=(
   "web/site/index.html"
   "web/site/styles.css"
   "web/favicon.png"
+  "web/og-image.png"
   "web/robots.txt"
   "web/legal/privacy.html"
   "web/legal/terms.html"
@@ -89,6 +91,7 @@ find "$OUT_DIR" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 cp "$REPO_ROOT/web/site/index.html"       "$OUT_DIR/index.html"
 cp "$REPO_ROOT/web/site/styles.css"       "$OUT_DIR/styles.css"
 cp "$REPO_ROOT/web/favicon.png"           "$OUT_DIR/favicon.png"
+cp "$REPO_ROOT/web/og-image.png"          "$OUT_DIR/og-image.png"
 cp "$REPO_ROOT/web/robots.txt"            "$OUT_DIR/robots.txt"
 cp -r "$REPO_ROOT/web/icons"              "$OUT_DIR/icons"
 mkdir -p "$OUT_DIR/legal"
@@ -97,7 +100,7 @@ cp "$REPO_ROOT/web/legal/terms.html"      "$OUT_DIR/legal/terms.html"
 
 # --- 4. verify the copy before it can be published ----------------------------
 EXPECTED=(
-  "index.html" "styles.css" "favicon.png" "robots.txt"
+  "index.html" "styles.css" "favicon.png" "og-image.png" "robots.txt"
   "icons/Icon-192.png" "icons/Icon-512.png"
   "icons/Icon-maskable-192.png" "icons/Icon-maskable-512.png"
   "legal/privacy.html" "legal/terms.html"
