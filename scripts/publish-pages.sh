@@ -8,10 +8,11 @@
 # never copied `robots.txt`, so following it deleted the live robots.txt.
 #
 # Usage:
-#   scripts/publish-pages.sh --out <gh-pages worktree> [--push]
+#   scripts/publish-pages.sh --out <gh-pages checkout> [--push]
 #
 #   --out    directory that receives the published tree. It must be a git
-#            worktree of this repository on the `gh-pages` branch.
+#            checkout of the `gh-pages` branch - a worktree of this repository
+#            or a separate clone of it (that is what CI uses).
 #   --push   commit the result and push it to `origin/gh-pages`.
 #
 # Published layout (and why):
@@ -47,7 +48,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$OUT_DIR" ]; then
-  echo "publish-pages: --out <gh-pages worktree> is required" >&2
+  echo "publish-pages: --out <gh-pages checkout> is required" >&2
   exit 2
 fi
 
@@ -115,28 +116,40 @@ echo "publish-pages: published $(find "$OUT_DIR" -type f ! -name .git ! -path '*
 
 # --- 5. commit + push ---------------------------------------------------------
 if [ "$PUSH" -eq 1 ]; then
+  # A CI runner has no git identity by default, and `git commit` refuses to run
+  # without one. Read the EFFECTIVE identity and fall back to the bot identity
+  # when it is missing or empty. The test has to look at the VALUE: `git config
+  # user.email` exits 0 with empty output when the key exists but is blank, so
+  # testing its exit code let the commit fail with "Author identity unknown".
+  # An empty identity must not be inherited from the runner either: git would
+  # otherwise invent one from the runner's hostname and sign the publish as
+  # "runner@<host>" instead of the bot.
+  git_email="$(git -C "$OUT_DIR" config --get user.email 2>/dev/null || true)"
+  git_name="$(git -C "$OUT_DIR" config --get user.name 2>/dev/null || true)"
+  if [ -z "$git_email" ]; then
+    git_email="github-actions[bot]@users.noreply.github.com"
+  fi
+  if [ -z "$git_name" ]; then
+    git_name="github-actions[bot]"
+  fi
+  # Written to the repository config as well, so the published commit has the
+  # bot identity even if the push is done by hand from the same checkout.
+  git -C "$OUT_DIR" config user.email "$git_email"
+  git -C "$OUT_DIR" config user.name "$git_name"
+
   git -C "$OUT_DIR" add -A
   if git -C "$OUT_DIR" diff --cached --quiet; then
     echo "publish-pages: nothing changed, nothing to publish"
   else
-    git -C "$OUT_DIR" commit -q -F - <<'MSG'
-docs: publish the landing page, the legal pages and robots.txt
+    git -C "$OUT_DIR" -c user.name="$git_name" -c user.email="$git_email" commit -q -F - <<'MSG'
+docs: publish the site from main
 
-Rebuilds the whole gh-pages tree from web/ so the published site always
-matches the repository and nothing that is live can be dropped by a partial
-copy.
+Rebuilds the whole gh-pages tree from web/, so the published site always
+matches the repository: the landing page, styles.css, favicon.png, robots.txt,
+the icons and the two legal pages - and nothing else.
 
-Every link was written for the SOURCE layout, where the landing page lives in
-web/site/ and the legal pages in web/legal/. The published site copies
-web/site/index.html to the root and web/legal/* into legal/, so those links
-resolved one directory too high and returned 404: the live home page could not
-open the privacy policy, could not open the terms, had no icon, and the Home
-links inside both legal pages were dead.
-
-The landing page now links to favicon.png, legal/privacy.html and
-legal/terms.html; both legal pages link back to the landing page with
-../index.html. robots.txt moves into web/ (it existed only on this branch), so
-the published tree always carries it.
+A partial copy is what broke this site before, so the tree is rebuilt in full
+on every run and verified before anything is committed.
 MSG
     git -C "$OUT_DIR" push origin HEAD:gh-pages
     echo "publish-pages: pushed to origin/gh-pages"
