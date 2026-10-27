@@ -20,6 +20,9 @@ void main() {
   /// method 'enable' trả về giá trị này.
   var nativeEnableResult = true;
 
+  /// method 'enable' NÉM LỖI thay vì trả lời (native crash / channel hỏng).
+  var nativeEnableThrows = false;
+
   void installChannel() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
@@ -28,6 +31,10 @@ void main() {
         case 'hasAccess':
           return nativeGranted;
         case 'enable':
+          if (nativeEnableThrows) {
+            // Lỗi thật, không phải "bị từ chối" — kênh mất trả lời.
+            throw StateError('native enable crashed');
+          }
           return nativeEnableResult;
         default:
           return null;
@@ -42,6 +49,7 @@ void main() {
     calls.clear();
     nativeGranted = true;
     nativeEnableResult = true;
+    nativeEnableThrows = false;
     SharedPreferences.setMockInitialValues({});
     installChannel();
   });
@@ -84,6 +92,23 @@ void main() {
     nativeGranted = false;
     expect(await FocusModeService.instance.hasAccess(), isFalse);
     expect(countCalls('hasAccess'), 2);
+  });
+
+  // Chỉ khi native trả lời CHẮC CHẮN "không" (false) thì cache mới bị xoá.
+  // Lỗi kênh / native crash KHÔNG phải từ chối — xoá cache ở đây sẽ làm
+  // banner "cấp quyền DND" hiện lại dù người dùng đã cấp.
+  test('enable() THROWING does not clear the cached grant', () async {
+    expect(await FocusModeService.instance.hasAccess(), isTrue);
+
+    nativeEnableThrows = true;
+    expect(await FocusModeService.instance.enable(), isFalse);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(FocusModeService.dndGrantedPrefKey), isTrue);
+
+    // Lần hỏi sau vẫn báo true VÀ không hỏi lại native nữa.
+    expect(await FocusModeService.instance.hasAccess(), isTrue);
+    expect(countCalls('hasAccess'), 1);
   });
 
   test('the grant is persisted, so it survives an app restart', () async {
