@@ -24,6 +24,7 @@ import 'providers/theme_provider.dart';
 import 'providers/update_provider.dart';
 import 'providers/usage_limit_provider.dart';
 import 'navigation/root_navigator.dart';
+import 'screens/app_lock_overlay.dart';
 import 'screens/consent_screen.dart';
 import 'screens/eye_break_screen.dart';
 import 'screens/habits_survey_screen.dart';
@@ -39,14 +40,13 @@ import 'theme/app_theme.dart';
 
 // Navigator toàn cục — dùng để điều hướng tới EyeBreakScreen ngay khi người
 // dùng nhấn vào thông báo "Đến giờ nghỉ mắt", kể cả khi thông báo được nhấn
-// lúc app đang ở nền (không có BuildContext nào sẵn có lúc đó). Đặt ở top
-// level (không phải trong 1 State) vì NotificationService (tầng service,
-// không có UI) cần gọi được nó thông qua callback onBreakReminderTapped mà
-// không phải import ngược lại màn hình.
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-
+// lúc app đang ở nền (không có BuildContext nào sẵn có lúc đó). Dùng CHUNG key
+// `rootNavigatorKey` trong lib/navigation/root_navigator.dart (trước đây
+// main.dart giữ một key riêng, khiến key dùng chung không gắn với navigator
+// nào — AppLockGate cần đúng navigator gốc để mở trang Cài đặt từ màn
+// hình khoá).
 void _openEyeBreakScreenFromNotification() {
-  final navigator = _rootNavigatorKey.currentState;
+  final navigator = rootNavigatorKey.currentState;
   if (navigator == null) return;
   // Tránh chồng nhiều EyeBreakScreen nếu người dùng bấm thông báo nhiều lần
   // liên tiếp (VD báo thức lặp bắn 2 lần trước khi mở thông báo đầu) — quay
@@ -183,12 +183,18 @@ class _EyeCareAppState extends State<EyeCareApp> {
     final fontTextTheme = font.getTextTheme(isVietnamese);
 
     return MaterialApp(
-      navigatorKey: _rootNavigatorKey,
+      navigatorKey: rootNavigatorKey,
       title: 'EyeCare AI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(accentSeed: accent.seedColor, fontTextTheme: fontTextTheme),
       darkTheme: AppTheme.dark(accentSeed: accent.seedColor, fontTextTheme: fontTextTheme),
       themeMode: theme.themeMode,
+      // Cổng khoá app: khi `UsageLimitProvider.isLocked` = true, màn hình khoá
+      // được vẽ ĐÈ lên TOÀN BỘ app (builder nằm ngoài navigator nên phủ được
+      // mọi route đã push — kể cả Cài đặt). Đây là enforcement thật của
+      // app-lock Phase 1; trước đây màn hình khoá không được gắn vào bất kỳ
+      // navigator nào nên không bao giờ hiện.
+      builder: (context, child) => AppLockGate(child: child ?? const SizedBox.shrink()),
       home: const _AppGate(),
     );
   }

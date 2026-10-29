@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../providers/auto_break_provider.dart';
 import '../providers/habit_provider.dart';
 import '../providers/settings_provider.dart';
+import '../utils/platform_capability.dart';
 import 'focus_mode_service.dart';
 
 /// Cho phép AI không chỉ TRẢ LỜI mà còn THAO TÁC được với app.
@@ -277,6 +278,13 @@ class AiActionHandler {
 
   static Future<String> _toggleFocusMode(bool enable, bool isVietnamese) async {
     final service = FocusModeService.instance;
+    // iOS không có DND điều khiển được từ app — nói rõ thay vì hứa một việc
+    // không làm được.
+    if (!hasAndroidNativeFeatures()) {
+      return isVietnamese
+          ? 'ℹ️ Chế độ Tập trung chỉ có trên Android.'
+          : 'ℹ️ Focus mode is only available on Android.';
+    }
     final hasAccess = await service.hasAccess();
     if (!hasAccess) {
       return isVietnamese

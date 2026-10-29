@@ -2,7 +2,7 @@
 
 > Source: Notion page "PATCHES" (26/07/2026) + SETTINGS spec + Feature wishlist
 > Status legend: ✅ Done · 🟡 Partial · ❌ Not Started
-> **Current truth: § CURRENT GAPS — 2026-10-26 (top of file).**
+> **Current truth: § CURRENT GAPS — 2026-10-27 (top of file).**
 > Historical layers kept for provenance:
 > - § NOTION SYNC — 2026-10-26 — the Notion page reconciled against the code.
 > - § CODE-VERIFIED REFRESH (2026-10-23) — the code-grounded baseline the 10-26 sync re-checks.
@@ -14,13 +14,18 @@
 
 ---
 
-## 🚧 CURRENT GAPS — 2026-10-26 (what is **not** available in the repo right now)
+## 🚧 CURRENT GAPS — 2026-10-27 (what is **not** available in the repo right now)
 
 > **Why this section:** the layers below record what shipped. This one records the opposite —
 > every feature that a user, a reviewer or a store can **not** get from the current build.
 > **Method:** repo-wide sweep of `lib/`, `android/`, `ios/`, `web/`, `docs/` at `main` @ `a67e056`,
 > live URL checks, a read of every open marker in this file, and a certificate check on the
 > shipped build-98 artifacts. "0 references" means the string/symbol does not exist in the tree.
+> **Re-verified 2026-10-27** after three lane merges (app-lock enforcement, web link repair,
+> listing accuracy + signing guard): every row below was re-checked against the merged tree
+> and against the live site. Rows those merges closed moved to § F — none of them was closed
+> on a bot's word, each was re-verified by Chief against the code, the shipped artifact or a
+> live URL.
 > **Headline:** the app is feature-rich and shippable as an alpha. What is missing clusters in
 > **analytics, iOS, store submission and 8 wishlist features** — plus a few small in-app items and
 > the user-side legal/store facts.
@@ -50,21 +55,19 @@
 | **App Store IPA** | `build-ios.yml` is `workflow_dispatch`-only and exports with `method: development` (`ios/ExportOptions.plist`) → no distributable IPA can be produced |
 | **iOS build** | iOS **source** exists (`ios/Runner/AppDelegate.swift`, `Info.plist`, `Runner.entitlements`, `Assets.xcassets` — 49 files), but there is no macOS/Xcode runner, no iOS CI, and no signing → no iOS artifact can be produced here |
 | **iOS feature parity** | Usage Access, exact alarms, the dark-room foreground service and the home-screen widget are **Android-only** — the iOS build would be missing the core of the product |
-| **App-lock enforcement** | the gate can never fire: `armGate` is always called with an empty blocked-app list (`app_usage_monitor.dart:69`), the native watcher only shows the overlay when the foreground package is in that set (`AppLockOverlayManager.kt:169-175`), `showGateOverlay` has no Dart caller, and the `AppLockOverlay` Flutter screen (`app_lock_overlay.dart:17`) is never routed to. The settings sheet and the overlay **preview** work; the lock itself does not |
 | **Contextual rating prompt** | 0 references — "Rate App" is a manual Settings tile only, never asked at a streak milestone or after a weekly report |
 | **Guardian auto-send** | the worker + HTTPS send path shipped (`GuardianReminderWorker.kt`, `guardian_reminder_service.dart:32`), but **no endpoint value is configured anywhere** — `GUARDIAN_EMAIL_ENDPOINT` is only a dart-define constant. Without it the app falls back to opening a pre-filled mail client |
 | **Play / App Store listing links** | `store_links.dart:17` `playListingPublished = false`, `:20` `appStoreListingPublished = false`, `:23` `appStoreId = ''` → `buildStoreUri` returns null on every platform, so "Rate App" always shows the fallback dialog (thanks → `mailto:eyecareai.app@gmail.com` → GitHub Releases) |
-| **Social preview image** | no `og:image` and no `twitter:card` in `web/site/index.html` — shared links render with no preview image |
 | **Landing page imagery** | 0 `<img>` tags in `web/site/index.html` — no screenshots, no phone mockups, no app icon on the page |
 | **Vietnamese legal pages** | 0 `lang="vi"` in either legal page — the landing page's Vietnamese legal buttons open the **English** documents |
 | **`LICENSE` file** | the repo has none (README says MIT, the terms page has a chip asking for it) → GitHub detects no licence for the repo |
-| **`sitemap.xml` / 404 page** | absent; `robots.txt` exists **only on the `gh-pages` branch**, not in `main` |
+| **`sitemap.xml` / 404 page** | absent. ✅ `robots.txt` now lives in `main` (`web/robots.txt`) and is published by `scripts/publish-pages.sh` |
 
 ### 🟡 B. Available but incomplete
 
 | Item | What is there | What is missing |
 |---|---|---|
-| **App lock / usage limit** | the counter **is** implemented and wired: `usage_limit_provider.dart:66` ← `app_usage_monitor.dart:55` ← `main_shell.dart:97`/`:175`, fed by real UsageStats, with daily reset + a 5-minute "+5 min" grant; the overlay preview and the settings sheet both render | ⚠️ **enforcement never fires** — `armGate` is always called with an empty list (`app_usage_monitor.dart:69`, "chưa có blocked-app picker"), and the native watcher shows the gate only when the foreground package is in that set (`AppLockOverlayManager.kt:169-175`), so with an empty set the overlay **never appears**. `showGateOverlay` has no Dart caller and the `AppLockOverlay` Flutter screen (`app_lock_overlay.dart:17`) is never routed to. The budget is also only recomputed while the Dart process is alive |
+| **App lock / usage limit** | the counter **is** implemented and wired: `usage_limit_provider.dart` ← `app_usage_monitor.dart` ← `main_shell.dart`, fed by real UsageStats, with daily reset + a 5-minute "+5 phút" grant; the overlay preview and the settings sheet both render | ✅ **enforcement now fires (2026-10-27)** — `UsageLimitProvider.isLocked` owns the state (limit on + exhausted + no live grant) and `AppLockGate` paints the lock over the **whole app** through `MaterialApp.builder`, so it covers every route (Settings included), the system Back cannot dismiss it, and "+5 phút" releases it. CI: 54 tests pass, 11 new. ⚠️ **blocking OTHER apps is still not implemented** — the native gate is still armed with an empty `blockedPackages` list (no blocked-app picker), so the native overlay still cannot fire, and the budget is still only recomputed while the Dart process is alive |
 | **Analytics** | consent screen + `pref_consent_given` + a toggle | no endpoint, no events, no schema test — so every experiment in `docs/growth/retention-plan.md` is currently unmeasurable |
 | **Cloud sync** | backup/restore includes the daily snapshots (`cloud_backup_service.dart:31-32`) and writes them back on restore | it is a **manual** backup/restore, not live sync; no conflict resolution across devices. It also **defaults to ON** for signed-in users (`settings_more_provider.dart:34`, `:47`) → that must be declared in the Play Data Safety form, or flipped to opt-in |
 | **Achievements / badges** | 9 badges whose progress is computed from real data (`_buildItems` in `home_screen.dart` uses `totalEyeBreaksAllTime` / `streakDays`) — the old hardcoded `unlocked: true` is gone | no distance- or environment-based tiers, and nothing outside break counts |
@@ -82,7 +85,7 @@
 | **Legal facts** | **44 unfilled markers live on the published pages**: 41 chip spans (27 in `privacy.html`, 14 in `terms.html`) of which 2 are legend examples → **39 question chips**, **plus 5 plain-text prose TODOs in the page footers** (privacy L801-803: legal entity name, postal address, privacy e-mail; terms L629-630: entity name, postal address). Distinct underlying facts: **36** counting each chip as its own question, **32** when a fact asked twice (body + footer, or on both pages) is merged — the footer prose repeats facts already asked in the body. Still needed: legal entity name, jurisdiction, registered address, contact e-mail, effective date, retention windows, NVIDIA sub-processor terms, Firestore rules, guardian-endpoint operator. ⚠️ **7 of the 39 chips are not collected in Appendix B** (privacy L477 usage-history window, L692 analytics-off, L705 Firestore rules, L715 publisher-structure clause, L761 security commitments; terms L494 explicit clause, L621 arbitration/mediation) → answering only Appendix B still leaves them open |
 | **Play Developer account** + legal developer name | `docs/growth/app-listing.md:29` — **TODO, user must provide**; `:286` still asks personal vs organisation |
 | **Play upload key** | CI signs with the app **release** key; only `android/app/ci-fallback-keystore.jks` sits in the repo. A dedicated upload key is required before the first Play upload |
-| **Play listing fields** | `app-listing.md:22` iOS app name still `Eye Care Ai` (rename to `EyeCare AI`), `:157` privacy-policy URL still TODO (the page is live now — this one is fillable today) |
+| **Play listing fields** | ✅ the two stale rows are fixed (2026-10-27): the iOS display name is now `EyeCare AI` (`ios/Runner/Info.plist:10`) and the privacy-policy URL carries the live page. ⚠️ still open: the developer legal entity (`app-listing.md:29`) and the Play account type (`:286`) |
 | **Store graphics** | the Play icon, feature graphic and 8 screenshots do not exist yet — they need a device and a design pass |
 | **iOS** | Apple Developer account, `com.eyecare.eyeCareAi` distribution signing, an App Store ID, iOS screenshots/metadata, and a macOS build machine |
 | **Guardian endpoint** | a real HTTPS endpoint URL to pass as `GUARDIAN_EMAIL_ENDPOINT` at build time |
@@ -93,19 +96,15 @@
 
 | Item | Evidence |
 |---|---|
-| 3 dead files, 0 references each | `lib/providers/usage_provider.dart`, `lib/widgets/usage_pie_chart.dart`, `lib/services/storage_service.dart` — still present, still unreferenced |
-| Focus-mode DND grant not cached | `focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42` `isNotificationPolicyAccessGranted` is re-checked every time, so the re-check banner can reappear |
-| 3 unused Eye Test strings | `eyeTestHint`, `eyeTestInstruction`, `eyeTestTitle` — 0 call sites outside `app_strings.dart` |
-| **No Pages automation** | nothing in `.github/workflows/` publishes `gh-pages` — every legal-page change needs a manual republish (in sync today). Worse, the publish recipe in `docs/web/README.md:44-57` does not copy `robots.txt`, so following it would **delete the live robots.txt** |
-| **Broken favicon path** | `web/site/index.html:11` uses `href="../favicon.png"` → resolves to `https://thongaccount.github.io/favicon.png` → **404**; the file is at `/eye_care_ai/favicon.png` (200). One-line fix |
+| ~~3 dead files, 0 references each~~ | ✅ **deleted 2026-10-27** — `lib/providers/usage_provider.dart`, `lib/widgets/usage_pie_chart.dart`, `lib/services/storage_service.dart` (0 bytes). Chief re-verified: the only remaining hits for `UsageProvider` / `UsagePieChart` were inside the two files that define them |
+| ~~Focus-mode DND grant not cached~~ | ✅ **fixed 2026-10-27** — `focus_mode_service.dart` caches the grant in SharedPreferences (`pref_focus_mode_dnd_granted`): `hasAccess()` only asks native when the cache says "not granted", and `enable()` returning false clears the cache, so a manual revoke in system Settings is still detected. Test: `test/focus_mode_service_test.dart` |
+| ~~Unused `AppStrings` getters~~ | ✅ **pruned 2026-10-27** — 86 getters removed in a verified sweep (dropped-feature copy, old API-key setup, "chat under maintenance", consent-withdraw and legal-section titles, eye-test/survey labels). Chief re-swept independently: **442 getters declared, 0 with zero references**; every removed name has 0 hits outside `app_strings.dart` |
+| ~~**No Pages automation**~~ | ✅ **done 2026-10-27** — `.github/workflows/publish-pages.yml` publishes `gh-pages` from `main` on a push that touches `web/**` (or the script/workflow), using the same `scripts/publish-pages.sh` a human runs, and then verifies the live site. First real run (the og-image merge): publish ✅ and the site went from 10 to 11 files correctly, but **verify failed on a race** — the wait stopped on the live privacy page's sha256, which already matched because that file did not change, so it asserted URLs against a tree Pages had not built yet. The site itself was correct and live; the *check* was wrong. Fixed in the next row |
+| ~~**Pages verify race**~~ | ✅ **fixed 2026-10-27** — the verify job now builds this commit's expected tree with the same publish script and waits until **every** published file is byte-identical over HTTP, so no commit can skip the wait (a whole-tree match cannot be true of a half-built tree either). Reproven live twice by dispatch on the branch (publish no-op, `gh-pages` untouched, verify green with "pages is serving this commit's whole tree"), and the negative case — a stale site — proven locally to fail with an explicit error instead of a wrong assertion. How to re-run both proofs: `docs/web/README.md` → "Proving the verify job's wait" |
 | **In-app terms date runs ahead of the pages** | the app shows "Terms Version 1.0 / Last Updated: October 2026" (`app_strings.dart:1070-1071`) while both published pages still carry the effective/last-updated dates as TODO |
-| **Guardian copy overstates what ships** | the Settings copy implies an automatic guardian reminder, but no build has an endpoint configured — today the worker only writes a pending flag and opens the user's mail client |
-| **Stale docs** | `docs/web/handoff-legal-urls.md:4`, `:38-39` ("nothing applied to `lib/`", "cards are still placeholders") are false since `6f00eef`; `docs/growth/app-listing.md:3` (grounded at an old SHA), `:156` ("marketing site in flight" — it is live), `:157` (privacy URL still TODO while the page is live) |
 | **`web/index.html` is Flutter's untouched template** | harmless today (it is not deployed), but a trap if anyone ever publishes `web/` as a Flutter build |
 | Analytics stub | `analytics_service.dart:57`, `:63` |
-| Setup wizard asks for Usage Access first | `setup_wizard_screen.dart:44-51` — the permission-heavy step comes before notifications, which is the opposite of the "value first" onboarding in `docs/growth/retention-plan.md` Move 3 |
-| Stale iOS HealthKit strings | `ios/Runner/Info.plist:66`, `:68` still declare `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` although the `health` package was removed — App Review will ask why |
-| `docs/growth/app-listing.md` accuracy | `:187` says location is sampled "while the app is open" — stale, `ACCESS_BACKGROUND_LOCATION` is declared (`AndroidManifest.xml:68`) and a WorkManager outdoor sampler runs; `:193` says only the e-mail prefix is published — stale, the leaderboard publishes `displayName` **and** `avatarUrl` (`leaderboard_service.dart:80-95`); `:171-172` content-rating wording still says "nickname" |
+| ~~Setup wizard asks for Usage Access first~~ | ✅ **fixed 2026-10-27** — the wizard order now comes from one constant, `kSetupWizardStepOrder` (`setup_provider.dart`): notifications first, Usage Access **last**, so a user who skips the heavy system-settings detour still has the notification permission the 20-20-20 reminder needs. Test: `test/setup_wizard_order_test.dart`. ⚠️ still open: the day-2 ask with the value reason (retention-plan Move 3, step 2) |
 | Toolchain drift | Gradle 8.14 / AGP 8.11.1 / Kotlin 2.2.20 — Flutter warns these will be dropped |
 
 ### 🕳️ E. Notion "15 idea groups" — what is actually there (verified 2026-10-26)
@@ -136,6 +135,26 @@
 - Health Connect setup guide — **obsolete**: the app does not use Health Connect at all (explicitly removed; sleep is estimated from usage times).
 - Rate App + hosted Privacy/Terms — shipped; the HISTORICAL SETTINGS rows that still say "not implemented / in flight" were stale text.
 
+**Closed by the 2026-10-27 lane merges** (each verified by Chief against the code, the artifact or the live URL before merging):
+
+- **Dead code and stale copy** — the 3 unreferenced files (`usage_provider.dart`, `usage_pie_chart.dart`, `storage_service.dart`) are deleted and 86 unreferenced `AppStrings` getters are pruned (Chief re-swept independently: 442 declared, 0 unused afterwards). Three copy claims that were false against the code now tell the truth: the outdoor habit tile says GPS only (~1 min in the app, ~15 min in the background), the FAQ no longer promises blink-rate or distance estimation and no longer claims sensor-based screen-time estimates, and the consent screen no longer calls the live AI chat "(when re-enabled)".
+
+- **App-lock enforcement** — the lock is real now. `UsageLimitProvider.isLocked` owns the state and `AppLockGate` paints the lock over the whole app via `MaterialApp.builder` (`lib/main.dart`), so it covers every route and Back cannot dismiss it; only "+5 phút" or turning the limit off releases it. The counter no longer freezes while the native gate is armed (that freeze is what made "+5 phút" unable to re-lock), the daily reset drops yesterday's grant, and the shared `rootNavigatorKey` is finally attached to a navigator. CI run `40380955191`: analyze clean, 54 tests pass (11 new). ⚠️ blocking *other* apps still needs a blocked-app picker — documented in `app_usage_monitor.dart`.
+- **15 dead links on the live site** — the landing page could not reach its own privacy policy, terms or favicon (`../favicon.png`, `../legal/*.html` resolve one level above the project → 404), and the legal pages' Home links pointed at `../site/index.html`, which does not exist once published. All fixed at the source; the published legal pages differ from `main` by exactly **3 link attributes per file** — no chip, no wording, no structure touched. Verified live: every link 200, `/site/index.html` now 404 (the redirect shim was dropped).
+- **`robots.txt` + a safe publish** — `web/robots.txt` is in `main` and `scripts/publish-pages.sh` rebuilds the whole published tree from `web/`, verifying every expected file before pushing; the old recipe that began with `git rm -rf .` and never copied `robots.txt` (it would have deleted the live one) is gone.
+- **Social preview** — `og:url`, `og:image` (+ type/size/alt) and `twitter:card=summary_large_image` point at a dedicated 1200×630 card (`web/og-image.png`, published at `/og-image.png`), built from the site's own palette with the landing page's headline. Shipped in `3068841`, verified live (the card returns 200 and the published `index.html` differs from `main` by exactly its 7 meta lines).
+- **iOS metadata** — display name `Eye Care Ai` → `EyeCare AI`; the `NSHealthShare/UpdateUsageDescription` pairs, the HealthKit note and the `com.apple.developer.healthkit.access = health-records` entitlement are gone (the file is emptied, not deleted — `project.pbxproj:388/568/591` still wires `CODE_SIGN_ENTITLEMENTS` to it). There is no HealthKit code in the app.
+- **Store-listing accuracy** — location now states the ~15-minute background sampler (`outdoor_time_periodic`, `ACCESS_BACKGROUND_LOCATION`), the leaderboard row names display name **+ avatar URL** (`leaderboard_service.dart:87-88` publishes both), the content-rating row says display name + avatar + streak, and cloud backup is recorded as **collected by default** for signed-in users (`settings_more_provider.dart:34/47`) with the flip-to-opt-in kept as a recommendation, not a code change.
+- **Signing guard** — the release build now fails without the signing secret and refuses a keystore identical to the committed fallback, so the public fallback can never sign a shipped release. The shipped build-98 was already signed with the real key, so this closes a latent risk, not a live compromise.
+- **Guardian copy** — the Settings line now matches reality: with a configured endpoint the app says it emails the guardian automatically; without one (every current build) it says it detects the limit in the background and opens your mail app.
+- **Stale docs** — `docs/web/handoff-legal-urls.md` no longer claims nothing was applied to `lib/`; `docs/growth/app-listing.md` carries the live marketing-site and privacy-policy URLs and a current grounding SHA.
+
+### Closed by the iOS honesty merge (`fix/ios-honest-features` → `main` @ `448087a`)
+
+- **iOS setup banner can never clear** (row `:152`) — now clears. iOS shows only applicable setup steps (notifications first, location second); non-applicable steps no longer linger as `true`, so the banner can dismiss. Seam: `lib/utils/platform_capability.dart` (`hasAndroidNativeFeatures`).
+- **iOS DND / focus button is a dead end** (row `:153`) — now honest. The focus toggle is disabled on iOS with a "not available on iOS" description, and `enable()` is guarded by the platform seam.
+- **iOS app-lock looks live-but-broken** (row `:154`) — now shows unavailable. The app-lock settings sheet shows unavailable text on iOS with no switches, presets or test overlay; the AI action handler returns "Focus mode is only available on Android." Tests: `platform_capability_test.dart`, `setup_provider_ios_test.dart`, `ios_honesty_widget_test.dart` (12 new, 76 total; CI run `40527003092` green).
+
 ### 🔐 G. Signing & key exposure — checked on the shipped build-98 artifacts
 
 | Check | Result |
@@ -143,7 +162,7 @@
 | **Which key signed the APK?** | The **real release key**: `CN = EyeCare AI, O = ThongAccount, C = VN`, alias `EYECARE_`, SHA-256 `BC:C2:3B:01:74:69:2F:4D:D3:76:83:4F:18:C9:1D:F1:AB:7A:01:71:BF:F5:D0:B1:36:BF:7F:84:F4:70:C0:11` — extracted from the APK's v2 signing block (`0x7109871a`) |
 | **And the AAB?** | Identical certificate, same fingerprint (v1 signature `META-INF/EYECARE_.RSA`) |
 | **Was it the committed fallback keystore?** | **No.** `android/app/ci-fallback-keystore.jks` holds a different cert — `CN = EyeCare AI CI Fallback`, SHA-256 `39:0C:E6:16:78:27:0E:46:E6:7B:0A:57:9C:02:12:C8:78:E6:AD:8D:1C:90:BB:AC:03:43:31:E4:F5:03:22:1A` |
-| **Latent risk** | `build-apk.yml:142-145` **silently skips** the release-signing step when `KEYSTORE_BASE64` is missing, and `build.gradle.kts:74-105` then signs with the committed fallback. It did not happen in build 98, but it would sign with a key that is public in the repo. The build should **fail** instead of falling back |
+| **Latent risk — CLOSED 2026-10-27** | ✅ the release build now **fails** when `KEYSTORE_BASE64` is missing (the signing step exits 1 *before* any key material is written to disk) and also refuses a release keystore that is byte-identical to the committed fallback. The silent-skip (`build-apk.yml:142-145`) is gone; `build.gradle.kts:74-105` still keeps the fallback path, but CI can no longer reach it |
 | **Play upload key** | still not configured — only `release` / `ciFallback` exist, no Play App Signing upload config |
 | **NVIDIA NIM key** | compiled into the binary (`--dart-define=NIM_API_KEY`, `build-apk.yml:227` / `:271`) → extractable from the downloaded APK. Move it behind a backend proxy before a public release |
 
@@ -293,7 +312,7 @@
 - Analytics logging stub (2 TODOs).
 - Stale string `habitSubtitle('breaks')` ("Front camera gaze detection" vs manual/auto-detect).
 - Health Connect setup guide missing from the Permissions sheet.
-- Focus-mode DND grant state not persisted (re-check banner reappears).
+- ~~Focus-mode DND grant state not persisted (re-check banner reappears)~~ — ✅ fixed 2026-10-27 (cached in SharedPreferences).
 - iOS build blocked on Mac/Apple Developer account.
 - No crash reporting (Sentry/Crashlytics).
 - Keystore rotation still pending.
@@ -317,7 +336,15 @@
   shows the gate for a package in that set (`AppLockOverlayManager.kt:169-175`), `showGateOverlay` has no
   Dart caller and `AppLockOverlay` (`app_lock_overlay.dart:17`) is never routed to. The UI preview works;
   the lock does not.*
-- [~] **Guardian email** — Notion now *(Partial)* (PLAN had it ❌ missing). Still no background auto-send.
+  *2026-10-27: **fixed** — the app now locks itself. `UsageLimitProvider.isLocked` owns the state and
+  `AppLockGate` paints the lock over the whole app via `MaterialApp.builder` (`lib/main.dart`), so it covers
+  every route and the system Back cannot dismiss it; "+5 phút" releases it and it re-locks when the grant
+  expires. CI run `40380955191` is green (54 tests, 11 new). Blocking *other* apps still needs a
+  blocked-app picker — that part remains open.*
+- [~] **Guardian email** — Notion now *(Partial)* (PLAN had it ❌ missing). Still no background auto-send
+  (no endpoint is configured anywhere). *2026-10-27: the Settings copy now says exactly what happens — with
+  an endpoint it "emails the guardian automatically", without one it detects the limit in the background and
+  opens your mail app.*
 - [~] **Cập nhật trực tiếp (không xóa cài lại)** — Notion [x] + "*Đang cải thiện*":
   in-app update via GitHub Releases now implemented (`UpdateService`, manual check button,
   changelog screen, skip-version memory). PLAN's "not implemented" is stale.
@@ -704,8 +731,9 @@ Modal build 110 verified the mobile lane; CI builds 83+ cut the releases.
 - [x] ~~**Health Connect setup guide** in Permissions bottom sheet~~ — **OBSOLETE**: the app does not use
   Health Connect at all (the `health` package and the Health Connect permission were removed; sleep is
   estimated from usage times). There is nothing to guide.
-- [ ] **Persist Focus Mode DND grant state** to avoid re-check banner — still open
-  (`focus_mode_service.hasAccess()` → `FocusModeHandler.kt:42`, re-checked every time)
+- [x] ~~**Persist Focus Mode DND grant state** to avoid re-check banner~~ — ✅ **done 2026-10-27**
+  (`focus_mode_service.dart`: the grant is cached in SharedPreferences, `enable()` returning false clears it;
+  test `test/focus_mode_service_test.dart`)
 
 ---
 

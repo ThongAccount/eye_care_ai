@@ -2,22 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../navigation/root_navigator.dart';
 import '../providers/language_provider.dart';
 import '../providers/usage_limit_provider.dart';
 import '../services/app_usage_monitor.dart';
 import '../theme/app_colors.dart';
+import '../utils/platform_capability.dart';
 
 /// Kênh native app-lock (MainActivity: canDrawOverlays / showTestOverlay ...).
 const MethodChannel _appLockChannel = MethodChannel('eye_care_ai/app_lock');
 
-/// Overlay khóa toàn màn hình khi hết giờ dùng app (app-lock Phase 1).
+/// Màn hình khoá toàn màn hình khi hết giờ dùng app (app-lock Phase 1).
 /// Không có nút thoát trực tiếp — chỉ có "+5 phút" (1 lần/khóa) hoặc tắt
 /// giới hạn ở Settings; đây là rào cản có chủ đích, đúng tinh thần
 /// "digital wellbeing".
+///
+/// Màn hình này được vẽ ĐÈ lên toàn bộ app bởi [AppLockGate] khi
+/// `UsageLimitProvider.isLocked` = true. Nút Back của hệ thống không gỡ được
+/// màn hình khoá (nó không phải một route) — lối thoát duy nhất là "+5 phút"
+/// hoặc tắt giới hạn trong Cài đặt.
 class AppLockOverlay extends StatelessWidget {
-  const AppLockOverlay({super.key, required this.onDismissed});
+  const AppLockOverlay({super.key, this.onOpenSettings});
 
-  final VoidCallback onDismissed;
+  /// Gọi khi người dùng bấm nút "mở Cài đặt" — gate sẽ tạm ẩn màn hình khoá
+  /// để trang Cài đặt (một route bình thường) nhìn thấy được.
+  final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +62,13 @@ class AppLockOverlay extends StatelessWidget {
               const SizedBox(height: 32),
               FilledButton.tonalIcon(
                 onPressed: canGrant
-                    ? () {
-                        provider.grantExtraTime(DateTime.now());
+                    ? () async {
+                        // Cấp thêm 5 phút -> provider cập nhật isLocked = false
+                        // -> AppLockGate tự gỡ màn hình khoá. Hết 5 phút mà
+                        // vẫn vượt hạn mức thì gate khoá lại (monitor cập nhật
+                        // số phút đã dùng mỗi ~60s).
+                        await provider.grantExtraTime(DateTime.now());
                         AppUsageMonitor.instance.notifyOverlayClosed();
-                        Navigator.of(context).pop();
-                        onDismissed();
                       }
                     : null,
                 icon: const Icon(Icons.add_alarm_outlined),
@@ -65,15 +76,7 @@ class AppLockOverlay extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () {
-                  final navigator = Navigator.of(context);
-                  navigator.pop();
-                  onDismissed();
-                  // Mở thẳng trang Cài đặt để người dùng có lối thoát thật sự.
-                  navigator.push(
-                    MaterialPageRoute(builder: (_) => const AppLockSettingsSheetHost()),
-                  );
-                },
+                onPressed: onOpenSettings,
                 child: Text(strings.appLockOpenSettings, style: const TextStyle(color: Colors.white70)),
               ),
             ],
@@ -81,6 +84,61 @@ class AppLockOverlay extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Cổng khoá app (app-lock Phase 1).
+///
+/// Khi `UsageLimitProvider.isLocked` = true, [AppLockOverlay] được vẽ ĐÈ lên
+/// TOÀN BỘ app — kể cả các route đã push (Cài đặt, bài kiểm tra mắt...) —
+/// nên người dùng không thể dùng tiếp app khi đã hết hạn mức. Đây là
+/// enforcement THẬT của app-lock; trước đây gate native được "armed" với
+/// danh sách app bị chặn RỖNG nên không bao giờ hiện được (xem
+/// lib/services/app_usage_monitor.dart).
+///
+/// Gate này được gắn vào `MaterialApp.builder` nên nó nằm NGOÀI navigator:
+/// mọi route của app đều nằm bên dưới lớp khoá.
+class AppLockGate extends StatefulWidget {
+  const AppLockGate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<AppLockGate> createState() => _AppLockGateState();
+}
+
+class _AppLockGateState extends State<AppLockGate> {
+  // Đang mở trang Cài đặt app-lock từ màn hình khoá → tạm ẩn màn hình khoá
+  // để trang Cài đặt (một route bình thường của app) nhìn thấy được. Quay
+  // lại từ Cài đặt mà chưa tắt giới hạn thì màn hình khoá hiện lại.
+  bool _settingsOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final locked = context.watch<UsageLimitProvider>().isLocked;
+    if (!locked || _settingsOpen) return widget.child;
+
+    return Stack(
+      children: [
+        widget.child,
+        Positioned.fill(child: AppLockOverlay(onOpenSettings: _openSettings)),
+      ],
+    );
+  }
+
+  /// Mở trang Cài đặt app-lock (nằm trong navigator gốc) để người dùng có
+  /// lối thoát thật sự: tắt giới hạn, đổi hạn mức, hoặc xem trước overlay.
+  void _openSettings() {
+    final navigator = rootNavigatorKey.currentState;
+    if (navigator == null) return;
+    setState(() => _settingsOpen = true);
+    navigator
+        .push(
+          MaterialPageRoute(builder: (_) => const AppLockSettingsSheetHost()),
+        )
+        .whenComplete(() {
+      if (mounted) setState(() => _settingsOpen = false);
+    });
   }
 }
 
@@ -94,6 +152,28 @@ class AppLockSettingsSheetHost extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = context.watch<LanguageProvider>().strings;
     final provider = context.watch<UsageLimitProvider>();
+
+    // iOS không đọc được thời gian dùng mỗi app (không có Usage Access), nên
+    // giới hạn ngày không bao giờ chạm hạn mức. Hiện rõ trạng thái thay vì để
+    // công tắc/preset/các nút thử overlay nhìn như đang hoạt động.
+    if (!hasAndroidNativeFeatures()) {
+      return Scaffold(
+        appBar: AppBar(title: Text(strings.appLockSettingsTitle)),
+        body: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                strings.appLockUnavailableOnIOS,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.appLockSettingsTitle)),

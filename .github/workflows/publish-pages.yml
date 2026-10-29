@@ -1,0 +1,185 @@
+# Publishes the static site (landing page + legal pages) to the `gh-pages`
+# branch, which is the branch GitHub Pages serves for this repository.
+#
+# The publish itself is done by `scripts/publish-pages.sh` - the same script a
+# human runs by hand - so CI and a manual publish cannot drift apart. The
+# workflow only decides WHEN to run it, and then checks that the site really
+# came back up with every link working.
+#
+# It pushes to `origin/gh-pages` and to nothing else: `main` and `main-merger`
+# are never touched here.
+
+name: Publish Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+      - 'scripts/publish-pages.sh'
+      - '.github/workflows/publish-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two publishes must never race for the gh-pages branch: the second one waits.
+concurrency:
+  group: publish-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the site to gh-pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      # The branch that Pages serves, checked out as a worktree of this
+      # repository so the script can rebuild it and push it. actions/checkout
+      # insists on a path under the workspace, so the worktree is created with
+      # plain git here - it shares this checkout's credentials, so the push
+      # needs no extra setup.
+      - name: Check out gh-pages
+        env:
+          GH_PAGES_DIR: ${{ runner.temp }}/gh-pages
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin gh-pages
+          git worktree add "$GH_PAGES_DIR" FETCH_HEAD
+
+      # The script rebuilds the whole tree from web/, commits it when something
+      # changed, pushes to origin/gh-pages, and exits 0 without doing anything
+      # when the site is already up to date.
+      - name: Publish the site to gh-pages
+        env:
+          GH_PAGES_DIR: ${{ runner.temp }}/gh-pages
+        run: bash scripts/publish-pages.sh --out "$GH_PAGES_DIR" --push
+
+  verify:
+    name: Verify the published site
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+
+      - name: Wait for Pages and check every published URL
+        run: |
+          set -euo pipefail
+
+          # The canonical base URL comes from the same constant the app uses,
+          # so CI and the app can never disagree about where the site lives.
+          base="$(grep -oE "https://[^']+/eye_care_ai" lib/config/legal_urls.dart | head -1 || true)"
+          if [ -z "$base" ]; then
+            base="https://thongaccount.github.io/eye_care_ai"
+          fi
+          # Set only outside CI, to exercise this same wait logic against a
+          # scratch site: CI always uses the URL the app itself uses.
+          if [ -n "${PAGES_BASE_URL:-}" ]; then
+            base="${PAGES_BASE_URL%/}"
+          fi
+          # The wait is tuned so a slow Pages build is waited out rather than
+          # guessed at. CI keeps the defaults; the local proof documented in
+          # docs/web/README.md shrinks both.
+          attempts="${PAGES_WAIT_ATTEMPTS:-60}"
+          pause="${PAGES_WAIT_PAUSE:-10}"
+          echo "base: $base (waiting up to $attempts x ${pause}s)"
+
+          # Build the tree this commit is supposed to publish, with the SAME
+          # script the publish job runs. That is the file list this job needs,
+          # so it can never drift from what the publish job copies.
+          expected_dir="$(mktemp -d)"
+          trap 'rm -rf "$expected_dir"' EXIT
+          bash scripts/publish-pages.sh --out "$expected_dir"
+
+          # Every published file, as a path relative to the site root.
+          published=()
+          while IFS= read -r f; do
+            published+=("${f#./}")
+          done < <(cd "$expected_dir" && find . -type f | sort)
+
+          # WAIT CONDITION - read this before changing the loop.
+          #
+          # Pages starts building only after the publish job pushes to
+          # gh-pages, so the first checks usually still see the previous tree.
+          # Waiting for ONE file to match is not enough, and that is not a
+          # theory: this loop used to stop as soon as the live privacy page's
+          # sha256 matched this commit's, which is already true on the first
+          # check whenever the commit does not touch the privacy page. The
+          # og-image publish changed none of it, so the loop exited immediately
+          # and the job then failed on a tree Pages had still to build.
+          #
+          # So the wait ends only when the published tree is serving THIS
+          # commit: EVERY file the script publishes must be byte-identical to
+          # the tree just built from this commit. One unchanged file matching is
+          # not evidence - an unchanged file inside an unfinished tree is
+          # exactly the trap - while a whole-tree match cannot be true of a
+          # stale build either.
+          served=0
+          for attempt in $(seq 1 "$attempts"); do
+            served=1
+            for rel in "${published[@]}"; do
+              live="$(curl -s "$base/$rel" | sha256sum | cut -d' ' -f1 || true)"
+              want="$(sha256sum "$expected_dir/$rel" | cut -d' ' -f1)"
+              if [ "$live" != "$want" ]; then
+                echo "waiting for pages: check $attempt/$attempts, $rel is not this commit's file yet"
+                served=0
+                break
+              fi
+            done
+            if [ "$served" = "1" ]; then
+              echo "pages is serving this commit's whole tree (after $attempt checks)"
+              break
+            fi
+            sleep "$pause"
+          done
+          if [ "$served" -ne 1 ]; then
+            echo "::error::the published site did not serve this commit's tree within the wait window" >&2
+            exit 1
+          fi
+
+          # The live tree is this commit's tree now, so the assertions below
+          # can no longer be looking at a build that has not finished.
+
+          failed=0
+          for path in / /favicon.png /og-image.png /styles.css /robots.txt /icons/Icon-512.png /legal/privacy.html /legal/terms.html; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$base$path" || true)"
+            echo "$code  $base$path"
+            if [ "$code" != "200" ]; then
+              failed=1
+            fi
+          done
+
+          # The links that used to be dead: the landing page must point at the
+          # legal pages with their published paths, and both legal pages must
+          # point back at the landing page. The social card is checked here too,
+          # because a meta tag that points at a file the publish script does not
+          # copy is a 404 that only a crawler would ever notice.
+          landing="$(curl -s "$base/")"
+          for marker in 'href="legal/privacy.html"' 'href="legal/terms.html"' 'href="favicon.png"' 'og-image.png"'; do
+            case "$landing" in
+              *"$marker"*) ;;
+              *) echo "::error::the landing page is missing $marker" >&2; failed=1 ;;
+            esac
+          done
+          for page in legal/privacy.html legal/terms.html; do
+            body="$(curl -s "$base/$page")"
+            case "$body" in
+              *'href="../index.html"'*) ;;
+              *) echo "::error::$page does not link back to the landing page" >&2; failed=1 ;;
+            esac
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::the published site failed its checks" >&2
+            exit 1
+          fi
+          echo "every published URL returns 200 and every link resolves"

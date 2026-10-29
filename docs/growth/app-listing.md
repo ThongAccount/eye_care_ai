@@ -1,7 +1,8 @@
 # EyeCare AI — Store Listing Pack (Google Play primary, App Store secondary)
 
-> Grounded in the code at `main` @ `521cb2e` (2026-10-24), re-verified at the `1.4.0+alpha`
-> version bump. Every claim below maps to a
+> Grounded in the code at `main` @ `521cb2e` (2026-10-24); the web/legal facts below were
+> re-checked against `main` @ `c6c37cd` (2026-10-26). The `1.4.0+alpha` version bump is unchanged.
+> Every claim below maps to a
 > file in the repo. Anything that is **not** shipped is marked as a TODO, not written as a
 > feature. Health-adjacent rules applied throughout: no "treats / prevents / cures /
 > diagnoses", no Snellen-style 20/20 score, no medical-device framing.
@@ -99,8 +100,9 @@ REPORTS AND AI, WITHOUT THE HYPE
 • English and Tiếng Việt, dark mode, metric or imperial units, JSON data export, cloud backup and in-app updates
 
 PRIVACY FIRST
-• Sensor readings stay on your device unless you turn on cloud backup or use the AI assistant
+• Sensor readings stay on your device unless cloud backup is on (it is on by default once you sign in — switch it off in Settings) or you use the AI assistant
 • Camera frames are processed on-device and are never stored or uploaded
+• If you allow "all the time" location, outdoor time is sampled about every 15 minutes, even while the app is closed
 • No ads, no ad SDKs, no selling of personal data
 • Export or delete everything from Settings, or delete your account outright
 
@@ -113,7 +115,7 @@ NOT A MEDICAL DEVICE
 EyeCare AI is a wellness and habit tracker. It does not diagnose, treat, prevent or cure eye disease and does not replace an eye exam. If you have persistent blurred vision, eye pain or frequent headaches, see an eye professional.
 ```
 
-*3,230 characters — comfortable headroom under the 4,000 limit.*
+*3,412 characters — comfortable headroom under the 4,000 limit.*
 
 **Claims deliberately NOT made** (each would be false today):
 
@@ -153,8 +155,8 @@ Play indexes title + short description + full description. Priority order by int
 | Category | **Health & Fitness** | Secondary: Productivity (screen-time users). If Play reviewers push back, move to Lifestyle — do **not** claim Medical. |
 | Tags | Health, Wellness, Productivity, Screen time, Habit tracker | Up to 5 |
 | Contact e-mail | `eyecareai.app@gmail.com` | already in-app |
-| External marketing site | GitHub repo / GitHub Pages landing page (in flight) | |
-| Privacy policy URL | **TODO** — required before submission | see §0 |
+| External marketing site | `https://thongaccount.github.io/eye_care_ai/` | GitHub Pages (`gh-pages` branch) — live, HTTP 200 |
+| Privacy policy URL | `https://thongaccount.github.io/eye_care_ai/legal/privacy.html` | live, HTTP 200 — Play rejects a listing without a public URL |
 | Government app | No | |
 | Financial features | None | no lending, no trading, no crypto |
 | Target audience | 13+ (no ads, no purchases, no user-generated content published) | consider 18+ to be conservative if the AI chat stays open |
@@ -168,9 +170,9 @@ Play indexes title + short description + full description. Priority order by int
 | Controlled substances | No | |
 | Crude humour / profanity | No | |
 | Gambling | No | |
-| User interaction | **Yes — limited** | The leaderboard shows other users' nickname + streak to signed-in users; AI chat is private to the user |
-| User-generated content shared | **No** | No public posting; the leaderboard entry is auto-generated from your own streak |
-| Location sharing with third parties | No | GPS is read on-device only |
+| User interaction | **Yes — limited** | The leaderboard shows other users' **display name + avatar + streak** to signed-in users; AI chat is private to the user |
+| User-generated content shared | **No** | No public posting; your leaderboard entry is auto-generated from your own account — **display name + avatar + streak** — and is visible to other signed-in users |
+| Location sharing with third parties | No | GPS is read on-device only; the location itself never leaves the device — only derived outdoor minutes can (cloud backup / AI assistant) |
 | Digital purchases | No | No IAP, no paid SDKs |
 | AI-generated content | **Yes** | The assistant writes advice; it is advisory only, with ask-before-act confirmations and a medical disclaimer |
 | Ads | No | |
@@ -184,22 +186,34 @@ device. "Processed on-device and discarded" is **not** collection.
 
 | Data type | What is really collected | Where it goes | Declare |
 |---|---|---|---|
-| **Location — precise** | GPS fixes sampled ~1/min while the app is open, used to add up outdoor time | Stays on device; **included in cloud backup** (as outdoor minutes) and **in the AI context block** if the assistant runs | Collected · Optional (app works without it) · Not sold · Not used for ads |
-| **App activity / app interactions** | Screen-on time and foreground-app usage via Android Usage Access; per-app breakdown is shown locally | Stays on device; **included in cloud backup** (daily snapshots) and in AI context aggregates | Collected · Optional · Not sold |
-| **Health and fitness** | Sleep hours (estimated from phone-use gap or entered by hand), outdoor minutes, eye-break count, Eye Health Score | Stays on device; **included in cloud backup**; **score + per-habit current/target sent to NVIDIA NIM** when the AI assistant or the Home auto-analysis runs | Collected · Optional · **Shared with the AI provider (NVIDIA) as a processor** · Not sold · Not used for ads |
-| **Photos and videos** | Camera frames for the opt-in ML Kit eye-open / distance check | **Never stored, never uploaded** — processed on-device, camera closed after each sample | **Not collected** (state this in the listing's privacy section so reviewers see the honesty) |
+| **Location — precise** | GPS fixes sampled ~1/min while the app is open **and every ~15 min by a background WorkManager task (`outdoor_time_periodic`) even when the app is closed** — the background sampler needs the "Allow all the time" permission (`ACCESS_BACKGROUND_LOCATION`, `AndroidManifest.xml:68`). Used only to add up outdoor time | Stays on device; **included in cloud backup** (as outdoor minutes) and **in the AI context block** if the assistant runs | Collected · Optional (app works without it) · **On by default for signed-in users while cloud backup is left on** · Not sold · Not used for ads |
+| **App activity / app interactions** | Screen-on time and foreground-app usage via Android Usage Access; per-app breakdown is shown locally | Stays on device; **included in cloud backup** (daily snapshots) and in AI context aggregates | Collected · Optional · **On by default for signed-in users while cloud backup is left on** · Not sold |
+| **Health and fitness** | Sleep hours (estimated from phone-use gap or entered by hand), outdoor minutes, eye-break count, Eye Health Score | Stays on device; **included in cloud backup**; **score + per-habit current/target sent to NVIDIA NIM** when the AI assistant or the Home auto-analysis runs | Collected · Optional · **On by default for signed-in users while cloud backup is left on** · **Shared with the AI provider (NVIDIA) as a processor** · Not sold · Not used for ads |
+| **Photos and videos** | **Profile photo:** the account's profile-photo URL (`avatarUrl`) is published to the leaderboard next to your display name and streak. The **camera frames** for the opt-in ML Kit eye-open / distance check are a separate thing and are never stored or uploaded | avatarUrl → Firestore (`leaderboard` document); camera frames stay on device | **Collected — profile-photo URL only** · Optional · **Visible to other signed-in users** · Not sold. **Camera frames: not collected** (state this in the listing's privacy section so reviewers see the honesty) |
 | **Messages** | Your AI chat messages and the aggregate context block | Sent to `integrate.api.nvidia.com` (NVIDIA NIM) | Collected · Optional · Shared with the AI provider · Not sold |
 | **User IDs** | Firebase Auth UID | Firebase Auth + Firestore (`leaderboard`, `user_backups`) | Collected · Optional (guest mode exists) · Not sold |
-| **Contact info (e-mail)** | E-mail address when you create an account; the part before "@" is shown as your leaderboard nickname | Firebase Auth; nickname published on the leaderboard | Collected · Optional · **The nickname is visible to other signed-in users** · Not sold |
+| **Contact info (e-mail)** | E-mail address when you create an account; it identifies your account, and if you have not set a display name, the part before "@" becomes the **display name** shown on the leaderboard | Firebase Auth; the derived **display name** is published to the leaderboard | Collected · Optional (guest mode exists) · **The display name is visible to other signed-in users** · Not sold |
 | **Crash logs / diagnostics** | None — no crash reporting SDK is installed | — | **Not collected** |
-| **Photos, audio, files, calendar, contacts, precise location history** | Not used | — | Not collected |
+| **Photos, audio, files, calendar, contacts, precise location history** | Not used — no GPS point, route or place history is stored; only the derived outdoor-minute counter is kept | — | Not collected |
+
+**Collection trigger — cloud backup is ON by default.** `SettingsMoreProvider.cloudBackup`
+defaults to `true` (`lib/providers/settings_more_provider.dart:34`) and a missing stored value
+falls back to `true` (`:47`), so a signed-in user's daily snapshots (score, screen hours, sleep,
+outdoor minutes) are uploaded to Firestore **without the user ever opting in**. Every row above
+that mentions cloud backup is therefore *optional but collected by default* for signed-in users;
+switching it off in Settings stops the upload. Guest mode uploads nothing.
+**Recommendation (not applied — no code change here):** flip the default to `off` so the
+collection is opt-in. That is one line in the provider and it makes the Data Safety answers
+above cleaner.
 
 Three answers that need the developer's decision before submitting:
 
-1. **Cloud backup default.** `SettingsMoreProvider.cloudBackup` defaults to *on*, so a signed-in
-   user's daily snapshots (score, screen hours, sleep, outdoor minutes) go to Firestore by
-   default. Either keep it on and declare it as above, or default it to **off** and make it
-   opt-in — the latter is the cleaner privacy story and one line of code. **Recommend: default off.**
+1. **Cloud backup default.** **Currently ON by default** for signed-in users (see the
+   collection-trigger note above) — a signed-in user's daily snapshots (score, screen hours,
+   sleep, outdoor minutes) go to Firestore unless the user turns it off. Either keep it on and
+   declare it as above, or default it to **off** and make it opt-in — the latter is the cleaner
+   privacy story and one line of code. **Recommend: default off.** (This branch changes no code;
+   it only records the current behaviour.)
 2. **The AI key is compiled into the APK** (`--dart-define=NIM_API_KEY`, `lib/config/env.dart`).
    Anyone who unpacks the APK can extract it and use the developer's quota. Not a data-safety
    answer, but it *is* a Play-review risk (server keys in clients) and a cost risk. **Recommend:
@@ -216,9 +230,12 @@ Paste into the listing's "Privacy" / "App safety" section:
 > EyeCare AI is a wellness habit tracker with no ads and no ad SDKs. Screen time, ambient
 > light, outdoor time, sleep estimates, eye-break counts and your Eye Health Score are measured
 > on your device. Camera frames used for the optional eye-open/distance check are processed
-> on-device and are never stored or uploaded. If you sign in and turn on cloud backup, your
-> settings, targets and daily eye-health snapshots are stored in Firebase under your user ID so
-> you can restore them on a new device. If you use the AI assistant, the text you type and a
+> on-device and are never stored or uploaded. If you allow background location, outdoor time is
+> also sampled about every 15 minutes while the app is closed. If you sign in, cloud backup is
+> on by default (you can switch it off in Settings): your settings, targets and daily eye-health
+> snapshots are stored in Firebase under your user ID so you can restore them on a new device.
+> Your display name, profile-photo URL and streak appear on the in-app leaderboard, where other
+> signed-in users can see them. If you use the AI assistant, the text you type and a
 > short summary of your own numbers are sent to NVIDIA's NIM API to generate the reply. You can
 > export or delete all data in Settings, or delete your account, at any time.
 
