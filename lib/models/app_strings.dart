@@ -193,6 +193,11 @@ class AppStrings {
   String get appLockGrantFive => vi ? '+5 phút nữa' : '+5 more minutes';
   String get appLockOpenSettings => vi ? 'Mở Cài đặt giới hạn' : 'Open limit settings';
   String get appLockSettingsTitle => vi ? 'Giới hạn thời gian' : 'Usage Limit';
+  // iOS không đọc được thời gian dùng từng app (không có Usage Access), nên
+  // giới hạn ngày không bao giờ chạm hạn mức — nói rõ thay vì hiện công tắc.
+  String get appLockUnavailableOnIOS => vi
+      ? 'Giới hạn thời gian cần đọc thời gian dùng từng app, điều này chỉ làm được trên Android nên chưa có trên iOS.'
+      : 'The daily limit reads how long each app is used, which only works on Android, so it is not available on iOS.';
   String get appLockEnable => vi ? 'Bật giới hạn' : 'Enable limit';
   String appLockMinutes(int m) => vi ? '$m phút mỗi ngày' : '$m minutes per day';
   String get appLockTestTitle => vi ? 'Kiểm tra màn hình chặn' : 'Test the blocking screen';
@@ -448,6 +453,10 @@ class AppStrings {
       ? 'Android yêu cầu cấp quyền này thủ công trong Cài đặt hệ thống, app không tự xin được. Bấm để mở đúng màn hình cần bật.'
       : 'Android requires granting this manually in system Settings — the app can\'t request it directly. Tap to open the right screen.';
   String get focusModeGrantAccess => vi ? 'Cấp quyền' : 'Grant access';
+
+  // iOS không có "Notification policy access" như Android, nên công tắc Focus
+  // mode trên iOS chỉ hiện dòng này và không bấm được.
+  String get notAvailableOnIOS => vi ? 'Không có trên iOS' : 'Not available on iOS';
   String get eyeBreakTimeUp => vi ? 'Đến giờ nghỉ mắt rồi!' : 'Time for an eye break!';
   String get eyeBreakLookAway =>
       vi ? 'Nhìn vào một vật cách xa khoảng 6 mét' : 'Look at something about 20 feet away';

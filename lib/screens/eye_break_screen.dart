@@ -12,6 +12,7 @@ import '../services/focus_mode_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_icon.dart';
+import '../utils/platform_capability.dart';
 import '../widgets/settings_toggle_tile.dart';
 import '../widgets/shared_widgets.dart';
 
@@ -192,7 +193,7 @@ class _EyeBreakScreenState extends State<EyeBreakScreen>
     await _scheduleRepeatingAlarm(reminder.reminderMinutes);
     _startCountdown(reminder);
     _updateOngoingNotification();
-    if (reminder.focusModeEnabled) {
+    if (hasAndroidNativeFeatures() && reminder.focusModeEnabled) {
       FocusModeService.instance.enable();
     }
     setState(() {});
@@ -613,11 +614,19 @@ class _EyeBreakScreenState extends State<EyeBreakScreen>
                   children: [
                     SettingsToggleTile(
                       title: strings.focusModeTitle,
-                      description: strings.focusModeDescription,
-                      value: reminder.focusModeEnabled,
-                      onChanged: (value) => reminder.setFocusModeEnabled(value),
+                      // iOS: DND không điều khiển được như Android, nên hiện
+                      // rõ "không có trên iOS" thay vì để công tắc bất được
+                      // mà không có tác dụng gì.
+                      description: hasAndroidNativeFeatures()
+                          ? strings.focusModeDescription
+                          : strings.notAvailableOnIOS,
+                      value: hasAndroidNativeFeatures() &&
+                          reminder.focusModeEnabled,
+                      onChanged: hasAndroidNativeFeatures()
+                          ? (value) => reminder.setFocusModeEnabled(value)
+                          : null,
                     ),
-                    if (reminder.focusModeEnabled)
+                    if (hasAndroidNativeFeatures() && reminder.focusModeEnabled)
                       const _FocusModePermissionBanner(),
                   ],
                 ),

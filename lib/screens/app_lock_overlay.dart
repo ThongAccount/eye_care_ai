@@ -7,6 +7,7 @@ import '../providers/language_provider.dart';
 import '../providers/usage_limit_provider.dart';
 import '../services/app_usage_monitor.dart';
 import '../theme/app_colors.dart';
+import '../utils/platform_capability.dart';
 
 /// Kênh native app-lock (MainActivity: canDrawOverlays / showTestOverlay ...).
 const MethodChannel _appLockChannel = MethodChannel('eye_care_ai/app_lock');
@@ -151,6 +152,28 @@ class AppLockSettingsSheetHost extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = context.watch<LanguageProvider>().strings;
     final provider = context.watch<UsageLimitProvider>();
+
+    // iOS không đọc được thời gian dùng mỗi app (không có Usage Access), nên
+    // giới hạn ngày không bao giờ chạm hạn mức. Hiện rõ trạng thái thay vì để
+    // công tắc/preset/các nút thử overlay nhìn như đang hoạt động.
+    if (!hasAndroidNativeFeatures()) {
+      return Scaffold(
+        appBar: AppBar(title: Text(strings.appLockSettingsTitle)),
+        body: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                strings.appLockUnavailableOnIOS,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.appLockSettingsTitle)),

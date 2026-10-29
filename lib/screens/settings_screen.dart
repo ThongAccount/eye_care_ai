@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../utils/app_icon.dart';
 import '../utils/permission_helper.dart';
+import '../utils/platform_capability.dart';
 import 'app_lock_overlay.dart';
 
 import '../models/app_strings.dart';
@@ -298,11 +299,13 @@ class SettingsScreen extends StatelessWidget {
                                     style: Theme.of(context).textTheme.titleSmall),
                                 const SizedBox(height: 4),
                                 Text(
-                                  theme.autoNightMode
-                                      ? (theme.tonightLabel != null
-                                          ? strings.nightModeOnWithTimes(theme.tonightLabel!)
-                                          : strings.nightModeOnFallback)
-                                      : strings.nightModeSubtitle,
+                                  hasAndroidNativeFeatures()
+                                      ? (theme.autoNightMode
+                                          ? (theme.tonightLabel != null
+                                              ? strings.nightModeOnWithTimes(theme.tonightLabel!)
+                                              : strings.nightModeOnFallback)
+                                          : strings.nightModeSubtitle)
+                                      : strings.notAvailableOnIOS,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -310,8 +313,13 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Switch.adaptive(
-                            value: theme.autoNightMode,
-                            onChanged: (v) => theme.setAutoNightMode(v),
+                            // iOS không có cảm biến ánh sáng + API đổi độ sáng
+                            // hệ thống, nên bật/tắt ở đây không tác dụng gì.
+                            value:
+                                hasAndroidNativeFeatures() && theme.autoNightMode,
+                            onChanged: hasAndroidNativeFeatures()
+                                ? (v) => theme.setAutoNightMode(v)
+                                : null,
                             activeTrackColor: Theme.of(context)
                                 .colorScheme
                                 .primary
@@ -1274,6 +1282,12 @@ Future<void> _showFontDialog(
   }
 }
 
+/// Các tile chỉ có trên Android — iOS không có màn hình cài đặt tương ứng cho
+/// Usage Access, nhận diện hoạt động, popup toàn màn hình hay tối ưu pin, nên
+/// hỏi/nhắc chúng ở đó chỉ là nút bấm vô tác dụng.
+List<Widget> androidOnly(List<Widget> children) =>
+    hasAndroidNativeFeatures() ? children : const [];
+
 // THÊM HÀM NÀY VÀO CUỐI FILE
 void _showPermissionSettings(BuildContext context) {
   final strings = context.read<LanguageProvider>().strings;
@@ -1299,6 +1313,9 @@ void _showPermissionSettings(BuildContext context) {
           }
 
           Map<String, bool> permissions = snapshot.data!;
+
+          // 4 quyền kia chỉ tồn tại trên Android — iOS không có màn hình cài
+          // đặt nào để mở, nên ẩn hẳn thay vì hiện tile lúc nào cũng "Chưa cấp".
 
           return StatefulBuilder(
             builder: (context, setState) {
@@ -1334,26 +1351,28 @@ void _showPermissionSettings(BuildContext context) {
 
                         const SizedBox(height: 24),
 
-                        _PermissionTile(
-                          icon: '📱',
-                          title: strings.permUsageTitle,
-                          description: strings.permUsageDesc,
-                          isGranted: permissions["usage"] ?? false,
-                          grantedLabel: strings.permGranted,
-                          notGrantedLabel: strings.permNotGranted,
-                          helpLabel: strings.permGuideButton,
-                          onHelp: () => _showUsagePermissionGuide(context, strings),
-                          onTap: () async {
-                            await PermissionHelper.requestUsagePermission();
+                        ...androidOnly([
+                          _PermissionTile(
+                            icon: '📱',
+                            title: strings.permUsageTitle,
+                            description: strings.permUsageDesc,
+                            isGranted: permissions["usage"] ?? false,
+                            grantedLabel: strings.permGranted,
+                            notGrantedLabel: strings.permNotGranted,
+                            helpLabel: strings.permGuideButton,
+                            onHelp: () => _showUsagePermissionGuide(context, strings),
+                            onTap: () async {
+                              await PermissionHelper.requestUsagePermission();
 
-                            permissions =
-                                await PermissionHelper.checkAllPermissions();
+                              permissions =
+                                  await PermissionHelper.checkAllPermissions();
 
-                            setState(() {});
-                          },
-                        ),
+                              setState(() {});
+                            },
+                          ),
 
-                        const Divider(),
+                          const Divider(),
+                        ]),
 
                         _PermissionTile(
                           icon: '📍',
@@ -1372,63 +1391,65 @@ void _showPermissionSettings(BuildContext context) {
                           },
                         ),
 
-                        const Divider(),
+                        ...androidOnly([
+                          const Divider(),
 
-                        _PermissionTile(
-                          icon: '🏃',
-                          title: strings.permActivityTitle,
-                          description: strings.permActivityDesc,
-                          isGranted: permissions["activity"] ?? false,
-                          grantedLabel: strings.permGranted,
-                          notGrantedLabel: strings.permNotGranted,
-                          onTap: () async {
-                            await PermissionHelper.requestActivityPermission();
+                          _PermissionTile(
+                            icon: '🏃',
+                            title: strings.permActivityTitle,
+                            description: strings.permActivityDesc,
+                            isGranted: permissions["activity"] ?? false,
+                            grantedLabel: strings.permGranted,
+                            notGrantedLabel: strings.permNotGranted,
+                            onTap: () async {
+                              await PermissionHelper.requestActivityPermission();
 
-                            permissions =
-                                await PermissionHelper.checkAllPermissions();
+                              permissions =
+                                  await PermissionHelper.checkAllPermissions();
 
-                            setState(() {});
-                          },
-                        ),
+                              setState(() {});
+                            },
+                          ),
 
-                        const Divider(),
+                          const Divider(),
 
-                        // Android 14+ có công tắc riêng "Hiển thị toàn màn
-                        // hình" cho từng app — nếu tắt, thông báo hết-giờ-
-                        // nghỉ-mắt chỉ hiện như thông báo thường thay vì bật
-                        // pop-up toàn màn hình giống báo thức. Luôn hiển thị
-                        // tile này (không kiểm tra trạng thái) vì không có
-                        // API công khai đọc được trạng thái công tắc đó.
-                        _PermissionTile(
-                          icon: '⏰',
-                          title: strings.permFullScreenAlertTitle,
-                          description: strings.permFullScreenAlertDesc,
-                          isGranted: true,
-                          grantedLabel: strings.permManage,
-                          notGrantedLabel: strings.permManage,
-                          onTap: () async {
-                            await NotificationService.instance.openFullScreenIntentSettings();
-                          },
-                        ),
+                          // Android 14+ có công tắc riêng "Hiển thị toàn màn
+                          // hình" cho từng app — nếu tắt, thông báo hết-giờ-
+                          // nghỉ-mắt chỉ hiện như thông báo thường thay vì bật
+                          // pop-up toàn màn hình giống báo thức. Luôn hiển thị
+                          // tile này (không kiểm tra trạng thái) vì không có
+                          // API công khai đọc được trạng thái công tắc đó.
+                          _PermissionTile(
+                            icon: '⏰',
+                            title: strings.permFullScreenAlertTitle,
+                            description: strings.permFullScreenAlertDesc,
+                            isGranted: true,
+                            grantedLabel: strings.permManage,
+                            notGrantedLabel: strings.permManage,
+                            onTap: () async {
+                              await NotificationService.instance.openFullScreenIntentSettings();
+                            },
+                          ),
 
-                        const Divider(),
+                          const Divider(),
 
-                        // Nhiều hãng máy (Xiaomi/OPPO/Vivo/Samsung...) tự
-                        // đóng băng app đứng yên trong nền để tiết kiệm pin,
-                        // khiến báo thức nghỉ mắt bị trễ hoặc im lặng dù đã
-                        // cấp đủ các quyền ở trên. Đây là công tắc quan
-                        // trọng nhất để "chạy nền" đáng tin cậy.
-                        _PermissionTile(
-                          icon: '🔋',
-                          title: strings.permBatteryTitle,
-                          description: strings.permBatteryDesc,
-                          isGranted: true,
-                          grantedLabel: strings.permManage,
-                          notGrantedLabel: strings.permManage,
-                          onTap: () async {
-                            await NotificationService.instance.requestIgnoreBatteryOptimizations();
-                          },
-                        ),
+                          // Nhiều hãng máy (Xiaomi/OPPO/Vivo/Samsung...) tự
+                          // đóng băng app đứng yên trong nền để tiết kiệm pin,
+                          // khiến báo thức nghỉ mắt bị trễ hoặc im lặng dù đã
+                          // cấp đủ các quyền ở trên. Đây là công tắc quan
+                          // trọng nhất để "chạy nền" đáng tin cậy.
+                          _PermissionTile(
+                            icon: '🔋',
+                            title: strings.permBatteryTitle,
+                            description: strings.permBatteryDesc,
+                            isGranted: true,
+                            grantedLabel: strings.permManage,
+                            notGrantedLabel: strings.permManage,
+                            onTap: () async {
+                              await NotificationService.instance.requestIgnoreBatteryOptimizations();
+                            },
+                          ),
+                        ]),
                       ],
                     ),
                   );

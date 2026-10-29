@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../providers/usage_limit_provider.dart';
 import '../services/device_data_service.dart';
+import '../utils/platform_capability.dart';
 
 /// Kênh native app-lock (MainActivity / AppLockOverlayManager).
 const MethodChannel _appLockChannel = MethodChannel('eye_care_ai/app_lock');
@@ -36,6 +37,9 @@ class AppUsageMonitor {
   /// Bounded timeout 6s giống mọi nguồn khác — lỗi → bỏ qua, KHÔNG bao giờ
   /// treo boot (xem quy tắc từ 749f37a).
   Future<void> check(UsageLimitProvider provider) async {
+    // iOS không có dữ liệu usage-access, nên hỏi native 60s/lần chỉ toàn lỗi.
+    if (!hasAndroidNativeFeatures()) return;
+
     // Tránh spam native query khi đã kiểm tra < 15s trước.
     final now = DateTime.now();
     if (_lastChecked != null && now.difference(_lastChecked!) < const Duration(seconds: 15)) {
