@@ -149,6 +149,12 @@
 - **Guardian copy** — the Settings line now matches reality: with a configured endpoint the app says it emails the guardian automatically; without one (every current build) it says it detects the limit in the background and opens your mail app.
 - **Stale docs** — `docs/web/handoff-legal-urls.md` no longer claims nothing was applied to `lib/`; `docs/growth/app-listing.md` carries the live marketing-site and privacy-policy URLs and a current grounding SHA.
 
+### Closed by the iOS honesty merge (`fix/ios-honest-features` → `main` @ `448087a`)
+
+- **iOS setup banner can never clear** (row `:152`) — now clears. iOS shows only applicable setup steps (notifications first, location second); non-applicable steps no longer linger as `true`, so the banner can dismiss. Seam: `lib/utils/platform_capability.dart` (`hasAndroidNativeFeatures`).
+- **iOS DND / focus button is a dead end** (row `:153`) — now honest. The focus toggle is disabled on iOS with a "not available on iOS" description, and `enable()` is guarded by the platform seam.
+- **iOS app-lock looks live-but-broken** (row `:154`) — now shows unavailable. The app-lock settings sheet shows unavailable text on iOS with no switches, presets or test overlay; the AI action handler returns "Focus mode is only available on Android." Tests: `platform_capability_test.dart`, `setup_provider_ios_test.dart`, `ios_honesty_widget_test.dart` (12 new, 76 total; CI run `40527003092` green).
+
 ### 🔐 G. Signing & key exposure — checked on the shipped build-98 artifacts
 
 | Check | Result |
