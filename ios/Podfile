@@ -40,5 +40,12 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # google_mlkit_* pods require iOS >= 15.5; the app-wide platform stays at 15.0.
+    if target.name.include?('MLKit')
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+      end
+    end
   end
 end
