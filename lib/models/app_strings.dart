@@ -322,7 +322,7 @@ class AppStrings {
   String get stepLabel => vi ? 'Bước' : 'Step';
 
   // ---------------- Bài tập mắt có hướng dẫn ----------------
-  String get eyeExerciseTitle => vi ? 'Bài tập thư giãn mắt' : 'Eye Exercises';
+  String get eyeExerciseTitle => vi ? 'Bài tập mắt' : 'Eye exercises';
   String get eyeExerciseSubtitle => vi
       ? 'Nhìn theo chấm di chuyển, chớp mắt chủ động — khoảng 80 giây'
       : 'Follow the moving dot and blink actively — about 80 seconds';
@@ -362,53 +362,6 @@ class AppStrings {
     final tips = vi ? viTips : enTips;
     return tips[i.clamp(0, tips.length - 1)];
   }
-
-  String get eyeExerciseGuidedTitle =>
-      vi ? 'Bài tập mắt có hướng dẫn' : 'Guided sequence';
-
-  // ---------------- Individual eye exercises ----------------
-  String get eyeExerciseToday => vi ? 'Thời gian tập hôm nay' : 'Exercise time today';
-  String get eyeExerciseChoose => vi ? 'Chọn bài tập' : 'Choose an exercise';
-  String get eyeExerciseCompleted =>
-      vi ? 'Hoàn thành bài tập. Nghỉ mắt thật tốt!' : 'Exercise completed. Rest your eyes!';
-  String get eyeExerciseStop => vi ? 'Dừng bài tập' : 'Stop exercise';
-  String get eyeExerciseSafety => vi
-      ? 'Thực hiện nhẹ nhàng; dừng lại nếu đau mắt, đau đầu hoặc chóng mặt.'
-      : 'Move gently; stop if you experience eye pain, headache, or dizziness.';
-  String get minuteUnit => vi ? 'phút' : 'minutes';
-  String get secondUnit => vi ? 'giây' : 'seconds';
-
-  String get eyeExerciseBlinkTitle => vi ? 'Chớp mắt có kiểm soát' : 'Controlled blinking';
-  String get eyeExerciseBlinkBody => vi
-      ? 'Giúp mắt bớt khô và phân bổ lại lớp nước mắt.'
-      : 'Helps reduce dryness and refresh the tear film.';
-  String get eyeExerciseBlinkInstruction => vi
-      ? 'Nhắm nhẹ mắt trong 2 giây, rồi mở bình thường. Chớp chậm liên tục trong suốt thời gian đếm.'
-      : 'Close gently for 2 seconds, then open normally. Continue slow, complete blinks while the timer runs.';
-
-  String get eyeExerciseFocusTitle => vi ? 'Nhìn xa — nhìn gần' : 'Far–near focusing';
-  String get eyeExerciseFocusBody => vi
-      ? 'Luân phiên điều tiết mắt theo hai khoảng cách.'
-      : 'Alternate focus between a near object and a distant view.';
-  String get eyeExerciseFocusInstruction => vi
-      ? 'Cứ 5 giây: nhìn ngón tay cách mặt 20-30cm, sau đó nhìn xa qua cửa sổ hoặc hướng lên bầu trời.'
-      : 'Every 5 seconds: focus on a finger 20-30cm away, then shift to something far away outdoors or across the room.';
-
-  String get eyeExerciseMovementTitle => vi ? 'Di chuyển mắt theo hướng' : 'Eye movement exercise';
-  String get eyeExerciseMovementBody => vi
-      ? 'Vẽ tròn, nhìn trái — phải — lên — xuống chậm rãi.'
-      : 'Move gently left, right, up, down, and in circles.';
-  String get eyeExerciseMovementInstruction => vi
-      ? 'Giữ đầu cố định. Nhìn chậm sang trái, phải, lên, xuống rồi vẽ một vòng tròn theo chiều kim đồng hồ.'
-      : 'Keep your head still. Slowly look left, right, up, down, then trace a circle clockwise.';
-
-  String get eyeExerciseRelaxTitle => vi ? 'Nghỉ sâu bằng bàn tay' : 'Palming relaxation';
-  String get eyeExerciseRelaxBody => vi
-      ? 'Che mắt bằng lòng bàn tay để thư giãn trong bóng tối.'
-      : 'Cover the eyes with warm palms for a short relaxation.';
-  String get eyeExerciseRelaxInstruction => vi
-      ? 'Rời màn hình, đặt lòng bàn tay lên mắt đã nhắm. Thở chậm và để mắt thư giãn trong bóng tối.'
-      : 'Step away from the screen and place your palms over closed eyes. Breathe slowly and relax in darkness.';
 
   // ---------------- Kiểm tra mắt: Tumbling E ----------------
   String get eyeTestIntroTitle => vi ? 'Kiểm tra thị lực nhanh' : 'Quick vision check';
